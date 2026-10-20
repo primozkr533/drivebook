@@ -25,7 +25,8 @@ test("dev inbox shows an e-mail captured by the fake provider", async ({ page })
   const message = page.getByTestId("inbox-message").filter({ hasText: `Povabilo ${marker}` });
   await expect(message).toBeVisible();
   await expect(message.getByText(`kupec-${marker}@example.si`)).toBeVisible();
-  await expect(message.getByTestId("inbox-link")).toHaveAttribute("href", link);
+  await expect(message.getByTestId("inbox-link")).toHaveText(link);
+  await expect(message.getByTestId("inbox-link")).toHaveAttribute("href", `/_dev/app/set-password?token=${marker}`);
 
   await message.getByRole("button", { name: "Prikaži HTML" }).click();
   await expect(message.frameLocator("iframe").getByText(`Povabilo ${marker}`)).toBeVisible();
