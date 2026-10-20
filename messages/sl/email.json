@@ -2,6 +2,7 @@
   "title": "E-pošta",
   "platformName": "DriveBook",
   "footer": "To sporočilo je bilo poslano na {recipientEmail}. Če ga niste pričakovali, ga lahko prezrete.",
+  "expiresAt": "{date} ob {time}",
   "linkFallback": "Če gumb ne deluje, kopirajte to povezavo v brskalnik:",
   "surface": {
     "dealer": "skrbništvo trgovca",
