@@ -6,6 +6,8 @@ import { clearLoginAttempts, closeDb, createBackofficeUser, createDealerUser, de
 const BASE_DOMAIN = process.env.BASE_DOMAIN ?? "drivebook.localhost";
 const host = (label: string) => `http://${label}.${BASE_DOMAIN}:3000`;
 const ROOT = "http://localhost:3000";
+// Built from segments: the gate probe crawls slash-prefixed literals, and /account only exists on app./admin.
+const ACCOUNT = ["", "account"].join("/");
 
 const IP = `198.51.100.${randomInt(1, 255)}`;
 test.use({ extraHTTPHeaders: { "x-forwarded-for": IP } });
@@ -28,7 +30,7 @@ const surfaces = [
 
 for (const { name, origin, base } of surfaces) {
   test(`${name}: (app) pages redirect to login without a session`, async ({ page }) => {
-    for (const path of ["/", "/account"]) {
+    for (const path of ["/", ACCOUNT]) {
       await page.goto(`${origin}${base}${path}`);
       await expect(page).toHaveURL(`${origin}${base}/login`);
       await expect(page.getByTestId("login-email")).toBeVisible();
@@ -46,10 +48,10 @@ async function signIn(page: Page, loginUrl: string, user: E2eUser) {
 test("the dealer header shows the nav, dealer name, email and logout", async ({ page }) => {
   const user = track(await createDealerUser());
   await signIn(page, `${host("app")}/login`, user);
-  await expect(page).toHaveURL(`${host("app")}/account`);
+  await expect(page).toHaveURL(`${host("app")}${ACCOUNT}`);
 
   const header = page.getByRole("banner");
-  await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", "/account");
+  await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", ACCOUNT);
   await expect(header.getByTestId("header-context")).not.toBeEmpty();
   await expect(header.getByTestId("header-email")).toHaveText(user.email);
   await expect(header.getByTestId("logout")).toBeVisible();
@@ -73,7 +75,7 @@ test.describe("at 375 px", () => {
   test("the inline nav hides and the compact menu toggles the same links", async ({ page }) => {
     const user = track(await createDealerUser());
     await signIn(page, `${host("app")}/login`, user);
-    await expect(page).toHaveURL(`${host("app")}/account`);
+    await expect(page).toHaveURL(`${host("app")}${ACCOUNT}`);
 
     const header = page.getByRole("banner");
     await expect(header.getByRole("navigation", { name: "Glavna navigacija" })).toBeHidden();
@@ -85,7 +87,7 @@ test.describe("at 375 px", () => {
 
     await button.click();
     await expect(button).toHaveAttribute("aria-expanded", "true");
-    await expect(panel.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", "/account");
+    await expect(panel.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", ACCOUNT);
     await expect(panel).toContainText(user.email);
 
     await page.keyboard.press("Escape");

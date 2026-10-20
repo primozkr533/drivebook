@@ -3,7 +3,15 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dealers, dealerSlugHistory, plans } from "@/db/schema";
 import { setDbForTests } from "@/server/data/db";
 import { resolveDealerSlug, type ResolvedDealerSlug } from "@/server/data/dealers";
-import { NOT_FOUND_PATH, requestHost, routeRequest, type RouteConfig } from "@/server/routing";
+import {
+  NOT_FOUND_PATH,
+  requestHost,
+  routeRequest,
+  TEST_LOGIN_PATH,
+  sessionCookieSecure,
+  testLoginRedirect,
+  type RouteConfig,
+} from "@/server/routing";
 import { getTestDb, truncateAll } from "../setup/db";
 
 function config(overrides: Partial<RouteConfig> = {}): RouteConfig {
@@ -154,6 +162,60 @@ describe("routeRequest: 404s and isolation", () => {
       location: "/backoffice/login",
     });
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
+  });
+});
+
+describe("routeRequest: gate-only test login", () => {
+  it("passes the test login through untouched on app. and non-dealer hosts", async () => {
+    expect(await route("app.drivebook.localhost", TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+    expect(await route("app.drivebook.localhost:3000", TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+    for (const host of ["localhost:3000", "web:3000", "drivebook.localhost"]) {
+      expect(await route(host, TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+      expect(await route(host, TEST_LOGIN_PATH, config({ devAliases: false }))).toEqual({ kind: "next" });
+    }
+  });
+
+  it("only passes the exact path through on app.", async () => {
+    expect(await route("app.drivebook.localhost", `${TEST_LOGIN_PATH}/x`)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/dealer-admin${TEST_LOGIN_PATH}/x`,
+    });
+  });
+
+  it("does not pass it through on dealer or admin. hosts", async () => {
+    expect(await route("demo.drivebook.localhost", TEST_LOGIN_PATH)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/site/demo${TEST_LOGIN_PATH}`,
+    });
+    expect(await route("admin.drivebook.localhost", TEST_LOGIN_PATH)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/backoffice${TEST_LOGIN_PATH}`,
+    });
+  });
+
+  it("redirects to the dealer admin home for the host, and refuses dealer and admin. hosts", () => {
+    const base = "drivebook.localhost";
+    expect(testLoginRedirect("app.drivebook.localhost:3000", base)).toBe("/");
+    expect(testLoginRedirect("localhost:3000", base)).toBe("/_dev/app");
+    expect(testLoginRedirect("drivebook.localhost", base)).toBe("/_dev/app");
+    expect(testLoginRedirect("demo.drivebook.localhost", base)).toBeNull();
+    expect(testLoginRedirect("admin.drivebook.localhost", base)).toBeNull();
+  });
+});
+
+describe("sessionCookieSecure", () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+
+  it("stays Secure on https, localhost and *.localhost", () => {
+    expect(sessionCookieSecure(h({ host: "localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "app.drivebook.localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "https" }), true)).toBe(true);
+  });
+
+  it("drops Secure only on plain-http non-localhost hosts with dev aliases on", () => {
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), false)).toBe(true);
   });
 });
 

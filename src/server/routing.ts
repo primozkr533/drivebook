@@ -6,6 +6,7 @@ export const BASE_PATH_HEADER = "x-drivebook-base-path";
 export const NOT_FOUND_PATH = ["", "_404"].join("/");
 export const DEV_INDEX_PATH = "/dev";
 export const DEV_INBOX_PATH = "/dev/inbox";
+export const TEST_LOGIN_PATH = "/api/test/login";
 
 // Root-host paths that, with dev aliases on, redirect to the alias that actually serves them.
 const DEV_REDIRECTS: [string, string][] = [
@@ -61,6 +62,23 @@ function surface(internal: "/dealer-admin" | "/backoffice", path: string, search
   return { kind: "rewrite", pathname: `${internal}${path}`, search, headers: { [BASE_PATH_HEADER]: aliasPrefix } };
 }
 
+// Where the gate-only test login sends the browser; null on dealer and admin. hosts, where it does not exist.
+export function testLoginRedirect(host: string, baseDomain: string): string | null {
+  const { hostname } = splitHost(host);
+  if (hostname === `app.${baseDomain}`) return "/";
+  if (hostname.endsWith(`.${baseDomain}`)) return null;
+  return "/_dev/app";
+}
+
+// Browsers drop Secure cookies set over plain http except on localhost, so dev-alias hosts such as
+// http://web:3000 get a non-Secure session cookie. Production (no dev aliases) is always Secure.
+export function sessionCookieSecure(headers: Headers, devAliases: boolean): boolean {
+  if (!devAliases) return true;
+  if (headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() === "https") return true;
+  const { hostname } = splitHost(requestHost(headers));
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
 async function dealerSite(
   slug: string,
   path: string,
@@ -81,7 +99,9 @@ export async function routeRequest(host: string, pathname: string, search: strin
 
   if (hostname.endsWith(`.${base}`)) {
     const label = hostname.slice(0, -(base.length + 1));
-    if (label === "app") return surface("/dealer-admin", pathname, search);
+    if (label === "app") {
+      return pathname === TEST_LOGIN_PATH ? { kind: "next" } : surface("/dealer-admin", pathname, search);
+    }
     if (label === "admin") return surface("/backoffice", pathname, search);
     const protocol = cfg.protocol ?? "http:";
     return dealerSite(
