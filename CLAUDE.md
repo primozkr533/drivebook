@@ -46,6 +46,12 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `RUN_MIGRATIONS_ON_START` — apply pending migrations when the server starts
 - `SEED_ON_START` — run the idempotent seed (default plan, superadmin, demo dealer) when the server starts
 - `SEED_SUPERADMIN_EMAIL` — email of the superadmin account created by the seed
+- `AUTH_SECRET` — secret (≥ 32 chars) that encrypts TOTP secrets at rest and signs the TOTP pending token; required in production
+- `FARM_TEST_AUTH` — `1` enables the gate-only test login route (off by default)
+- `DEV_INBOX_ENABLED` — `1` serves the dev inbox in production (always on outside production)
+- `NOTIFY_FAKE` — `1` forces the fake SMS/e-mail adapters even when provider keys are present
+- `PUBLIC_URL_SCHEME` — `https` (default) or `http` (dev); scheme for absolute links in e-mails
+- `PUBLIC_URL_PORT` — optional port appended to absolute links (`3000` in dev, empty in production)
 - `TWILIO_ACCOUNT_SID` — Twilio account SID for SMS
 - `TWILIO_AUTH_TOKEN` — Twilio auth token
 - `TWILIO_FROM_NUMBER` — Twilio sender number (E.164)
