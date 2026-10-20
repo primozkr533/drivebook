@@ -55,7 +55,7 @@ describe("runSeed", () => {
     expect(demoCars.map((car) => car.id).sort()).toEqual(Object.values(DEMO_CAR_IDS).sort());
 
     const hours = await db.select().from(openingHours).where(eq(openingHours.dealerId, dealer.id));
-    expect(hours).toHaveLength(6);
+    expect(hours).toHaveLength(11);
     expect([...new Set(hours.map((h) => h.isoWeekday))].sort()).toEqual([1, 2, 3, 4, 5, 6]);
 
     const users = await db.select().from(dealerUsers).where(eq(dealerUsers.dealerId, dealer.id));
@@ -85,7 +85,7 @@ describe("runSeed", () => {
     await runSeed(db);
     const again = await Promise.all(tables.map((table) => rowCount(table)));
     expect(again).toEqual(first);
-    expect(first).toEqual([1, 1, 4, 2, 1, 6, 1]);
+    expect(first).toEqual([1, 1, 4, 2, 1, 11, 1]);
   });
 
   it("keeps rows the user added", async () => {
