@@ -1,0 +1,146 @@
+/* ==========================================================================
+   DriveBook design tokens — SINGLE SOURCE OF TRUTH
+   Aesthetic: "Signal & Tarmac" — road-infrastructure geometry. Warm-graphite
+   asphalt neutrals, one hot signal orange, expanded grotesk caps, hairline
+   rules and chamfered (plate-cut) corners.
+
+   Every colour is declared once with light-dark(light, dark). The active
+   world is chosen by `color-scheme`: system preference by default, forced
+   with <html data-theme="light|dark">.
+
+   Tailwind utilities are generated from these in src/app/globals.css
+   (@theme inline). Components read tokens — never literals.
+   ========================================================================== */
+
+:root,
+[data-theme] {
+  color-scheme: light dark;
+
+  /* ---- Palette: neutrals (asphalt, biased ~35° toward the signal hue) --- */
+  --ground:       light-dark(#F2F1EE, #13110F); /* page ground              */
+  --surface:      light-dark(#FBFAF8, #1C1A17); /* cards, inputs            */
+  --surface-2:    light-dark(#E8E6E2, #0C0B0A); /* sunken wells, tracks     */
+  --ink:          light-dark(#17140F, #F2EFEA); /* primary text, hard rules */
+  --ink-2:        light-dark(#3B3631, #CEC8BF); /* secondary text           */
+  --muted:        light-dark(#6F6862, #8F877E); /* captions, placeholders   */
+  --line:         light-dark(#D8D4CE, #33302B); /* hairlines, borders       */
+  --line-strong:  light-dark(#17140F, #F2EFEA); /* geometric rules          */
+
+  /* ---- Palette: the one loud move ---------------------------------------- */
+  --signal:       light-dark(#FF4F0F, #FF5C1F); /* fills: buttons, markers  */
+  --signal-ink:   light-dark(#B83A06, #FF8A55); /* signal-coloured TEXT     */
+  --signal-wash:  light-dark(#FFE2D4, #3A1B0D); /* tinted backgrounds       */
+  --on-signal:    #17140F;                       /* text on signal: always ink (≥6:1) */
+
+  /* ---- Palette: status (muted so they never compete with signal) -------- */
+  --ok:           light-dark(#1E6B47, #5CC394);
+  --ok-wash:      light-dark(#DCEDE3, #12291E);
+  --warn:         light-dark(#8A5D00, #E3B341);
+  --warn-wash:    light-dark(#F5E9CC, #2E2410);
+  --danger:       light-dark(#A3123A, #FF6B8B);  /* crimson, distinct from signal */
+  --danger-wash:  light-dark(#F6D9E0, #33121C);
+
+  /* ---- Dealer brand slot --------------------------------------------------
+     Public pages paint brand surfaces with --brand. A dealer's primary colour
+     overrides it inline (style={{'--brand': hex, '--on-brand': readableInk(hex)}});
+     never hardcode a dealer colour. Defaults to the platform signal.           */
+  --brand:        var(--signal);
+  --on-brand:     var(--on-signal);
+
+  /* ---- Type -------------------------------------------------------------- */
+  --font-display: "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body:    "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --stretch-display: 125%;   /* expanded — the display register          */
+  --stretch-body:    100%;
+  --weight-display:  800;
+  --weight-strong:   650;
+  --weight-body:     420;
+
+  /* size / line-height / tracking */
+  --text-mega:   clamp(2.25rem, 1rem + 5vw, 5.5rem);    --lh-mega: 0.92;   --track-mega: -0.035em;
+  --text-d1:     clamp(2.25rem, 1.6rem + 2.6vw, 3.75rem); --lh-d1: 0.98; --track-d1: -0.03em;
+  --text-h1:     clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);  --lh-h1: 1.05; --track-h1: -0.02em;
+  --text-h2:     1.5rem;    --lh-h2: 1.15;  --track-h2: -0.015em;
+  --text-h3:     1.125rem;  --lh-h3: 1.25;  --track-h3: -0.005em;
+  --text-lead:   1.1875rem; --lh-lead: 1.5;
+  --text-body:   1rem;      --lh-body: 1.55;
+  --text-small:  0.875rem;  --lh-small: 1.45;
+  --text-code:   0.8125rem; --lh-code: 1.4;  /* mono values: times, URLs */
+  --text-caption: 0.75rem;  --lh-caption: 1.4;
+  --text-micro:  0.6875rem; --lh-micro: 1.3; --track-micro: 0.14em; /* mono caps */
+
+  /* ---- Space (4px grid) -------------------------------------------------- */
+  --space-unit: 0.25rem;
+  --space-1: 0.25rem;  /*  4 */
+  --space-2: 0.5rem;   /*  8 */
+  --space-3: 0.75rem;  /* 12 */
+  --space-4: 1rem;     /* 16 */
+  --space-5: 1.5rem;   /* 24 */
+  --space-6: 2rem;     /* 32 */
+  --space-7: 3rem;     /* 48 */
+  --space-8: 4rem;     /* 64 */
+  --space-9: 6rem;     /* 96 */
+
+  /* ---- Layout ------------------------------------------------------------ */
+  --container-max: 78rem;                       /* 1248px content width */
+  --container-narrow: 44rem;                    /* forms, reading       */
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
+  --header-h: 4rem;
+
+  /* ---- Shape: sharp by default, chamfer is the signature cut ------------ */
+  --radius-sharp: 0;
+  --radius-soft:  3px;      /* inputs, buttons — barely softened   */
+  --radius-pill:  999px;    /* pills/badges only                   */
+  --cut:          10px;     /* chamfer on signature corners        */
+  --cut-lg:       22px;
+  --rule:         1px;      /* hairline                            */
+  --rule-bold:    2px;      /* active / focused / selected         */
+
+  /* ---- Elevation: hard offset shadows, not blur clouds ------------------ */
+  --shadow-none:  none;
+  --shadow-hard:  4px 4px 0 0 var(--ink);
+  --shadow-hard-signal: 6px 6px 0 0 var(--signal);
+  --shadow-float: 0 1px 0 var(--line), 0 12px 32px -12px light-dark(rgb(23 20 15 / 0.22), rgb(0 0 0 / 0.6));
+
+  /* ---- Motion ------------------------------------------------------------ */
+  --ease-out:   cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-snap:  cubic-bezier(0.5, 0, 0.1, 1);
+  --dur-fast:   120ms;
+  --dur-base:   220ms;
+  --dur-reveal: 640ms;
+
+  /* ---- Focus ------------------------------------------------------------- */
+  --focus-ring: 0 0 0 2px var(--ground), 0 0 0 4px var(--signal);
+
+  /* ---- shadcn/ui aliases — so `npx shadcn add …` inherits the system ---- */
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--signal);
+  --primary-foreground: var(--on-signal);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent: var(--signal-wash);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--signal);
+  --radius: var(--radius-soft);
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+/* Scoped worlds (e.g. a dark panel inside a light page) */
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"]  { color-scheme: dark; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-reveal: 0ms; }
+}
