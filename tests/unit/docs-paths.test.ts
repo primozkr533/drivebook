@@ -6,7 +6,7 @@ const docs = ["CLAUDE.md", "README.md"];
 
 function documentedPaths(doc: string): string[] {
   const text = readFileSync(join(process.cwd(), doc), "utf8");
-  const tokens = [...text.matchAll(/`([^`\s]+)`/g)].map((m) => m[1]);
+  const tokens = [...text.matchAll(new RegExp("`([^`\\s]+)`", "g"))].map((m) => m[1]);
   return [
     ...new Set(tokens.filter((t) => /^(src|tests|messages|drizzle)\/|^\.env\.example$/.test(t) && !/[*{]/.test(t))),
   ];

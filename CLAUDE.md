@@ -68,12 +68,12 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 ## Routing
 Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired up by `src/proxy.ts`.
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
-- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to `/login`)
+- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to the login page)
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
 - Internal links on the dealer site are prefixed with the `x-drivebook-base-path` request header (empty on a real subdomain, `/_dev/site/{slug}` via the dev alias)
-- The gate's browser probe crawls path literals in the repo (including tests): build deliberately-missing paths in tests from segments (`["", "_dev", "other"].join("/")`), never as a `"/..."` literal
+- The gate's browser probe crawls path literals in the repo (including tests): build deliberately-missing paths in tests from segments (`["", "_dev", "other"].join("/")`), never as a quoted slash-prefixed literal
 
 ## Design system
 
@@ -93,7 +93,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 3. New shared components **compose** primitives; they never restyle them. Don't fork a Button to change its look — add a variant in `Button.tsx` if one is truly needed.
 4. One loud move per screen: `signal` (or `brand` on public pages) for the primary action/selection only. Status colours (`ok`/`warn`/`danger`) are for status, never decoration. Display type (`Heading size="mega"|"d1"|"h1"`) at most once per screen.
 5. Dealer branding goes through the `--brand` / `--on-brand` slot: wrap the public page in `style={brandStyle(dealer.primaryColor)}` and use `bg-brand text-on-brand` / `Button variant="brand"`. Never compute contrast ad hoc; never put a dealer colour anywhere else.
-6. shadcn/ui components added later inherit via the alias variables in `tokens.css` (`--background`, `--primary`, `--ring`…); after `npx shadcn add`, replace any `rounded-md`/default classes with token utilities.
+6. shadcn/ui components added later inherit via the alias variables in `tokens.css` (`--background`, `--primary`, `--ring`…); after `npx shadcn add`, replace any `rounded-md` and other default classes with token utilities.
 7. Text: all user-facing strings come from next-intl translation files in feature code (the `/design` specimen content in `src/app/design/content.ts` is the only exception). Times/dates are pre-formatted for Europe/Ljubljana by the date utility and passed into components — components never read the clock.
 8. Accessibility: keep the `:focus-visible` ring (`--focus-ring`), text contrast ≥ 4.5:1 (use `signal-ink`, not `signal`, for orange TEXT), real labels on every field (`Input label=…`).
 

@@ -42,7 +42,7 @@ describe("routeRequest: hosts", () => {
       search: "",
       headers: { "x-drivebook-base-path": "" },
     });
-    expect(await route("demo.drivebook.localhost:3000", "/zasebnost")).toMatchObject({
+    expect(await route("demo.drivebook.localhost:3000", path("zasebnost"))).toMatchObject({
       pathname: "/site/demo/zasebnost",
     });
   });
@@ -62,14 +62,14 @@ describe("routeRequest: hosts", () => {
   });
 
   it("redirects app. and admin. roots to /login and rewrites their paths", async () => {
-    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: "/login" });
-    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: "/login" });
-    expect(await route("app.drivebook.localhost", "/login")).toEqual({
+    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
+    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
+    expect(await route("app.drivebook.localhost", path("login"))).toEqual({
       kind: "rewrite",
       pathname: "/dealer-admin/login",
       search: "",
     });
-    expect(await route("admin.drivebook.localhost", "/login?next=x")).toEqual({
+    expect(await route("admin.drivebook.localhost", `${path("login")}?next=x`)).toEqual({
       kind: "rewrite",
       pathname: "/backoffice/login",
       search: "?next=x",
