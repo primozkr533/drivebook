@@ -29,8 +29,8 @@ Then open:
 | --- | --- |
 | http://localhost:3000 | redirects to `/design` (design showcase) |
 | http://demo.drivebook.localhost:3000 | public page of the demo dealer |
-| http://app.drivebook.localhost:3000 | dealer admin (login placeholder) |
-| http://admin.drivebook.localhost:3000 | backoffice (login placeholder) |
+| http://app.drivebook.localhost:3000 | dealer admin (login) |
+| http://admin.drivebook.localhost:3000 | backoffice (login) |
 | http://avtohisa-demo.drivebook.localhost:3000 | old slug demo — 301-redirects to `demo.drivebook.localhost` |
 
 `*.localhost` resolves to 127.0.0.1 in Chrome, Firefox and Edge with no hosts-file edits. curl does not do this, so send the Host header yourself:
