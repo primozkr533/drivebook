@@ -52,6 +52,7 @@ test("the dealer header shows the nav, dealer name, email and logout", async ({ 
 
   const header = page.getByRole("banner");
   await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", ACCOUNT);
+  await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("aria-current", "page");
   await expect(header.getByTestId("header-context")).not.toBeEmpty();
   await expect(header.getByTestId("header-email")).toHaveText(user.email);
   await expect(header.getByTestId("logout")).toBeVisible();
@@ -65,6 +66,7 @@ test("the backoffice header under the dev alias links within the alias", async (
 
   const header = page.getByRole("banner");
   await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", "/_dev/admin/account");
+  await expect(header.getByRole("link", { name: account.navAccount })).toHaveAttribute("aria-current", "page");
   await expect(header.getByTestId("header-email")).toHaveText(user.email);
   await expect(header.getByTestId("logout")).toBeVisible();
 });
@@ -88,6 +90,7 @@ test.describe("at 375 px", () => {
     await button.click();
     await expect(button).toHaveAttribute("aria-expanded", "true");
     await expect(panel.getByRole("link", { name: account.navAccount })).toHaveAttribute("href", ACCOUNT);
+    await expect(panel.getByRole("link", { name: account.navAccount })).toHaveAttribute("aria-current", "page");
     await expect(panel).toContainText(user.email);
 
     await page.keyboard.press("Escape");
