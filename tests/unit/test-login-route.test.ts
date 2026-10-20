@@ -89,6 +89,13 @@ describe("POST /api/test/login", () => {
     expect(await res.json()).toMatchObject({ ok: true, redirect: "/" });
   });
 
+  it("drops Secure on a plain-http non-localhost dev host such as the farm's web:3000", async () => {
+    enable();
+    const res = await post("web:3000");
+    expect(await res.json()).toMatchObject({ ok: true, redirect: "/_dev/app" });
+    expect(jar.get(SESSION_COOKIE.dealer)?.options).toEqual({ ...SESSION_COOKIE_OPTIONS, secure: false });
+  });
+
   it("rejects other surfaces", async () => {
     enable();
     for (const body of [JSON.stringify({ surface: "backoffice" }), "not json", "[1]"]) {

@@ -1,8 +1,10 @@
 import { and, eq, gt, ne } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { getConfig } from "@/lib/config";
 import { backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers } from "@/db/schema";
 import { createDealerContext, type DealerContext } from "@/server/data/context";
 import { db } from "@/server/data/db";
+import { sessionCookieSecure } from "@/server/routing";
 import { hashToken, newOpaqueToken } from "./tokens";
 
 export type AuthSurface = "dealer" | "backoffice";
@@ -69,12 +71,30 @@ export async function createSession(
   return token;
 }
 
-export async function setSessionCookie(surface: AuthSurface, token: string): Promise<void> {
-  (await cookies()).set(SESSION_COOKIE[surface], token, SESSION_COOKIE_OPTIONS);
+export type SessionCookieOverride = { secure?: boolean };
+
+async function cookieOptions(override: SessionCookieOverride = {}) {
+  let secure = override.secure;
+  if (secure === undefined) {
+    try {
+      secure = sessionCookieSecure(await headers(), getConfig().devAliases);
+    } catch {
+      secure = true;
+    }
+  }
+  return secure ? SESSION_COOKIE_OPTIONS : { ...SESSION_COOKIE_OPTIONS, secure: false };
+}
+
+export async function setSessionCookie(
+  surface: AuthSurface,
+  token: string,
+  override?: SessionCookieOverride,
+): Promise<void> {
+  (await cookies()).set(SESSION_COOKIE[surface], token, await cookieOptions(override));
 }
 
 export async function clearSessionCookie(surface: AuthSurface): Promise<void> {
-  (await cookies()).set(SESSION_COOKIE[surface], "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+  (await cookies()).set(SESSION_COOKIE[surface], "", { ...(await cookieOptions()), maxAge: 0 });
 }
 
 export async function validateSessionToken<S extends AuthSurface>(
@@ -154,7 +174,7 @@ export async function getCurrentSession<S extends AuthSurface>(surface: S): Prom
   const result = await validateSessionToken(surface, token);
   if (result?.session.refreshed) {
     try {
-      store.set(SESSION_COOKIE[surface], token, SESSION_COOKIE_OPTIONS);
+      store.set(SESSION_COOKIE[surface], token, await cookieOptions());
     } catch {
       // Server Components cannot set cookies; the next action or route handler will.
     }

@@ -1,7 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { setSessionCookie } from "@/server/auth/session";
 import { testLoginDemoOwner } from "@/server/auth/test-login";
-import { requestHost, testLoginRedirect } from "@/server/routing";
+import { requestHost, sessionCookieSecure, testLoginRedirect } from "@/server/routing";
 
 const notFound = () => new Response(null, { status: 404 });
 
@@ -19,7 +19,7 @@ async function requestedSurface(request: Request): Promise<string | null> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const { farmTestAuth, baseDomain } = getConfig();
+  const { farmTestAuth, baseDomain, devAliases } = getConfig();
   if (!farmTestAuth) return notFound();
   const redirect = testLoginRedirect(requestHost(request.headers), baseDomain);
   if (redirect === null) return notFound();
@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!result) return Response.json({ ok: false, error: "demo_owner_missing" }, { status: 500 });
 
-  await setSessionCookie("dealer", result.token);
+  await setSessionCookie("dealer", result.token, { secure: sessionCookieSecure(request.headers, devAliases) });
   return Response.json({
     ok: true,
     user: { email: result.email, role: result.role },

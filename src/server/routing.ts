@@ -70,6 +70,15 @@ export function testLoginRedirect(host: string, baseDomain: string): string | nu
   return "/_dev/app";
 }
 
+// Browsers drop Secure cookies set over plain http except on localhost, so dev-alias hosts such as
+// http://web:3000 get a non-Secure session cookie. Production (no dev aliases) is always Secure.
+export function sessionCookieSecure(headers: Headers, devAliases: boolean): boolean {
+  if (!devAliases) return true;
+  if (headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() === "https") return true;
+  const { hostname } = splitHost(requestHost(headers));
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
 async function dealerSite(
   slug: string,
   path: string,

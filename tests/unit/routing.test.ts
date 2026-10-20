@@ -8,6 +8,7 @@ import {
   requestHost,
   routeRequest,
   TEST_LOGIN_PATH,
+  sessionCookieSecure,
   testLoginRedirect,
   type RouteConfig,
 } from "@/server/routing";
@@ -199,6 +200,22 @@ describe("routeRequest: gate-only test login", () => {
     expect(testLoginRedirect("drivebook.localhost", base)).toBe("/_dev/app");
     expect(testLoginRedirect("demo.drivebook.localhost", base)).toBeNull();
     expect(testLoginRedirect("admin.drivebook.localhost", base)).toBeNull();
+  });
+});
+
+describe("sessionCookieSecure", () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+
+  it("stays Secure on https, localhost and *.localhost", () => {
+    expect(sessionCookieSecure(h({ host: "localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "app.drivebook.localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "https" }), true)).toBe(true);
+  });
+
+  it("drops Secure only on plain-http non-localhost hosts with dev aliases on", () => {
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), false)).toBe(true);
   });
 });
 

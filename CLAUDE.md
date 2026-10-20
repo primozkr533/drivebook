@@ -71,7 +71,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
   - Exists only when `FARM_TEST_AUTH=1` (`getConfig().farmTestAuth`). Otherwise it responds 404 (exactly as an unknown route).
   - Request body: none required. An optional JSON `{ "surface": "dealer" }` is accepted; only `dealer` is supported.
   - Response 200 JSON: `{ "ok": true, "user": { "email": string, "role": "owner" }, "dealerSlug": string, "redirect": string }`. `redirect` is the dealer admin home for the request host (`/` on `app.` hosts, `/_dev/app` on non-dealer dev hosts).
-  - Sets the normal dealer session cookie `db_app_session` (httpOnly, Secure, SameSite=Lax, host-only) via `createSession` + `setSessionCookie` from `src/server/auth/session.ts`.
+  - Sets the normal dealer session cookie `db_app_session` (httpOnly, Secure, SameSite=Lax, host-only) via `createSession` + `setSessionCookie` from `src/server/auth/session.ts`. Exception: with dev aliases on (never in production), a plain-http request on a host other than `localhost`/`*.localhost` (e.g. `http://web:3000`) gets the cookie without `Secure`, since browsers drop Secure cookies set over http there (`sessionCookieSecure` in `src/server/routing.ts`; the login form follows the same rule).
   - Is not available on dealer subdomain hosts (404).
 
 ## Tenant isolation
