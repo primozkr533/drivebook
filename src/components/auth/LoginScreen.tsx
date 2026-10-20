@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { AppHeader, Card, Container, PageHeader, Shell, Stack } from "@/components/ui";
 import { getSurfaceBasePath } from "@/server/auth/permissions";
-import { getCurrentSession } from "@/server/auth/session";
+import { getCurrentSession, getDealerContextFromSession } from "@/server/auth/session";
 import { loginAction } from "./actions";
 import { LoginForm } from "./LoginForm";
 
@@ -20,7 +20,9 @@ export async function loginTitle(surface: LoginSurface) {
 
 export async function LoginScreen({ surface }: { surface: LoginSurface }) {
   const basePath = await getSurfaceBasePath();
-  if (await getCurrentSession(surface)) redirect(`${basePath}/`);
+  // Dealer home also needs the dealer row (requireDealerUser); a bare session would loop back here.
+  const signedIn = surface === "dealer" ? await getDealerContextFromSession() : await getCurrentSession(surface);
+  if (signedIn) redirect(`${basePath}/`);
 
   const t = await getTranslations("auth");
   const labels = {
