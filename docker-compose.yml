@@ -37,6 +37,19 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Same Dockerfile, but the build stage: the standalone runner has no tsx or sources.
+  worker:
+    build:
+      context: .
+      target: build
+    command: ["npm", "run", "worker"]
+    user: node
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:17-alpine
     environment:
