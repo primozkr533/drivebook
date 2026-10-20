@@ -211,6 +211,27 @@ describe("routeRequest: dev aliases", () => {
     expect(await route("preview.example.com", "/_dev/admin/login")).toMatchObject({ pathname: "/backoffice/login" });
   });
 
+  it("serves the dev inbox at /_dev/inbox", async () => {
+    const inbox = { kind: "rewrite", pathname: "/dev/inbox", search: "" };
+    expect(await route("localhost", "/_dev/inbox")).toEqual(inbox);
+    expect(await route("web:3000", "/_dev/inbox/")).toEqual(inbox);
+    expect(await route("localhost", "/dev/inbox")).toEqual({ kind: "redirect", status: 307, location: "/_dev/inbox" });
+    expect(await route("demo.drivebook.localhost", "/_dev/inbox")).toEqual(notFound());
+  });
+
+  it("404s the dev inbox in production unless DEV_INBOX_ENABLED is set", async () => {
+    const off = config({ devAliases: false, devInbox: false });
+    expect(await route("localhost", "/_dev/inbox", off)).toEqual(notFound());
+    expect(await route("localhost", "/dev/inbox", off)).toEqual(notFound());
+
+    const on = config({ devAliases: false, devInbox: true });
+    expect(await route("preview.example.com", "/_dev/inbox", on)).toEqual({ kind: "rewrite", pathname: "/dev/inbox", search: "" });
+    expect(await route("localhost", "/_dev", on)).toEqual(notFound());
+    expect(await route("localhost", path("_dev", "inbox", "x"), on)).toEqual(notFound());
+    expect(await route("localhost", "/dev/inbox", on)).toEqual(notFound());
+    expect(await route("app.drivebook.localhost", "/_dev/inbox", on)).toEqual(notFound());
+  });
+
   it("404s /_dev/* when dev aliases are off", async () => {
     const off = config({ devAliases: false });
     expect(await route("localhost", "/_dev/site/demo?car=1", off)).toEqual(notFound("?car=1"));

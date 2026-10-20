@@ -1,3 +1,4 @@
+import { desc } from "drizzle-orm";
 import { devOutbox } from "@/db/schema";
 import { db } from "@/server/data/db";
 
@@ -23,4 +24,10 @@ export async function insertDevOutbox(row: DevOutboxRow): Promise<{ id: string }
     })
     .returning({ id: devOutbox.id });
   return inserted;
+}
+
+export type DevOutboxMessage = typeof devOutbox.$inferSelect;
+
+export async function listDevOutbox({ limit = 50 }: { limit?: number } = {}): Promise<DevOutboxMessage[]> {
+  return db().select().from(devOutbox).orderBy(desc(devOutbox.createdAt)).limit(limit);
 }

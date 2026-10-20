@@ -12,6 +12,7 @@ const links = [
   { key: "site", href: `/_dev/site/${DEMO_DEALER_SLUG}` },
   { key: "app", href: "/_dev/app" },
   { key: "admin", href: "/_dev/admin" },
+  { key: "inbox", href: "/_dev/inbox" },
   { key: "design", href: "/design" },
 ] as const;
 

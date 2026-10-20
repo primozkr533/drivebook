@@ -5,7 +5,7 @@ import { BASE_PATH_HEADER, requestHost, routeRequest } from "@/server/routing";
 
 // Next 16 proxy always runs on Node.js (a `runtime` key here is a build error), so it can reach the DB.
 export async function proxy(request: NextRequest) {
-  const { baseDomain, devAliases } = getConfig();
+  const { baseDomain, devAliases, devInboxEnabled } = getConfig();
   const host = requestHost(request.headers);
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const protocol = forwardedProto ? `${forwardedProto}:` : request.nextUrl.protocol;
@@ -14,6 +14,7 @@ export async function proxy(request: NextRequest) {
   const result = await routeRequest(host, pathname, search, {
     baseDomain,
     devAliases,
+    devInbox: devInboxEnabled,
     resolveSlug: resolveDealerSlug,
     protocol,
   });
