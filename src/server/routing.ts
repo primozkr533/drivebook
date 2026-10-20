@@ -77,9 +77,8 @@ export async function routeRequest(host: string, pathname: string, search: strin
     );
   }
 
-  const isRootHost = hostname === base || hostname === "localhost" || hostname === "127.0.0.1";
   const devPath = underPrefix(pathname, "/_dev");
-  if (isRootHost && cfg.devAliases && devPath !== null) {
+  if (cfg.devAliases && devPath !== null) {
     const app = underPrefix(devPath, "/app");
     if (app !== null) return surface("/dealer-admin", app, search, "/_dev/app");
     const admin = underPrefix(devPath, "/admin");
@@ -100,7 +99,7 @@ export async function routeRequest(host: string, pathname: string, search: strin
     return notFound(search);
   }
 
-  // Unknown hosts (e.g. a preview proxy) get the root-host treatment without the dev aliases.
+  // Non-dealer hosts (localhost, preview proxies) get the root-host treatment; dev aliases are handled above.
   if (isInternal(pathname)) return notFound(search);
   return { kind: "next" };
 }

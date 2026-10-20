@@ -168,12 +168,17 @@ describe("routeRequest: dev aliases", () => {
     expect(await route("localhost", "/_dev/other")).toEqual(notFound());
   });
 
-  it("404s /_dev/* when dev aliases are off, and off the root host", async () => {
+  it("serves dev aliases on non-dealer hosts such as preview proxies", async () => {
+    expect(await route("web:3000", "/_dev/app/login")).toMatchObject({ pathname: "/dealer-admin/login" });
+    expect(await route("preview.example.com", "/_dev/admin/login")).toMatchObject({ pathname: "/backoffice/login" });
+  });
+
+  it("404s /_dev/* when dev aliases are off", async () => {
     const off = config({ devAliases: false });
     expect(await route("localhost", "/_dev/site/demo?car=1", off)).toEqual(notFound("?car=1"));
     expect(await route("localhost", "/_dev/app/login", off)).toEqual(notFound());
     expect(await route("localhost", "/_dev", off)).toEqual(notFound());
-    expect(await route("preview.example.com", "/_dev/app/login")).toEqual(notFound());
+    expect(await route("preview.example.com", "/_dev/app/login", off)).toEqual(notFound());
     expect(off.resolveSlug).not.toHaveBeenCalled();
   });
 });
