@@ -194,6 +194,7 @@ export async function deactivateUser(surface: AuthSurface, userId: string): Prom
 export type DealerSession = {
   ctx: DealerContext;
   user: { id: string; email: string; role: DealerSessionUser["role"] };
+  sessionId: string;
 };
 
 // The authenticated-session path for building a DealerContext (tenant rule 2).
@@ -207,5 +208,5 @@ export async function getDealerContextFromSession(): Promise<DealerSession | nul
     .limit(1);
   if (!dealer) return null;
   const { id, email, role } = current.user;
-  return { ctx: createDealerContext(dealer), user: { id, email, role } };
+  return { ctx: createDealerContext(dealer), user: { id, email, role }, sessionId: current.session.id };
 }
