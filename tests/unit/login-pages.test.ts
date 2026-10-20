@@ -111,7 +111,7 @@ describe("loginAction", () => {
     return data;
   };
 
-  it("passes the form and the forwarded IP to login(), sets the cookie and redirects home", async () => {
+  it("passes the form and the trusted (last) forwarded IP to login(), sets the cookie and redirects home", async () => {
     mocks.headers = new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1", "user-agent": "UA" });
     mocks.login.mockResolvedValue({ ok: true, token: "tok" });
     const url = await redirectOf(loginAction("dealer", { step: "password" }, form({ email: "a@b.si", password: "pw" })));
@@ -121,7 +121,7 @@ describe("loginAction", () => {
       password: "pw",
       totpCode: undefined,
       pendingToken: undefined,
-      ip: "203.0.113.7",
+      ip: "10.0.0.1",
       userAgent: "UA",
     });
     expect(mocks.setSessionCookie).toHaveBeenCalledWith("dealer", "tok");

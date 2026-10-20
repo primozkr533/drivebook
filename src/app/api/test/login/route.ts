@@ -1,4 +1,5 @@
 import { getConfig } from "@/lib/config";
+import { clientIp } from "@/server/auth/client-ip";
 import { setSessionCookie } from "@/server/auth/session";
 import { testLoginDemoOwner } from "@/server/auth/test-login";
 import { requestHost, sessionCookieSecure, testLoginRedirect } from "@/server/routing";
@@ -29,7 +30,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const result = await testLoginDemoOwner({
-    ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: clientIp(request.headers),
     userAgent: request.headers.get("user-agent"),
   });
   if (!result) return Response.json({ ok: false, error: "demo_owner_missing" }, { status: 500 });
