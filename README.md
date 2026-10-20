@@ -45,6 +45,17 @@ Dev aliases (no subdomains needed, disabled in production):
 - http://localhost:3000/_dev/app/login — dealer admin login
 - http://localhost:3000/_dev/admin/login — backoffice login
 
+### Commands
+
+```bash
+npm run db:migrate          # apply pending migrations
+npm run db:seed             # run the idempotent seed
+npm run worker              # notification worker (sends queued e-mail / SMS)
+npm run create-superadmin -- --email ops@example.com
+```
+
+`create-superadmin` finds or creates a backoffice superadmin with that (lowercased) e-mail and prints `Set-password link: <url>`. A new or not-yet-active user gets an invitation link (valid 7 days); an already active user gets a fresh password-reset link instead. Running it again invalidates the previous link. The CLI only enqueues the e-mail and then stops pg-boss; the `worker` sends it — if no worker is running, the message stays `queued` in `message_log` until one starts. With Compose, run it in the `worker` service (it has the full source and `tsx`): `docker compose exec worker npm run create-superadmin -- --email ops@example.com`.
+
 ### Tests
 
 ```bash
