@@ -22,6 +22,7 @@ vi.mock("next-intl/server", () => ({
 const mocks = vi.hoisted(() => ({
   headers: new Headers(),
   session: null as unknown,
+  dealerSession: null as unknown,
   inspectLinkToken: vi.fn(),
   consumeLinkToken: vi.fn(),
   requestPasswordReset: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/server/auth/session", () => ({
   getCurrentSession: async () => mocks.session,
+  getDealerContextFromSession: async () => mocks.dealerSession,
   setSessionCookie: mocks.setSessionCookie,
 }));
 vi.mock("@/server/auth/links", () => ({
@@ -47,6 +49,7 @@ vi.mock("@/server/auth/links", () => ({
 beforeEach(() => {
   mocks.headers = new Headers();
   mocks.session = null;
+  mocks.dealerSession = null;
   vi.clearAllMocks();
 });
 
@@ -165,10 +168,26 @@ describe.each([
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*data-testid="forgot-submit"/);
   });
 
+  it("redirects to the surface home when signed in", async () => {
+    mocks.session = { session: {}, user: {} };
+    mocks.dealerSession = { ctx: {}, user: {}, sessionId: "s" };
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/app" });
+    expect(await redirectOf(render(Page))).toBe("/_dev/app/");
+  });
+
   it("returns the same confirmation state whatever the e-mail", async () => {
     for (const email of ["obstaja@drivebook.si", "ne-obstaja@drivebook.si"]) {
       expect(await forgotPasswordAction(surface, { sent: false }, form({ email }))).toEqual({ sent: true });
       expect(mocks.requestPasswordReset).toHaveBeenLastCalledWith(surface, email);
     }
+  });
+});
+
+describe("dealer forgot-password with a session whose dealer is missing", () => {
+  it("renders the form instead of redirecting to the admin home", async () => {
+    mocks.session = { session: {}, user: {} };
+    mocks.dealerSession = null;
+    const html = await render(DealerForgotPasswordPage);
+    expect(html).toMatch(/<input[^>]*type="email"[^>]*data-testid="forgot-email"/);
   });
 });

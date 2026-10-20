@@ -19,6 +19,7 @@ vi.mock("next-intl/server", () => ({
 const mocks = vi.hoisted(() => ({
   headers: new Headers(),
   session: null as unknown,
+  dealerSession: null as unknown,
   login: vi.fn(),
   logout: vi.fn(),
   setSessionCookie: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/server/auth/session", () => ({
   getCurrentSession: async () => mocks.session,
+  getDealerContextFromSession: async () => mocks.dealerSession,
   setSessionCookie: mocks.setSessionCookie,
   clearSessionCookie: mocks.clearSessionCookie,
 }));
@@ -41,6 +43,7 @@ vi.mock("@/server/auth/login", () => ({ login: mocks.login, logout: mocks.logout
 beforeEach(() => {
   mocks.headers = new Headers();
   mocks.session = null;
+  mocks.dealerSession = null;
   vi.clearAllMocks();
 });
 
@@ -95,12 +98,24 @@ describe.each(pages)("$name login page", ({ Page, metadata, title, eyebrow }) =>
 
   it("redirects to the surface home when a session already exists", async () => {
     mocks.session = { session: {}, user: {} };
+    mocks.dealerSession = { ctx: {}, user: {}, sessionId: "s" };
     mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
     expect(await redirectOf(render(Page))).toBe("/_dev/admin/");
   });
 
   it("exports the translated metadata title", async () => {
     expect(await metadata()).toEqual({ title });
+  });
+});
+
+describe("dealer login page with a session whose dealer is missing", () => {
+  it("renders the form instead of redirecting to the admin home", async () => {
+    mocks.session = { session: {}, user: {} };
+    mocks.dealerSession = null;
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/app" });
+    const html = await render(DealerLoginPage);
+    expect(html).toMatch(/<input[^>]*type="email"[^>]*data-testid="login-email"/);
+    expect(html).toContain(`>${auth.dealerTitle}</h1>`);
   });
 });
 
