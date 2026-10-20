@@ -169,6 +169,32 @@ describe("rate limiting", () => {
     const all = await db.select({ success: loginAttempts.success }).from(loginAttempts);
     expect(all.filter((r) => r.success)).toHaveLength(2);
   });
+
+  it("doesn't let blocked attempts extend the lockout", async () => {
+    const owner = { ...base, surface: "dealer" as const, email: "owner@demo.si" };
+    for (let i = 0; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
+      expect(await login({ ...owner, password: "x" })).toEqual({ ok: false, error: "invalid" });
+    }
+    // The 5th real failure happened 14 minutes ago; the blocked attempts happen now.
+    await db.update(loginAttempts).set({ createdAt: new Date(Date.now() - LOGIN_RATE_WINDOW_MS + 60_000) });
+    for (let i = 0; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
+      expect(await login({ ...owner, password: PASSWORD })).toEqual({ ok: false, error: "rate_limited" });
+    }
+    expect(await db.select().from(loginAttempts)).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+    const blocked = (await db.select().from(auditLog)).filter(
+      (r) => (r.data as { reason?: string }).reason === "rate_limited",
+    );
+    expect(blocked).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+    expect(blocked[0]).toMatchObject({ action: "auth.login.failure", actorId: null, data: { email: "owner@demo.si" } });
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + 61_000);
+      expect((await login({ ...owner, password: PASSWORD })).ok).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("TOTP step", () => {
@@ -199,6 +225,13 @@ describe("TOTP step", () => {
     expect(await login({ ...base, surface: "dealer", email: "", pendingToken, totpCode: valid })).toEqual({
       ok: false,
       error: "rate_limited",
+    });
+    expect(await db.select().from(loginAttempts)).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+    const [last] = await db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(1);
+    expect(last).toMatchObject({
+      action: "auth.login.failure",
+      actorId: s.twoFactor.id,
+      data: { reason: "rate_limited", email: "2fa@demo.si" },
     });
   });
 
