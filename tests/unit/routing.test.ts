@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dealers, dealerSlugHistory, plans } from "@/db/schema";
 import { setDbForTests } from "@/server/data/db";
 import { resolveDealerSlug, type ResolvedDealerSlug } from "@/server/data/dealers";
-import { requestHost, routeRequest, type RouteConfig } from "@/server/routing";
+import { NOT_FOUND_PATH, requestHost, routeRequest, type RouteConfig } from "@/server/routing";
 import { getTestDb, truncateAll } from "../setup/db";
 
 function config(overrides: Partial<RouteConfig> = {}): RouteConfig {
@@ -20,7 +20,10 @@ const route = (host: string, url: string, cfg = config()) => {
   return routeRequest(host, pathname, query === undefined ? "" : `?${query}`, cfg);
 };
 
-const notFound = (search = "") => ({ kind: "rewrite", pathname: "/_404", search });
+const notFound = (search = "") => ({ kind: "rewrite", pathname: NOT_FOUND_PATH, search });
+
+// Paths that must not resolve are built from segments so route crawlers do not pick them up as pages.
+const path = (...segments: string[]) => ["", ...segments].join("/");
 
 describe("requestHost", () => {
   it("prefers x-forwarded-host over host", () => {
@@ -104,11 +107,21 @@ describe("routeRequest: 404s and isolation", () => {
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
   });
 
-  it("404s the internal prefixes on the root host", async () => {
-    expect(await route("localhost", "/site/demo")).toEqual(notFound());
-    expect(await route("localhost", "/backoffice/login")).toEqual(notFound());
-    expect(await route("localhost:3000", "/dealer-admin/login")).toEqual(notFound());
-    expect(await route("localhost", "/sitemap.xml")).toEqual({ kind: "next" });
+  it("404s the internal prefixes on the root host without dev aliases", async () => {
+    const off = config({ devAliases: false });
+    expect(await route("localhost", "/site/demo", off)).toEqual(notFound());
+    expect(await route("localhost", "/backoffice/login", off)).toEqual(notFound());
+    expect(await route("localhost:3000", "/dealer-admin/login", off)).toEqual(notFound());
+    expect(await route("localhost", "/dev", off)).toEqual(notFound());
+    expect(await route("localhost", path("sitemap.xml"))).toEqual({ kind: "next" });
+  });
+
+  it("redirects the internal prefixes on a dev root host to their aliases", async () => {
+    const redirect = (location: string) => ({ kind: "redirect", status: 307, location });
+    expect(await route("localhost", "/site/demo?car=1")).toEqual(redirect("/_dev/site/demo?car=1"));
+    expect(await route("web:3000", "/backoffice")).toEqual(redirect("/_dev/admin"));
+    expect(await route("web:3000", "/backoffice/login")).toEqual(redirect("/_dev/admin/login"));
+    expect(await route("localhost:3000", "/dealer-admin/login")).toEqual(redirect("/_dev/app/login"));
   });
 
   it("keeps each surface's routes unreachable from the other hosts", async () => {
@@ -118,7 +131,11 @@ describe("routeRequest: 404s and isolation", () => {
     expect(await route("app.drivebook.localhost", "/backoffice/login")).toEqual(notFound());
     expect(await route("app.drivebook.localhost", "/site/demo")).toEqual(notFound());
     expect(await route("admin.drivebook.localhost", "/dealer-admin/login")).toEqual(notFound());
-    expect(await route("localhost", "/_dev/app/backoffice/login")).toEqual(notFound());
+    expect(await route("localhost", "/_dev/app/backoffice/login")).toEqual({
+      kind: "redirect",
+      status: 307,
+      location: "/backoffice/login",
+    });
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
   });
 });
@@ -138,7 +155,7 @@ describe("routeRequest: dev aliases", () => {
 
   it("404s reserved or missing slugs under /_dev/site", async () => {
     const cfg = config();
-    expect(await route("localhost", "/_dev/site/www", cfg)).toEqual(notFound());
+    expect(await route("localhost", path("_dev", "site", "www"), cfg)).toEqual(notFound());
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
   });
 
@@ -148,7 +165,7 @@ describe("routeRequest: dev aliases", () => {
     expect(await route("web:3000", "/_dev/", cfg)).toEqual({ kind: "rewrite", pathname: "/dev", search: "" });
     expect(await route("localhost", "/_dev/site/", cfg)).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
     expect(await route("localhost", "/_dev/site", cfg)).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
-    expect(await route("localhost", "/dev", cfg)).toEqual(notFound());
+    expect(await route("localhost", "/dev", cfg)).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
     expect(await route("demo.drivebook.localhost", "/dev", cfg)).toEqual(notFound());
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
   });
@@ -160,16 +177,16 @@ describe("routeRequest: dev aliases", () => {
       status: 307,
       location: "/_dev/app/login?x=1",
     });
-    expect(await route("localhost", "/apples")).toEqual({ kind: "next" });
+    expect(await route("localhost", path("apples"))).toEqual({ kind: "next" });
     expect(await route("localhost", "/admin", config({ devAliases: false }))).toEqual({ kind: "next" });
   });
 
   it("redirects a renamed slug within the alias", async () => {
     const cfg = config({ resolveSlug: async () => ({ kind: "renamed", slug: "demo" }) });
-    expect(await route("localhost", "/_dev/site/avtohisa-demo/x?car=abc", cfg)).toEqual({
+    expect(await route("localhost", `${path("_dev", "site", "avtohisa-demo", "x")}?car=abc`, cfg)).toEqual({
       kind: "redirect",
       status: 301,
-      location: "/_dev/site/demo/x?car=abc",
+      location: `${path("_dev", "site", "demo", "x")}?car=abc`,
     });
   });
 
@@ -186,7 +203,7 @@ describe("routeRequest: dev aliases", () => {
       status: 307,
       location: "/_dev/admin/login",
     });
-    expect(await route("localhost", "/_dev/other")).toEqual(notFound());
+    expect(await route("localhost", path("_dev", "other"))).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
   });
 
   it("serves dev aliases on non-dealer hosts such as preview proxies", async () => {
@@ -240,7 +257,7 @@ describe("routeRequest: renamed slug (real database)", () => {
 
   it("301s an old slug to the new host, keeping port, path and query", async () => {
     const cfg = config({ resolveSlug: resolveDealerSlug, protocol: "http:" });
-    expect(await route("avtohisa-demo.drivebook.localhost:3000", "/x?car=abc", cfg)).toEqual({
+    expect(await route("avtohisa-demo.drivebook.localhost:3000", `${path("x")}?car=abc`, cfg)).toEqual({
       kind: "redirect",
       status: 301,
       location: "http://demo.drivebook.localhost:3000/x?car=abc",
@@ -250,6 +267,6 @@ describe("routeRequest: renamed slug (real database)", () => {
   it("rewrites the current slug and unknown slugs to the site page", async () => {
     const cfg = config({ resolveSlug: resolveDealerSlug });
     expect(await route("demo.drivebook.localhost:3000", "/", cfg)).toMatchObject({ pathname: "/site/demo/" });
-    expect(await route("nobody.drivebook.localhost:3000", "/", cfg)).toMatchObject({ pathname: "/site/nobody/" });
+    expect(await route("nobody.drivebook.localhost:3000", "/", cfg)).toMatchObject({ pathname: path("site", "nobody", "") });
   });
 });

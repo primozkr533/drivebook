@@ -81,7 +81,6 @@ test.describe("surface isolation", () => {
     `${host("app")}/backoffice/login`,
     `${host("admin")}/dealer-admin/login`,
     `${host("demo")}/dealer-admin/login`,
-    `${ROOT}/site/demo`,
   ];
   for (const url of crossSurface) {
     test(`${url} is a 404`, async ({ request }) => {
@@ -89,6 +88,12 @@ test.describe("surface isolation", () => {
       expect(res.status()).toBe(404);
     });
   }
+
+  test("internal paths on the dev root host redirect to their aliases", async ({ request }) => {
+    const res = await request.get(`${ROOT}/site/demo`, { maxRedirects: 0 });
+    expect(res.status()).toBe(307);
+    expect(new URL(res.headers()["location"]).pathname).toBe("/_dev/site/demo");
+  });
 });
 
 test.describe("dev aliases", () => {
