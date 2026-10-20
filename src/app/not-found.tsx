@@ -11,7 +11,7 @@ export default async function NotFound() {
           title={t("notFoundTitle")}
           description={t("notFoundBody")}
           actions={
-            <ButtonLink href="/" trailing={<Arrow />}>
+            <ButtonLink href="/" variant="secondary" trailing={<Arrow />}>
               {t("backHome")}
             </ButtonLink>
           }
