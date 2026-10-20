@@ -1,0 +1,13 @@
+# Dev stack. Today: the web app only (serves /design). Later stages add
+# postgres, worker, etc. — keep `web` startable on its own (no service_healthy gate).
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - BASE_DOMAIN=${BASE_DOMAIN:-drivebook.localhost}
+    restart: unless-stopped

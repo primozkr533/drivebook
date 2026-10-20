@@ -1,0 +1,79 @@
+{
+  "common": {
+    "product": "DriveBook",
+    "copy": "Kopiraj",
+    "copied": "Kopirano",
+    "save": "Shrani",
+    "cancel": "Prekliči",
+    "optional": "neobvezno",
+    "required": "obvezno"
+  },
+  "nav": {
+    "cars": "Avtomobili",
+    "settings": "Nastavitve",
+    "users": "Uporabniki",
+    "account": "Moj račun",
+    "logout": "Odjava",
+    "dealers": "Trgovci",
+    "plans": "Paketi",
+    "backofficeUsers": "Uporabniki zaledja",
+    "skipToContent": "Skoči na vsebino",
+    "primary": "Glavni meni"
+  },
+  "status": {
+    "active": "Aktiven",
+    "inactive": "Neaktiven",
+    "suspended": "Začasno ustavljen",
+    "verified": "Preverjeno",
+    "pending": "Čaka na potrditev",
+    "confirmed": "Potrjeno",
+    "noShowRisk": "Tveganje za neprihod",
+    "attended": "Prišel"
+  },
+  "car": {
+    "viewOnAvtoNet": "Oglej si oglas na avto.net",
+    "deepLink": "Povezava do avtomobila",
+    "noImage": "Fotografija ni na voljo",
+    "selected": "Izbrani avtomobil",
+    "year": "Letnik",
+    "price": "Cena",
+    "add": "Dodaj avtomobil",
+    "autofill": "Uvozi iz avto.net"
+  },
+  "ticket": {
+    "eyebrow": "Termin",
+    "testDrive": "Testna vožnja",
+    "viewing": "Ogled vozila",
+    "duration": "{minutes} min",
+    "customer": "Stranka",
+    "phone": "Telefon",
+    "verifiedStamp": "Telefon preverjen",
+    "reference": "Št. rezervacije",
+    "where": "Kje",
+    "reminder": "Opomnik po SMS dan prej ob 18:00"
+  },
+  "publicPage": {
+    "openingHours": "Delovni čas",
+    "closed": "Zaprto",
+    "today": "Danes",
+    "openNow": "Odprto zdaj",
+    "directions": "Navodila za pot",
+    "call": "Pokliči",
+    "carsHeading": "Avtomobili v ponudbi",
+    "carsCount": "{count, plural, one {# vozilo} two {# vozili} few {# vozila} other {# vozil}}",
+    "bookingHeading": "Rezervirajte termin",
+    "bookingSoon": "Spletno naročanje na testne vožnje in oglede bo kmalu na voljo tukaj.",
+    "unavailable": "Spletno naročanje trenutno ni na voljo, pokličite {phone}.",
+    "privacy": "Varstvo osebnih podatkov",
+    "poweredBy": "Rezervacije omogoča DriveBook"
+  },
+  "weekday": {
+    "mon": "Ponedeljek",
+    "tue": "Torek",
+    "wed": "Sreda",
+    "thu": "Četrtek",
+    "fri": "Petek",
+    "sat": "Sobota",
+    "sun": "Nedelja"
+  }
+}

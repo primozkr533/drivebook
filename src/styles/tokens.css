@@ -1,0 +1,187 @@
+/* ==========================================================================
+   DriveBook design tokens — THE single source of truth.
+   --------------------------------------------------------------------------
+   Aesthetic: "Avtocesta" — the calm, legible authority of Slovenian road
+   signage and the registration plate. A cool, green-biased ground; deep
+   petrol-black ink; ONE saturated move: motorway green. Condensed display
+   type like a sign panel, mono for times / IDs / plates.
+
+   Every component reads these through Tailwind utilities (mapped in
+   src/app/globals.css) or var(--…). Never hardcode a literal elsewhere.
+
+   Themes: light is the default; dark via [data-theme="dark"] on any
+   ancestor (set on <html> by the boot script in layout.tsx).
+   Dealer branding: --brand / --brand-ink are overridden per dealer on the
+   public page wrapper (see src/lib/brand.ts). Everything else stays ours.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Ground & surfaces — neutrals tinted toward the green (hue ~155°) */
+  --ground: #eef2ef;          /* page background, "alpine paper" */
+  --surface: #fafcfa;         /* cards, panels */
+  --surface-raised: #ffffff;  /* popovers, inputs */
+  --surface-sunk: #e2e8e4;    /* wells, table stripes, quiet button fill */
+
+  /* Ink */
+  --ink: #10201a;             /* primary text, headings */
+  --ink-soft: #2c3c35;        /* body copy on surfaces */
+  --muted: #5b6b64;           /* secondary text, captions */
+  --faint: #8a9992;           /* placeholders, disabled */
+
+  /* Lines */
+  --line: #cfd8d3;            /* hairlines, card borders */
+  --line-strong: #9eada6;     /* input borders, dividers that must read */
+
+  /* Accent — motorway green. The one loud colour. */
+  --primary: #0a7a4e;
+  --primary-strong: #065c3a;  /* hover / pressed, text-on-soft */
+  --primary-soft: #d3ece0;    /* tints, selected rows, highlight wash */
+  --primary-ink: #ffffff;     /* text on --primary (AA 5.4:1) */
+
+  /* Functional status — desaturated so they never fight the accent */
+  --warn: #8a5200;            /* no-show risk, pending */
+  --warn-soft: #f6e7cc;
+  --danger: #b3261e;          /* destructive, failed, suspended */
+  --danger-soft: #f7dcd9;
+  --info: #23508f;            /* road-sign blue: informational only */
+  --info-soft: #dbe5f3;
+
+  /* Focus ring */
+  --focus: #0a7a4e;
+
+  /* Plate — the registration-plate signature (fixed, theme-proof) */
+  --plate-ground: #fdfdfb;
+  --plate-ink: #111111;
+  --plate-band: #1c3f94;
+  --plate-band-ink: #f5d33c;
+
+  /* Dealer brand — defaults to our accent; overridden per dealer */
+  --brand: var(--primary);
+  --brand-ink: var(--primary-ink);
+
+  /* Shadows — tinted with the ink hue, never neutral black */
+  --elev-1: 0 1px 0 rgb(16 32 26 / 0.04), 0 1px 2px rgb(16 32 26 / 0.06);
+  --elev-2: 0 1px 0 rgb(16 32 26 / 0.04), 0 4px 12px -2px rgb(16 32 26 / 0.10);
+  --elev-3: 0 2px 0 rgb(16 32 26 / 0.04), 0 18px 40px -12px rgb(16 32 26 / 0.22);
+  --elev-drop: drop-shadow(0 1px 1px rgb(16 32 26 / 0.08)) drop-shadow(0 12px 20px rgb(16 32 26 / 0.12)); /* for masked shapes */
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ground: #0b1310;
+  --surface: #111b17;
+  --surface-raised: #17231e;
+  --surface-sunk: #0d1613;
+
+  --ink: #e5eee9;
+  --ink-soft: #c3d0ca;
+  --muted: #8d9e96;
+  --faint: #5f6f68;
+
+  --line: #24332c;
+  --line-strong: #3b4d45;
+
+  --primary: #3fbf88;
+  --primary-strong: #74d8ab;
+  --primary-soft: #143326;
+  --primary-ink: #04150d;
+
+  --warn: #e3a64a;
+  --warn-soft: #33260f;
+  --danger: #f08177;
+  --danger-soft: #3a1714;
+  --info: #8db2ea;
+  --info-soft: #15233a;
+
+  --focus: #74d8ab;
+
+  --brand: var(--primary);
+  --brand-ink: var(--primary-ink);
+
+  --elev-1: 0 1px 0 rgb(0 0 0 / 0.30);
+  --elev-2: 0 1px 0 rgb(0 0 0 / 0.30), 0 6px 16px -4px rgb(0 0 0 / 0.50);
+  --elev-3: 0 2px 0 rgb(0 0 0 / 0.30), 0 24px 48px -12px rgb(0 0 0 / 0.65);
+  --elev-drop: drop-shadow(0 1px 0 rgb(0 0 0 / 0.4)) drop-shadow(0 14px 24px rgb(0 0 0 / 0.5));
+}
+
+/* Derived brand tints — re-resolved on every theme scope and dealer brand
+   scope (data-brand, set by brandScope() in src/lib/brand.ts). */
+:root,
+[data-theme],
+[data-brand] {
+  --brand-soft: color-mix(in oklab, var(--brand) 13%, var(--surface));
+  --brand-line: color-mix(in oklab, var(--brand) 45%, var(--line));
+}
+
+:root {
+
+  /* ---- Typography ------------------------------------------------------ */
+  --face-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif-condensed, sans-serif;
+  --face-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --face-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Type scale — 1.25 ratio on a 16px body, display steps for sign panels */
+  --type-micro: 0.6875rem;   /* 11 — utility labels, uppercase mono */
+  --type-caption: 0.8125rem; /* 13 */
+  --type-small: 0.875rem;    /* 14 — dense admin tables */
+  --type-body: 1rem;         /* 16 */
+  --type-lead: 1.125rem;     /* 18 */
+  --type-h4: 1.25rem;        /* 20 */
+  --type-h3: 1.5rem;         /* 24 */
+  --type-h2: 2rem;           /* 32 */
+  --type-h1: 2.75rem;        /* 44 */
+  --type-display: 4rem;      /* 64 — one per screen, max */
+
+  --lh-tight: 1.02;
+  --lh-snug: 1.2;
+  --lh-body: 1.55;
+  --track-display: -0.005em;
+  --track-utility: 0.12em;
+
+  /* ---- Spacing — 4px grid (Tailwind's numeric scale = n × --space-unit) - */
+  --space-unit: 0.25rem;
+  --space-1: 0.25rem;  /* 4 */
+  --space-2: 0.5rem;   /* 8 */
+  --space-3: 0.75rem;  /* 12 */
+  --space-4: 1rem;     /* 16 */
+  --space-5: 1.25rem;  /* 20 */
+  --space-6: 1.5rem;   /* 24 */
+  --space-8: 2rem;     /* 32 */
+  --space-10: 2.5rem;  /* 40 */
+  --space-12: 3rem;    /* 48 */
+  --space-16: 4rem;    /* 64 */
+  --space-24: 6rem;    /* 96 */
+
+  /* ---- Radii — sign-panel tight; only pills are round ----------------- */
+  --corner-xs: 2px;    /* badges' inner, checkboxes */
+  --corner-sm: 3px;    /* buttons, inputs */
+  --corner-md: 5px;    /* cards, panels */
+  --corner-lg: 8px;    /* sheets, dialogs */
+  --corner-pill: 999px;
+
+  /* ---- Layout -------------------------------------------------------- */
+  --measure-narrow: 40rem;   /* forms, auth, settings columns */
+  --measure-default: 72rem;  /* admin & public page content */
+  --measure-wide: 88rem;     /* tables, showcase */
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --header-h: 3.75rem;
+
+  /* ---- Motion — restrained; zeroed under prefers-reduced-motion ------ */
+  --motion-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+}
