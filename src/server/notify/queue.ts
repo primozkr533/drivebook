@@ -59,6 +59,13 @@ export function setBossForTests(boss: NotifyBoss | undefined): void {
   bossOverride = boss;
 }
 
+export async function stopBoss(): Promise<void> {
+  const pending = bossPromise;
+  bossPromise = undefined;
+  const boss = await pending?.catch(() => undefined);
+  if (boss) await (boss as PgBoss).stop({ graceful: true, timeout: 10_000 });
+}
+
 export async function stopBossForTests(): Promise<void> {
   const pending = bossPromise;
   bossPromise = undefined;
