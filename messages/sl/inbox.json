@@ -1,3 +1,16 @@
 {
-  "title": "Razvojni nabiralnik"
+  "title": "Razvojni nabiralnik",
+  "eyebrow": "Razvojno okolje",
+  "description": "E-poštna sporočila in SMS-i, ki jih je zajel lažni ponudnik obvestil. Najnovejša so na vrhu.",
+  "empty": "Ni še poslanih sporočil.",
+  "channel": { "email": "E-pošta", "sms": "SMS" },
+  "recipient": "Prejemnik",
+  "sender": "Pošiljatelj",
+  "subject": "Zadeva",
+  "sentAt": "Poslano",
+  "noSubject": "Brez zadeve",
+  "textBody": "Besedilo",
+  "showHtml": "Prikaži HTML",
+  "hideHtml": "Skrij HTML",
+  "htmlPreview": "Predogled HTML sporočila"
 }
