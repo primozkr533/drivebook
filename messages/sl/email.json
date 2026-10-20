@@ -1,3 +1,31 @@
 {
-  "title": "E-pošta"
+  "title": "E-pošta",
+  "platformName": "DriveBook",
+  "footer": "To sporočilo je bilo poslano na {recipientEmail}. Če ga niste pričakovali, ga lahko prezrete.",
+  "linkFallback": "Če gumb ne deluje, kopirajte to povezavo v brskalnik:",
+  "surface": {
+    "dealer": "skrbništvo trgovca",
+    "backoffice": "zaledni sistem DriveBook"
+  },
+  "invitation": {
+    "subject": "Povabilo v DriveBook",
+    "subjectDealer": "{dealerName} vas vabi v DriveBook",
+    "heading": "Povabljeni ste",
+    "intro": "Povabljeni ste v {surface}.",
+    "introDealer": "Povabljeni ste v ekipo {dealerName} v DriveBook.",
+    "invitedBy": "Povabilo vam je poslal(a) {inviterName}.",
+    "action": "Za dostop si nastavite geslo.",
+    "button": "Nastavi geslo",
+    "expiry": "Povezava velja do {expiresAt}."
+  },
+  "passwordReset": {
+    "subject": "Ponastavitev gesla za DriveBook",
+    "subjectDealer": "Ponastavitev gesla – {dealerName}",
+    "heading": "Ponastavitev gesla",
+    "intro": "Prejeli smo zahtevo za ponastavitev gesla za {surface}.",
+    "introDealer": "Prejeli smo zahtevo za ponastavitev gesla za vaš račun pri {dealerName}.",
+    "button": "Ponastavi geslo",
+    "expiry": "Povezava velja {validMinutes} minut in jo lahko uporabite samo enkrat.",
+    "ignore": "Če ponastavitve niste zahtevali, lahko to sporočilo prezrete. Vaše geslo ostane nespremenjeno."
+  }
 }
