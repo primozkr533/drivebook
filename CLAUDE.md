@@ -11,6 +11,7 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run test:e2e` — Playwright against the running stack (`npx playwright install chromium` once)
 - `npm run db:generate` — generate a Drizzle migration from `src/db/schema` into `drizzle/`
 - `npm run db:migrate` — apply pending migrations · `npm run db:seed` — run the idempotent seed
+- `npm run worker` — notification worker (pg-boss `notify.email` / `notify.sms`); runs as the `worker` compose service, `web` never depends on it
 
 FARM-RUN-CONTRACT
 ```
@@ -31,6 +32,7 @@ smoke: docker compose exec -T web wget -qO- --header='Host: demo.drivebook.local
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
+- `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
 - `src/app/site/[slug]/` — public dealer site
 - `src/app/dealer-admin/` — `app.` surface (dealer admin)
 - `src/app/backoffice/` — `admin.` surface (backoffice)
