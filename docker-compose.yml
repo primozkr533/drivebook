@@ -1,0 +1,12 @@
+# Dev stack. Today: just the Next.js app (the /design showcase needs no backend).
+# Later phase-1 tickets add postgres, a pg-boss worker, etc. — keep `web` startable on its own.
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+    restart: unless-stopped

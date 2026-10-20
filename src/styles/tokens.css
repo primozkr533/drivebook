@@ -1,0 +1,199 @@
+/*
+ * DriveBook design tokens — THE single source of truth.
+ *
+ * Aesthetic: "the dealer's own magazine". Cool paper ground, deep blue-black
+ * ink, hairline + heavy editorial rules, a serif display face with an italic
+ * register, and ONE saturated move: registration-plate cobalt.
+ *
+ * Every value lives here once. The `@theme static` block both
+ *   1. emits each token as a CSS custom property on :root (use `var(--color-ink)`), and
+ *   2. generates the Tailwind utilities (`bg-ground`, `text-ink`, `font-display`, …).
+ * Tailwind's default palette, radii, shadows, type sizes and fonts are reset
+ * (`--*: initial`) so off-system values like `bg-blue-500` or `rounded-lg`
+ * simply do not exist.
+ *
+ * Light + dark: colours are written with `light-dark(day, night)`. They follow
+ * the element's `color-scheme`, which is the OS preference unless
+ * `data-theme="light" | "dark"` is set on <html> (or on any subtree).
+ */
+
+@theme static {
+  /* ── Palette ──────────────────────────────────────────────── */
+  --color-*: initial;
+
+  /* Ground & surfaces — neutrals biased toward the cobalt hue */
+  --color-ground: light-dark(#f3f4f7, #0d0f16);
+  --color-surface: light-dark(#ffffff, #151824);
+  --color-sunken: light-dark(#e7e9ef, #090a10);
+
+  /* Ink */
+  --color-ink: light-dark(#10121b, #eceef5);
+  --color-ink-soft: light-dark(#2c3040, #c6cad6);
+  --color-muted: light-dark(#5a5f71, #9399ac);
+  --color-faint: light-dark(#8b90a1, #5d6275); /* disabled / decorative only — not for body text */
+
+  /* Lines — `line` is the hairline, `rule` is the editorial ink rule */
+  --color-line: light-dark(#d3d6df, #2a2e3d);
+  --color-rule: light-dark(#10121b, #eceef5);
+
+  /* The one accent: registration-plate cobalt */
+  --color-accent: light-dark(#2238d4, #8d9bff);
+  --color-accent-strong: light-dark(#1729a6, #b3bcff);
+  --color-accent-soft: light-dark(#e2e6fc, #1c2250);
+  --color-accent-ink: light-dark(#ffffff, #0d0f16);
+
+  /* Status — desaturated so they never compete with the accent */
+  --color-positive: light-dark(#1c6b46, #6fcf9f);
+  --color-positive-soft: light-dark(#ddeee5, #12291f);
+  --color-caution: light-dark(#875800, #e4b45a);
+  --color-caution-soft: light-dark(#f5ead2, #2b2210);
+  --color-negative: light-dark(#b02a24, #ff8f86);
+  --color-negative-soft: light-dark(#f7e0de, #33161a);
+
+  --color-focus: var(--color-accent);
+
+  /* shadcn/ui aliases — so generated shadcn components inherit the system */
+  --color-background: var(--color-ground);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-ink);
+  --color-secondary: var(--color-sunken);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted-foreground: var(--color-muted);
+  --color-destructive: var(--color-negative);
+  --color-border: var(--color-line);
+  --color-input: var(--color-line);
+  --color-ring: var(--color-focus);
+
+  /* ── Type ─────────────────────────────────────────────────── */
+  --font-*: initial;
+  --font-display: "Newsreader Variable", "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-body: "Schibsted Grotesk Variable", "Schibsted Grotesk", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-utility: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-*: initial;
+  --text-caption: 0.6875rem; /* 11px — utility labels, uppercase + tracked */
+  --text-caption--line-height: 1.35;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6;
+  --text-md: 1.125rem;
+  --text-md--line-height: 1.55;
+  --text-lg: 1.375rem;
+  --text-lg--line-height: 1.3;
+  --text-xl: clamp(1.625rem, 1.3rem + 1.2vw, 2.125rem);
+  --text-xl--line-height: 1.15;
+  --text-2xl: clamp(2.125rem, 1.5rem + 2.4vw, 3.25rem);
+  --text-2xl--line-height: 1.06;
+  --text-3xl: clamp(2.75rem, 1.6rem + 4.4vw, 5rem);
+  --text-3xl--line-height: 1;
+  --text-display: clamp(3.5rem, 1.4rem + 8vw, 8.5rem);
+  --text-display--line-height: 0.92;
+
+  --leading-*: initial;
+  --leading-none: 0.92;
+  --leading-tight: 1.02;
+  --leading-snug: 1.15;
+  --leading-normal: 1.4;
+  --leading-body: 1.6;
+
+  --tracking-*: initial;
+  --tracking-display: -0.03em;
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0em;
+  --tracking-utility: 0.14em;
+
+  /* ── Space & layout ───────────────────────────────────────── */
+  --spacing: 0.25rem; /* 4px grid: p-1 = 4px, p-4 = 16px, p-12 = 48px */
+  --spacing-gutter: clamp(1rem, 0.4rem + 2.6vw, 2.5rem); /* page side padding + grid gaps */
+  --spacing-section: clamp(3rem, 1.8rem + 5vw, 7rem); /* vertical rhythm between sections */
+
+  --container-page: 80rem; /* 1280px max content width */
+  --container-measure: 38rem; /* comfortable reading width */
+  --container-narrow: 30rem; /* auth forms, dialogs */
+
+  --breakpoint-sm: 40rem; /* 640 — large phones, landscape */
+  --breakpoint-md: 48rem; /* 768 — tablet */
+  --breakpoint-lg: 64rem; /* 1024 — laptop: side-by-side layouts start */
+  --breakpoint-xl: 80rem; /* 1280 — desktop */
+
+  /* ── Shape ────────────────────────────────────────────────── */
+  --radius-*: initial;
+  --radius-none: 0px; /* cards, images, frames — print is square */
+  --radius-hair: 2px; /* buttons, inputs */
+  --radius-soft: 4px; /* popovers, toasts */
+  --radius-pill: 999px; /* pills, toggles, dots */
+
+  /* ── Depth — editorial pages use rules, not shadows. Overlays only. */
+  --shadow-*: initial;
+  --shadow-raise: 0 1px 0 var(--shadow-tint), 0 10px 28px -14px var(--shadow-tint-strong);
+  --shadow-overlay: 0 2px 0 var(--shadow-tint), 0 28px 64px -24px var(--shadow-tint-strong);
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  --ease-*: initial;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --ease-editorial: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --animate-rule-draw: rule-draw var(--duration-reveal) var(--ease-editorial) both;
+
+  @keyframes rule-draw {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/*
+ * Dealer brand — defaults to the accent; re-skinned per dealer via brandStyle().
+ * `inline` so utilities resolve `--brand` on the element itself, letting a
+ * subtree (the public dealer page) override it with an inline style.
+ */
+@theme inline {
+  --color-brand: var(--brand, var(--color-accent));
+  --color-brand-ink: var(--brand-ink, var(--color-accent-ink));
+  --color-primary: var(--brand, var(--color-accent));
+  --color-primary-foreground: var(--brand-ink, var(--color-accent-ink));
+}
+
+:root {
+  color-scheme: light dark;
+
+  --shadow-tint: light-dark(rgb(16 18 27 / 0.06), rgb(0 0 0 / 0.4));
+  --shadow-tint-strong: light-dark(rgb(16 18 27 / 0.22), rgb(0 0 0 / 0.65));
+
+  --duration-fast: 120ms; /* hover, press */
+  --duration-base: 200ms; /* focus, colour changes */
+  --duration-slow: 420ms; /* panels */
+  --duration-reveal: 900ms; /* the one ambient moment: masthead rule draw */
+
+  --rule-hair: 1px;
+  --rule-heavy: 2px;
+  --rule-brand: 3px;
+}
+
+:root[data-theme="light"],
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-reveal: 0ms;
+  }
+}
