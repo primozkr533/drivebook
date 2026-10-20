@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { clientIp } from "@/server/auth/client-ip";
 import { login, logout } from "@/server/auth/login";
 import { getSurfaceBasePath } from "@/server/auth/permissions";
 import { clearSessionCookie, setSessionCookie, type AuthSurface } from "@/server/auth/session";
@@ -27,7 +28,7 @@ export async function loginAction(surface: AuthSurface, _prev: LoginState, form:
     password: field(form, "password"),
     totpCode: field(form, "totpCode") || undefined,
     pendingToken: field(form, "pendingToken") || undefined,
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: clientIp(h),
     userAgent: h.get("user-agent"),
   });
 

@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { clientIp } from "@/server/auth/client-ip";
 import { consumeLinkToken, requestPasswordReset, type LinkPurpose } from "@/server/auth/links";
 import { validateNewPassword } from "@/server/auth/password";
 import { getSurfaceBasePath } from "@/server/auth/permissions";
@@ -33,7 +34,7 @@ export async function setPasswordAction(
 
   const h = await headers();
   const result = await consumeLinkToken(surface, purpose, token, password, {
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+    ip: clientIp(h),
     userAgent: h.get("user-agent"),
   });
   if (!result.ok) return result.error === "too_short" ? { error: "too_short" } : { status: result.error };
