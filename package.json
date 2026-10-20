@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:seed": "tsx src/db/seed-cli.ts",
-    "worker": "tsx src/worker.ts"
+    "worker": "tsx src/worker.ts",
+    "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.0",

@@ -12,6 +12,7 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run db:generate` — generate a Drizzle migration from `src/db/schema` into `drizzle/`
 - `npm run db:migrate` — apply pending migrations · `npm run db:seed` — run the idempotent seed
 - `npm run worker` — notification worker (pg-boss `notify.email` / `notify.sms`); runs as the `worker` compose service, `web` never depends on it
+- `npm run create-superadmin -- --email x` — create/invite a backoffice superadmin and print the set-password link
 
 FARM-RUN-CONTRACT
 ```

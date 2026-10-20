@@ -138,6 +138,10 @@ export async function requestPasswordReset(surface: AuthSurface, email: string, 
     );
   if ((recent?.n ?? 0) >= RESET_MAX_PER_HOUR) return;
 
+  await sendPasswordReset(surface, user, now);
+}
+
+async function sendPasswordReset(surface: AuthSurface, user: LinkUser, now: Date): Promise<{ link: string }> {
   const { link } = await issueToken(surface, user, "reset", now);
   const rendered = renderPasswordResetEmail({
     surface,
@@ -147,6 +151,12 @@ export async function requestPasswordReset(surface: AuthSurface, email: string, 
     validMinutes: RESET_TTL_MS / 60_000,
   });
   await sendEmail({ ...rendered, to: user.email, dealerId: user.dealerId, template: "password_reset" });
+  return { link };
+}
+
+// Operator-issued (CLI), so it skips the self-service rate limit.
+export async function createPasswordReset(surface: AuthSurface, userId: string, opts: Clock = {}): Promise<{ link: string }> {
+  return sendPasswordReset(surface, await requireUser(surface, userId), opts.now ?? new Date());
 }
 
 async function lookupToken(executor: Executor, surface: AuthSurface, purpose: LinkPurpose, token: string, lock: boolean) {
