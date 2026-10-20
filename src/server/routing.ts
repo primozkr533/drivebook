@@ -57,9 +57,8 @@ function surface(internal: "/dealer-admin" | "/backoffice", path: string, search
   // Under a dev alias, a nested internal path goes back through root-host routing (its own alias).
   if (isInternal(path) && aliasPrefix) return { kind: "redirect", status: 307, location: `${path}${search}` };
   if (isInternal(path)) return notFound(search);
-  // The surface root is the signed-in home, which itself redirects to /login without a session.
-  const rewrite: RouteResult = { kind: "rewrite", pathname: `${internal}${path}`, search };
-  return aliasPrefix ? { ...rewrite, headers: { [BASE_PATH_HEADER]: aliasPrefix } } : rewrite;
+  // The surface root is the signed-in home; its layout redirects to /login without a session.
+  return { kind: "rewrite", pathname: `${internal}${path}`, search, headers: { [BASE_PATH_HEADER]: aliasPrefix } };
 }
 
 async function dealerSite(

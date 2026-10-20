@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cx } from "@/lib/cx";
 
 type Variant = "primary" | "secondary" | "quiet" | "brand" | "danger";
@@ -32,7 +32,7 @@ const sizes: Record<Size, string> = {
 
 type Common = { variant?: Variant; size?: Size; icon?: ReactNode; trailing?: ReactNode; className?: string };
 
-export type ButtonProps = Common & ButtonHTMLAttributes<HTMLButtonElement>;
+export type ButtonProps = Common & ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> };
 export type ButtonLinkProps = Common & AnchorHTMLAttributes<HTMLAnchorElement> & { href: string };
 
 export function buttonClass({ variant = "primary", size = "md", className }: Common = {}) {

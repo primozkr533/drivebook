@@ -63,3 +63,8 @@ export async function resolveDealerSlug(slug: string): Promise<ResolvedDealerSlu
 
   return { kind: "unknown" };
 }
+
+export async function getDealerName(ctx: DealerContext): Promise<string | null> {
+  const [dealer] = await db().select({ name: dealers.name }).from(dealers).where(eq(dealers.id, ctx.dealerId)).limit(1);
+  return dealer?.name ?? null;
+}

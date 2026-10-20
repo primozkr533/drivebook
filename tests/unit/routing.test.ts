@@ -61,18 +61,35 @@ describe("routeRequest: hosts", () => {
     expect(cfg.resolveSlug).toHaveBeenCalledWith("demo");
   });
 
-  it("rewrites app. and admin. roots to the signed-in home and rewrites their paths", async () => {
-    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "rewrite", pathname: "/dealer-admin/", search: "" });
-    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "rewrite", pathname: "/backoffice/", search: "" });
+  it("rewrites app. and admin. roots to the surface home with an empty base path", async () => {
+    const empty = { "x-drivebook-base-path": "" };
+    expect(await route("app.drivebook.localhost", "/")).toEqual({
+      kind: "rewrite",
+      pathname: "/dealer-admin/",
+      search: "",
+      headers: empty,
+    });
+    expect(await route("admin.drivebook.localhost", "/")).toEqual({
+      kind: "rewrite",
+      pathname: "/backoffice/",
+      search: "",
+      headers: empty,
+    });
     expect(await route("app.drivebook.localhost", path("login"))).toEqual({
       kind: "rewrite",
       pathname: "/dealer-admin/login",
       search: "",
+      headers: empty,
     });
     expect(await route("admin.drivebook.localhost", `${path("login")}?next=x`)).toEqual({
       kind: "rewrite",
       pathname: "/backoffice/login",
       search: "?next=x",
+      headers: empty,
+    });
+    expect(await route("app.drivebook.localhost", path("account"))).toMatchObject({
+      pathname: "/dealer-admin/account",
+      headers: empty,
     });
   });
 
@@ -201,7 +218,16 @@ describe("routeRequest: dev aliases", () => {
       pathname: "/backoffice/login",
       headers: { "x-drivebook-base-path": "/_dev/admin" },
     });
-    expect(await route("localhost", "/_dev/app")).toMatchObject({ kind: "rewrite", pathname: "/dealer-admin" });
+    expect(await route("localhost", "/_dev/app")).toEqual({
+      kind: "rewrite",
+      pathname: "/dealer-admin",
+      search: "",
+      headers: { "x-drivebook-base-path": "/_dev/app" },
+    });
+    expect(await route("localhost", "/_dev/admin")).toMatchObject({
+      pathname: "/backoffice",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
+    });
     expect(await route("localhost", "/_dev/admin/")).toEqual({
       kind: "rewrite",
       pathname: "/backoffice/",

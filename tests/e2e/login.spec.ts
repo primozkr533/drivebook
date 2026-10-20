@@ -44,17 +44,17 @@ async function submit(page: Page) {
 
 const cookie = async (page: Page, name: string) => (await page.context().cookies()).find((c) => c.name === name);
 
-test("a dealer user signs in, is redirected home and signs out again", async ({ page }) => {
+test("a dealer user signs in, lands on the account page and signs out again", async ({ page }) => {
   const user = track(await createDealerUser());
   await page.goto(`${host("app")}/login`);
   await signIn(page, user.email, user.password);
 
-  await expect(page).toHaveURL(`${host("app")}/`);
+  await expect(page).toHaveURL(`${host("app")}/account`);
   expect(await cookie(page, "db_app_session")).toMatchObject({ httpOnly: true, domain: `app.${BASE_DOMAIN}` });
   expect(await cookie(page, "db_admin_session")).toBeUndefined();
 
   await page.goto(`${host("app")}/login`);
-  await expect(page).toHaveURL(`${host("app")}/`);
+  await expect(page).toHaveURL(`${host("app")}/account`);
 
   await page.getByTestId("logout").click();
   await expect(page).toHaveURL(`${host("app")}/login`);
@@ -79,7 +79,7 @@ test("a backoffice superadmin with 2FA signs in through the code step", async ({
 
   await page.getByTestId("login-totp").fill(totpCode(user));
   await page.getByTestId("login-submit").click();
-  await expect(page).toHaveURL(`${host("admin")}/`);
+  await expect(page).toHaveURL(`${host("admin")}/account`);
   expect(await cookie(page, "db_admin_session")).toMatchObject({ httpOnly: true, domain: `admin.${BASE_DOMAIN}` });
 });
 

@@ -1,3 +1,6 @@
 {
-  "title": "Moj račun"
+  "title": "Moj račun",
+  "navAccount": "Račun",
+  "menu": "Meni",
+  "signedInAs": "Prijavljeni ste kot {email}."
 }
