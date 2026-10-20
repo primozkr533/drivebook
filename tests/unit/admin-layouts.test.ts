@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   dealerSession: null as unknown,
   backofficeSession: null as unknown,
   getDealerName: vi.fn(),
+  getAccountSummary: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ headers: async () => mocks.headers }));
@@ -39,6 +40,7 @@ vi.mock("@/server/auth/session", () => ({
 }));
 vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
+vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
 
 const ctx = { dealerId: "dealer-1", slug: "demo", status: "active" };
 
@@ -121,9 +123,35 @@ describe.each(surfaces)("$name (app) group", ({ Layout, Home, Account, alias, si
 
   it("renders the account page for the signed-in user", async () => {
     signIn();
+    mocks.getAccountSummary.mockResolvedValue({ email: "prodaja@demo.si", role: "owner", totpEnabled: false });
     const html = await render(createElement(Account));
     expect(html).toContain(`>${account.title}</h1>`);
-    expect(html).toContain("prodaja@demo.si");
+    expect(html).toMatch(/data-testid="account-email"[^>]*>prodaja@demo\.si</);
+    expect(html).toContain(account.passwordTitle);
+    for (const id of ["current-password", "new-password", "confirm-password", "change-password-submit", "totp-enable"]) {
+      expect(html).toContain(`data-testid="${id}"`);
+    }
+    expect(html).toMatch(/data-testid="totp-state" data-state="off"/);
+    expect(html).toContain(account.totpOff);
+    expect(html).not.toContain('data-testid="totp-disable"');
+  });
+
+  it("shows the disable form when 2FA is on", async () => {
+    signIn();
+    mocks.getAccountSummary.mockResolvedValue({ email: "prodaja@demo.si", role: "support", totpEnabled: true });
+    const html = await render(createElement(Account));
+    expect(html).toMatch(/data-testid="totp-state" data-state="on"/);
+    for (const id of ["totp-disable-password", "totp-disable-code", "totp-disable"]) {
+      expect(html).toContain(`data-testid="${id}"`);
+    }
+    expect(html).not.toContain('data-testid="totp-enable"');
+  });
+
+  it("reads the account of the session user", async () => {
+    signIn();
+    mocks.getAccountSummary.mockResolvedValue({ email: "prodaja@demo.si", role: "owner", totpEnabled: false });
+    await render(createElement(Account));
+    expect(mocks.getAccountSummary).toHaveBeenCalledWith(expect.stringMatching(/^(dealer|backoffice)$/), expect.stringMatching(/^u[12]$/));
   });
 });
 
