@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",
-    "db:seed": "tsx src/db/seed-cli.ts"
+    "db:seed": "tsx src/db/seed-cli.ts",
+    "worker": "tsx src/worker.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.0",
@@ -23,6 +24,7 @@
     "next-intl": "^4.14.9",
     "otplib": "^13.5.0",
     "pg": "^8.23.1",
+    "pg-boss": "^12.38.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
