@@ -34,8 +34,8 @@ smoke: docker compose exec -T web wget -qO- --header='Host: demo.drivebook.local
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
 - `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
 - `src/app/site/[slug]/` — public dealer site
-- `src/app/dealer-admin/` — `app.` surface (dealer admin)
-- `src/app/backoffice/` — `admin.` surface (backoffice)
+- `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
+- `src/app/backoffice/` — `admin.` surface (backoffice); signed-in pages live in `(app)/`
 - `src/i18n/request.ts` + `messages/sl/` — translations
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
 
@@ -76,7 +76,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 ## Routing
 Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired up by `src/proxy.ts`.
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
-- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the signed-in home, which redirects to `/login` without a session; the dev aliases set `x-drivebook-base-path` to `/_dev/app` / `/_dev/admin`, read via `getSurfaceBasePath()`)
+- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the surface home in the `(app)` route group, whose layout redirects to `/login` without a session; login and password pages stay outside `(app)`; the proxy always sets `x-drivebook-base-path` there — empty on `app.`/`admin.`, `/_dev/app` / `/_dev/admin` under the dev aliases — read via `getSurfaceBasePath()`)
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
@@ -110,4 +110,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Content width: `Container` (`--container-max` 1248 px, fluid `--gutter`); `width="narrow"` (704 px) only for single forms/reading. Never strand a phone-width column on desktop.
 - Phones: one full-width column. From `md`/`lg`: multi-column via `Grid` (e.g. list + detail, cards 2–3 up, a `lg:col-span-8` main + `lg:col-span-4` aside).
 - Components that can live in both a main column and an aside (`DriveTicket`, `HoursStrip`) respond to their **container** (`@container`, `@md:`/`@2xl:`), not the viewport. Do the same for new signature-level components.
-- Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; add a compact menu when real navigation exists.
+- Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; pass `menu={{ label }}` to show the same items in the compact disclosure menu (`CompactMenu`) there.
