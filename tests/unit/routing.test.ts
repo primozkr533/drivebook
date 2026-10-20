@@ -61,9 +61,9 @@ describe("routeRequest: hosts", () => {
     expect(cfg.resolveSlug).toHaveBeenCalledWith("demo");
   });
 
-  it("redirects app. and admin. roots to /login and rewrites their paths", async () => {
-    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
-    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
+  it("rewrites app. and admin. roots to the signed-in home and rewrites their paths", async () => {
+    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "rewrite", pathname: "/dealer-admin/", search: "" });
+    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "rewrite", pathname: "/backoffice/", search: "" });
     expect(await route("app.drivebook.localhost", path("login"))).toEqual({
       kind: "rewrite",
       pathname: "/dealer-admin/login",
@@ -195,13 +195,18 @@ describe("routeRequest: dev aliases", () => {
       kind: "rewrite",
       pathname: "/dealer-admin/login",
       search: "",
+      headers: { "x-drivebook-base-path": "/_dev/app" },
     });
-    expect(await route("localhost", "/_dev/admin/login")).toMatchObject({ pathname: "/backoffice/login" });
-    expect(await route("localhost", "/_dev/app")).toEqual({ kind: "redirect", status: 307, location: "/_dev/app/login" });
+    expect(await route("localhost", "/_dev/admin/login")).toMatchObject({
+      pathname: "/backoffice/login",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
+    });
+    expect(await route("localhost", "/_dev/app")).toMatchObject({ kind: "rewrite", pathname: "/dealer-admin" });
     expect(await route("localhost", "/_dev/admin/")).toEqual({
-      kind: "redirect",
-      status: 307,
-      location: "/_dev/admin/login",
+      kind: "rewrite",
+      pathname: "/backoffice/",
+      search: "",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
     });
     expect(await route("localhost", path("_dev", "other"))).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
   });
