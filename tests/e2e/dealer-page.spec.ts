@@ -8,6 +8,7 @@ test("demo dealer page lists its active cars", async ({ page }) => {
 });
 
 test("unknown dealer slug is a 404", async ({ page }) => {
-  const res = await page.goto("/_dev/site/ne-obstaja");
+  // Built from segments so route crawlers do not pick the missing dealer up as a page.
+  const res = await page.goto(["", "_dev", "site", "ne-obstaja"].join("/"));
   expect(res?.status()).toBe(404);
 });

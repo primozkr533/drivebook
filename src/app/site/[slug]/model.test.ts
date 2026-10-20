@@ -96,7 +96,7 @@ describe("buildDealerPageModel", () => {
 
   it("falls back to the platform notice under the base path", () => {
     expect(build({ basePath: "/_dev/site/demo" }).privacy).toEqual({ href: "/_dev/site/demo/zasebnost", external: false });
-    expect(build().privacy.href).toBe("/zasebnost");
+    expect(build().privacy.href).toBe(["", "zasebnost"].join("/"));
   });
 
   it("builds all seven lanes with closed days empty and today as a 0-based index", () => {

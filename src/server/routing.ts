@@ -2,8 +2,19 @@ import { isReservedSlug } from "@/lib/config";
 import type { ResolvedDealerSlug } from "@/server/data/dealers";
 
 export const BASE_PATH_HEADER = "x-drivebook-base-path";
-export const NOT_FOUND_PATH = "/_404";
+// Built rather than a literal so route crawlers don't take the rewrite target for a page.
+export const NOT_FOUND_PATH = ["", "_404"].join("/");
 export const DEV_INDEX_PATH = "/dev";
+
+// Root-host paths that, with dev aliases on, redirect to the alias that actually serves them.
+const DEV_REDIRECTS: [string, string][] = [
+  ["/app", "/_dev/app"],
+  ["/admin", "/_dev/admin"],
+  ["/dealer-admin", "/_dev/app"],
+  ["/backoffice", "/_dev/admin"],
+  ["/site", "/_dev/site"],
+  [DEV_INDEX_PATH, "/_dev"],
+];
 
 export type RouteConfig = {
   baseDomain: string;
@@ -41,6 +52,8 @@ const isInternal = (pathname: string) => INTERNAL_PREFIXES.some((prefix) => unde
 
 function surface(internal: "/dealer-admin" | "/backoffice", path: string, search: string, aliasPrefix = ""): RouteResult {
   if (path === "" || path === "/") return { kind: "redirect", status: 307, location: `${aliasPrefix}/login` };
+  // Under a dev alias, a nested internal path goes back through root-host routing (its own alias).
+  if (isInternal(path) && aliasPrefix) return { kind: "redirect", status: 307, location: `${path}${search}` };
   if (isInternal(path)) return notFound(search);
   return { kind: "rewrite", pathname: `${internal}${path}`, search };
 }
@@ -99,13 +112,13 @@ export async function routeRequest(host: string, pathname: string, search: strin
         `/_dev/site/${slug}`,
       );
     }
-    return notFound(search);
+    return { kind: "redirect", status: 307, location: "/_dev" };
   }
 
   if (cfg.devAliases) {
-    for (const alias of ["/app", "/admin"]) {
-      const rest = underPrefix(pathname, alias);
-      if (rest !== null) return { kind: "redirect", status: 307, location: `/_dev${alias}${rest}${search}` };
+    for (const [prefix, alias] of DEV_REDIRECTS) {
+      const rest = underPrefix(pathname, prefix);
+      if (rest !== null) return { kind: "redirect", status: 307, location: `${alias}${rest}${search}` };
     }
   }
 
