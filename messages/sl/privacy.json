@@ -1,0 +1,15 @@
+{
+  "title": "Obvestilo o varstvu osebnih podatkov",
+  "controller": "Upravljavec osebnih podatkov je {legalName}, {address}.",
+  "contact": "Kontakt upravljavca: {email}, {phone}.",
+  "processor": "Platforma DriveBook (drivebook.si) podatke obdeluje kot obdelovalec v imenu upravljavca.",
+  "dataHeading": "Katere podatke zbiramo",
+  "dataBody": "Ime in priimek, telefonsko številko, e-poštni naslov ter izbrano vozilo in termin.",
+  "purposeHeading": "Namen obdelave",
+  "purposeBody": "Organizacija testnih voženj in ogledov vozil ter pošiljanje potrditev in opomnikov.",
+  "retentionHeading": "Hramba",
+  "retentionBody": "Podatke hranimo največ 12 mesecev po terminu, nato jih izbrišemo.",
+  "rightsHeading": "Vaše pravice",
+  "rightsBody": "Imate pravico do dostopa, popravka, izbrisa in omejitve obdelave ter pritožbe pri Informacijskem pooblaščencu RS.",
+  "back": "Nazaj na stran avtohiše"
+}

@@ -1,0 +1,16 @@
+{
+  "openingHours": "Delovni čas",
+  "cars": "Vozila v ponudbi",
+  "noCars": "Trenutno ni objavljenih vozil.",
+  "call": "Pokliči",
+  "maps": "Odpri zemljevid",
+  "bookingTitle": "Rezervacija testne vožnje",
+  "bookingSoon": "Spletna rezervacija termina bo kmalu na voljo. Do takrat nas pokličite.",
+  "suspendedTitle": "Stran trenutno ni na voljo",
+  "suspendedBody": "Spletno naročanje pri tej avtohiši je začasno onemogočeno. Za informacije jih pokličite.",
+  "privacy": "Varstvo osebnih podatkov",
+  "closed": "Zaprto",
+  "carSelected": "Izbrano vozilo",
+  "carListing": "Oglej si oglas na avto.net",
+  "carInactive": "Neaktivno"
+}

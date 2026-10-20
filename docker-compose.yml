@@ -7,5 +7,45 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:-postgres://drivebook:drivebook@db:5432/drivebook}
+      - APP_ENV=${APP_ENV:-development}
       - BASE_DOMAIN=${BASE_DOMAIN:-drivebook.localhost}
+      - RUN_MIGRATIONS_ON_START=${RUN_MIGRATIONS_ON_START:-true}
+      - SEED_ON_START=${SEED_ON_START:-true}
+      - SEED_SUPERADMIN_EMAIL=${SEED_SUPERADMIN_EMAIL:-admin@drivebook.localhost}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-DriveBook}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID:-}
+    # service_started only: the app retries its DB connection itself.
+    depends_on:
+      db:
+        condition: service_started
     restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=drivebook
+      - POSTGRES_PASSWORD=drivebook
+      - POSTGRES_DB=drivebook
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Init scripts only run when the db-data volume is first created;
+      # run `docker compose down -v` to re-apply them.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drivebook -d drivebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:
