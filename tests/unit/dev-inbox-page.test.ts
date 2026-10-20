@@ -1,6 +1,7 @@
 import { prerender } from "react-dom/static";
 import { createTranslator } from "next-intl";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetConfigForTests } from "@/lib/config";
 import { messages } from "./i18n";
 import type { DevOutboxMessage } from "@/server/notify/outbox";
 
@@ -29,6 +30,15 @@ const count = (html: string, needle: string) => html.split(needle).length - 1;
 
 beforeEach(() => {
   rows.length = 0;
+  vi.stubEnv("BASE_DOMAIN", "drivebook.localhost");
+  vi.stubEnv("PUBLIC_URL_SCHEME", "http");
+  vi.stubEnv("PUBLIC_URL_PORT", "3000");
+  resetConfigForTests();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetConfigForTests();
 });
 
 describe("dev inbox page", () => {
@@ -60,7 +70,8 @@ describe("dev inbox page", () => {
     expect(html).toContain(`>${inbox.title}</h1>`);
     expect(count(html, 'data-testid="inbox-message"')).toBe(2);
     expect(count(html, 'data-testid="inbox-link"')).toBe(1);
-    expect(html).toContain('href="http://app.drivebook.localhost:3000/set-password?token=abc"');
+    expect(html).toContain('href="/_dev/app/set-password?token=abc"');
+    expect(html).toContain(">http://app.drivebook.localhost:3000/set-password?token=abc</a>");
     expect(html).toContain(inbox.channel.email);
     expect(html).toContain(inbox.channel.sms);
     expect(html).toContain("kupec@example.si");

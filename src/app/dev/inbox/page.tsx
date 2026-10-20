@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AppHeader, Badge, Card, CardHeader, Container, Eyebrow, PageHeader, Shell, Stack, Text } from "@/components/ui";
-import { getConfig } from "@/lib/config";
+import { getConfig, surfaceOrigin } from "@/lib/config";
 import { formatDate, formatTime } from "@/lib/date";
 import { listDevOutbox } from "@/server/notify/outbox";
 import { HtmlPreview } from "./HtmlPreview";
+import { rewriteHtmlLinks } from "./rewrite-links";
 import { TextBody } from "./TextBody";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function DevInboxPage() {
 
   const t = await getTranslations("inbox");
   const messages = await listDevOutbox();
+  const origins = { dealer: surfaceOrigin("dealer"), backoffice: surfaceOrigin("backoffice") };
 
   return (
     <Shell header={<AppHeader />}>
@@ -57,10 +59,15 @@ export default async function DevInboxPage() {
                       </dl>
                       <div className="flex flex-col gap-2 border-t border-dashed border-line pt-4">
                         <Eyebrow>{t("textBody")}</Eyebrow>
-                        <TextBody text={m.textBody} />
+                        <TextBody text={m.textBody} origins={origins} />
                       </div>
                       {m.htmlBody && (
-                        <HtmlPreview html={m.htmlBody} showLabel={t("showHtml")} hideLabel={t("hideHtml")} title={t("htmlPreview")} />
+                        <HtmlPreview
+                          html={rewriteHtmlLinks(m.htmlBody, origins)}
+                          showLabel={t("showHtml")}
+                          hideLabel={t("hideHtml")}
+                          title={t("htmlPreview")}
+                        />
                       )}
                     </Stack>
                   </Card>
