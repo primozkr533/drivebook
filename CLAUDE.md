@@ -1,19 +1,78 @@
 # DriveBook — project conventions
 
 Multi-tenant SaaS (drivebook.si) for Slovenian car dealers: test-drive / viewing bookings from avto.net listings.
-Stack: Next.js (App Router, TypeScript strict) · Tailwind CSS v4 · shadcn/ui · next-intl (sl) · PostgreSQL + Drizzle · pg-boss.
-Currently only the design foundation exists; phase 1 features build on top of it.
+Stack: Next.js (App Router, TypeScript strict) · Tailwind CSS v4 · shadcn/ui · next-intl (sl, `messages/sl/*.json`) · PostgreSQL + Drizzle (migrations in `drizzle/`) · pg-boss · Vitest · Playwright.
+Phase 1's base is in place: data model + tenant-isolated data layer, host-based routing, and the read-only public dealer page. Phase 1 features build on top of it.
 
 ## Commands
-- `docker compose up --build` — serves the app on http://localhost:3000 (`/` → `/design` for now)
+- `docker compose up --build` — starts `db` + `web` on http://localhost:3000 (`/` → `/design`); migrations and the demo seed run on start
 - `npm run dev` — local dev server · `npm run build` — production build · `npm run typecheck`
+- `npm run test` — Vitest (needs `docker compose up -d db`; uses the `drivebook_test` DB via `TEST_DATABASE_URL`)
+- `npm run test:e2e` — Playwright against the running stack (`npx playwright install chromium` once)
+- `npm run db:generate` — generate a Drizzle migration from `src/db/schema` into `drizzle/`
+- `npm run db:migrate` — apply pending migrations · `npm run db:seed` — run the idempotent seed
 
 FARM-RUN-CONTRACT
 ```
+target: web
+runs-where: container
+run-via: compose
 web-service: web
 web-port: 3000
-preview-path: /design
+preview-path: /_dev/site/demo
+smoke: docker compose exec -T web wget -qO- --header='Host: demo.drivebook.localhost' http://localhost:3000/ | grep -q 'Octavia'
 ```
+
+## Structure
+- `src/lib/config.ts` — the only env reader (`getConfig()`); also `RESERVED_SLUGS`
+- `src/lib/date.ts` — the only Europe/Ljubljana date utility
+- `src/db/` — schema (`src/db/schema/`), client, migrate, seed, `newPublicId` (`src/db/ids.ts`)
+- `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
+- `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
+- `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
+- `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
+- `src/app/site/[slug]/` — public dealer site
+- `src/app/dealer-admin/` — `app.` surface (dealer admin)
+- `src/app/backoffice/` — `admin.` surface (backoffice)
+- `src/i18n/request.ts` + `messages/sl/` — translations
+- `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
+
+## Required environment variables
+All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
+- `DATABASE_URL` — Postgres connection string for the app
+- `TEST_DATABASE_URL` — Postgres connection string for Vitest (`drivebook_test`; must differ from `DATABASE_URL`)
+- `APP_ENV` — `development` | `test` | `production` (dev aliases are off in production)
+- `BASE_DOMAIN` — root domain for dealer subdomains and the `app.`/`admin.` surfaces (`drivebook.localhost` in dev)
+- `RUN_MIGRATIONS_ON_START` — apply pending migrations when the server starts
+- `SEED_ON_START` — run the idempotent seed (default plan, superadmin, demo dealer) when the server starts
+- `SEED_SUPERADMIN_EMAIL` — email of the superadmin account created by the seed
+- `TWILIO_ACCOUNT_SID` — Twilio account SID for SMS
+- `TWILIO_AUTH_TOKEN` — Twilio auth token
+- `TWILIO_FROM_NUMBER` — Twilio sender number (E.164)
+- `BREVO_API_KEY` — Brevo API key for transactional email
+- `BREVO_SENDER_EMAIL` — Brevo verified sender address
+- `BREVO_SENDER_NAME` — display name on outgoing email
+- `CLOUDFLARE_API_TOKEN` — Cloudflare API token for dealer custom domains
+- `CLOUDFLARE_ZONE_ID` — Cloudflare zone ID for dealer custom domains
+
+## Tenant isolation
+1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
+2. A `DealerContext` is created only by `resolveDealerSlug` (public host) or, later, by the authenticated session — never from IDs supplied in a request.
+3. Every dealer-scoped query filters by `ctx.dealerId`, including lookups by car ID (`getCar(ctx, id)`).
+4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction.
+5. Admin actions and routes call `requireDealerRole(ctx, roles)` / `requireBackofficeRole(roles)` first; both are stubs that throw until auth exists.
+6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first.
+7. Public IDs (cars) are unguessable `newPublicId()` values, never sequential.
+8. Reserved slugs (`RESERVED_SLUGS` in `src/lib/config.ts`) are never resolved as dealers.
+
+## Routing
+Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired up by `src/proxy.ts`.
+- `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
+- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to `/login`)
+- Old (renamed) dealer slugs 301 to the current slug, keeping path and query
+- Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`) 404 when requested directly on any other host
+- Dev aliases on `localhost` (off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin`
+- Internal links on the dealer site are prefixed with the `x-drivebook-base-path` request header (empty on a real subdomain, `/_dev/site/{slug}` via the dev alias)
 
 ## Design system
 
