@@ -139,8 +139,29 @@ describe("routeRequest: dev aliases", () => {
   it("404s reserved or missing slugs under /_dev/site", async () => {
     const cfg = config();
     expect(await route("localhost", "/_dev/site/www", cfg)).toEqual(notFound());
-    expect(await route("localhost", "/_dev/site/", cfg)).toEqual(notFound());
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
+  });
+
+  it("serves the dev index at /_dev and sends a bare /_dev/site there", async () => {
+    const cfg = config();
+    expect(await route("localhost", "/_dev", cfg)).toEqual({ kind: "rewrite", pathname: "/dev", search: "" });
+    expect(await route("web:3000", "/_dev/", cfg)).toEqual({ kind: "rewrite", pathname: "/dev", search: "" });
+    expect(await route("localhost", "/_dev/site/", cfg)).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
+    expect(await route("localhost", "/_dev/site", cfg)).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
+    expect(await route("localhost", "/dev", cfg)).toEqual(notFound());
+    expect(await route("demo.drivebook.localhost", "/dev", cfg)).toEqual(notFound());
+    expect(cfg.resolveSlug).not.toHaveBeenCalled();
+  });
+
+  it("redirects /app and /admin on a non-dealer host to their dev aliases", async () => {
+    expect(await route("web:3000", "/admin")).toEqual({ kind: "redirect", status: 307, location: "/_dev/admin" });
+    expect(await route("localhost", "/app/login?x=1")).toEqual({
+      kind: "redirect",
+      status: 307,
+      location: "/_dev/app/login?x=1",
+    });
+    expect(await route("localhost", "/apples")).toEqual({ kind: "next" });
+    expect(await route("localhost", "/admin", config({ devAliases: false }))).toEqual({ kind: "next" });
   });
 
   it("redirects a renamed slug within the alias", async () => {

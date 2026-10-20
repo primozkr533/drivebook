@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getConfig } from "@/lib/config";
+import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG } from "./demo";
 import type { Db } from "./client";
 import {
   backofficeUsers,
@@ -13,10 +14,10 @@ import {
   plans,
 } from "./schema";
 
+export { DEMO_DEALER_SLUG, DEMO_OLD_SLUG };
+
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-export const DEMO_DEALER_SLUG = "demo";
-export const DEMO_OLD_SLUG = "avtohisa-demo";
 export const DEMO_CAR_IDS = {
   octavia: "q7Kd2mXv9TzR4bNw",
   tiguan: "Lp3sV8yQe1HcZu6J",
