@@ -16,7 +16,7 @@ RUN test -f .next/standalone/node_modules/pg/package.json \
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
@@ -25,4 +25,5 @@ COPY --from=build --chown=app:app /app/public ./public
 COPY --from=build --chown=app:app /app/drizzle ./drizzle
 USER app
 EXPOSE 3000
-CMD ["node", "server.js"]
+COPY --chmod=755 docker/web/start.sh /usr/local/bin/start-web
+CMD ["start-web"]

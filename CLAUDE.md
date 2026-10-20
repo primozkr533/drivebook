@@ -71,7 +71,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to `/login`)
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`) 404 when requested directly on any other host
-- Dev aliases on `localhost` (off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin`
+- Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin`
 - Internal links on the dealer site are prefixed with the `x-drivebook-base-path` request header (empty on a real subdomain, `/_dev/site/{slug}` via the dev alias)
 
 ## Design system
