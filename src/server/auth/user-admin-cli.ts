@@ -55,7 +55,7 @@ export async function main(argv: string[], io: Io = console): Promise<number> {
     }
     const result = await resendInvitation(surface, userId);
     if (!result.ok) {
-      io.error(`The ${surface} user ${email} is not in the invited state; use the password reset instead.`);
+      io.error(`The ${surface} user ${email} is not in the invited state.`);
       return 1;
     }
     io.log(`Set-password link: ${result.link}`);

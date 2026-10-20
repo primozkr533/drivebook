@@ -29,11 +29,12 @@ test.afterAll(async () => {
   await closeDb();
 });
 
-// Runs the real operator CLI against the stack's database (DATABASE_URL, like the user helper).
+// Runs the real operator CLI against the stack's database (DATABASE_URL, like the user helper);
+// link defaults match docker-compose since nothing loads .env on the host.
 async function userAdmin(...args: string[]) {
   const { stdout } = await promisify(execFile)("npx", ["tsx", "src/server/auth/user-admin-cli.ts", ...args], {
     cwd: process.cwd(),
-    env: process.env,
+    env: { PUBLIC_URL_SCHEME: "http", PUBLIC_URL_PORT: "3000", ...process.env },
   });
   return stdout;
 }
