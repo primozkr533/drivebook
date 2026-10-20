@@ -3,6 +3,7 @@ import type { ResolvedDealerSlug } from "@/server/data/dealers";
 
 export const BASE_PATH_HEADER = "x-drivebook-base-path";
 export const NOT_FOUND_PATH = "/_404";
+export const DEV_INDEX_PATH = "/dev";
 
 export type RouteConfig = {
   baseDomain: string;
@@ -17,7 +18,7 @@ export type RouteResult =
   | { kind: "redirect"; status: 301 | 307; location: string };
 
 const SLUG_LABEL = /^[a-z0-9-]{1,63}$/;
-const INTERNAL_PREFIXES = ["/site", "/dealer-admin", "/backoffice", "/_dev"];
+const INTERNAL_PREFIXES = ["/site", "/dealer-admin", "/backoffice", "/_dev", DEV_INDEX_PATH];
 
 const notFound = (search: string): RouteResult => ({ kind: "rewrite", pathname: NOT_FOUND_PATH, search });
 
@@ -79,11 +80,13 @@ export async function routeRequest(host: string, pathname: string, search: strin
 
   const devPath = underPrefix(pathname, "/_dev");
   if (cfg.devAliases && devPath !== null) {
+    if (devPath === "" || devPath === "/") return { kind: "rewrite", pathname: DEV_INDEX_PATH, search };
     const app = underPrefix(devPath, "/app");
     if (app !== null) return surface("/dealer-admin", app, search, "/_dev/app");
     const admin = underPrefix(devPath, "/admin");
     if (admin !== null) return surface("/backoffice", admin, search, "/_dev/admin");
     const site = underPrefix(devPath, "/site");
+    if (site === "" || site === "/") return { kind: "redirect", status: 307, location: "/_dev" };
     if (site) {
       const [, slug = "", ...rest] = site.split("/");
       const path = rest.length ? `/${rest.join("/")}` : "";
@@ -97,6 +100,13 @@ export async function routeRequest(host: string, pathname: string, search: strin
       );
     }
     return notFound(search);
+  }
+
+  if (cfg.devAliases) {
+    for (const alias of ["/app", "/admin"]) {
+      const rest = underPrefix(pathname, alias);
+      if (rest !== null) return { kind: "redirect", status: 307, location: `/_dev${alias}${rest}${search}` };
+    }
   }
 
   // Non-dealer hosts (localhost, preview proxies) get the root-host treatment; dev aliases are handled above.
