@@ -1,0 +1,130 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getConfig, isReservedSlug, resetConfigForTests } from "@/lib/config";
+
+const originalEnv = process.env;
+
+function setEnv(env: Record<string, string>) {
+  process.env = { ...env } as NodeJS.ProcessEnv;
+  resetConfigForTests();
+}
+
+beforeEach(() => setEnv({}));
+
+afterEach(() => {
+  process.env = originalEnv;
+  resetConfigForTests();
+});
+
+describe("getConfig", () => {
+  it("uses development defaults with an empty env", () => {
+    const config = getConfig();
+    expect(config.appEnv).toBe("development");
+    expect(config.isProduction).toBe(false);
+    expect(config.baseDomain).toBe("drivebook.localhost");
+    expect(config.databaseUrl).toBe("postgres://drivebook:drivebook@localhost:5432/drivebook");
+    expect(config.testDatabaseUrl).toBe("postgres://drivebook:drivebook@localhost:5432/drivebook_test");
+    expect(config.devAliases).toBe(true);
+    expect(config.runMigrationsOnStart).toBe(true);
+    expect(config.seedOnStart).toBe(true);
+    expect(config.seedSuperadminEmail).toBe("admin@drivebook.localhost");
+    expect(config.providers).toEqual({ sms: "console", email: "console", cloudflare: false });
+    expect(config.twilio).toBeNull();
+    expect(config.brevo).toBeNull();
+    expect(config.cloudflare).toBeNull();
+  });
+
+  it("is memoised until reset", () => {
+    const first = getConfig();
+    process.env.BASE_DOMAIN = "other.test";
+    expect(getConfig()).toBe(first);
+    resetConfigForTests();
+    expect(getConfig().baseDomain).toBe("other.test");
+  });
+
+  it("defaults appEnv to production when NODE_ENV=production", () => {
+    setEnv({ NODE_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" });
+    const config = getConfig();
+    expect(config.appEnv).toBe("production");
+    expect(config.devAliases).toBe(false);
+    expect(config.seedOnStart).toBe(false);
+  });
+
+  it("lets APP_ENV override NODE_ENV", () => {
+    setEnv({ NODE_ENV: "production", APP_ENV: "development" });
+    expect(getConfig().appEnv).toBe("development");
+  });
+
+  it("throws naming every missing variable in production", () => {
+    setEnv({ APP_ENV: "production" });
+    expect(() => getConfig()).toThrow(/DATABASE_URL/);
+    expect(() => getConfig()).toThrow(/BASE_DOMAIN/);
+  });
+
+  it("treats whitespace-only values as missing", () => {
+    setEnv({ APP_ENV: "production", DATABASE_URL: "  ", BASE_DOMAIN: "drivebook.si" });
+    expect(() => getConfig()).toThrow(/DATABASE_URL/);
+  });
+
+  it("does not throw on import", async () => {
+    setEnv({ APP_ENV: "production" });
+    await expect(import("@/lib/config")).resolves.toBeDefined();
+  });
+
+  it("lowercases the base domain and strips the port", () => {
+    setEnv({ BASE_DOMAIN: " DriveBook.SI:3000 " });
+    expect(getConfig().baseDomain).toBe("drivebook.si");
+  });
+
+  it("parses boolean flags", () => {
+    setEnv({ RUN_MIGRATIONS_ON_START: "false", SEED_ON_START: "0" });
+    const config = getConfig();
+    expect(config.runMigrationsOnStart).toBe(false);
+    expect(config.seedOnStart).toBe(false);
+  });
+
+  it("selects twilio when all three vars are set", () => {
+    setEnv({ TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok", TWILIO_FROM_NUMBER: "+38640000000" });
+    const config = getConfig();
+    expect(config.providers.sms).toBe("twilio");
+    expect(config.twilio).toEqual({ accountSid: "AC123", authToken: "tok", fromNumber: "+38640000000" });
+  });
+
+  it("falls back to console sms when a twilio var is missing", () => {
+    setEnv({ TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok", TWILIO_FROM_NUMBER: " " });
+    expect(getConfig().providers.sms).toBe("console");
+    expect(getConfig().twilio).toBeNull();
+  });
+
+  it("selects brevo when key and sender email are set", () => {
+    setEnv({ BREVO_API_KEY: "key", BREVO_SENDER_EMAIL: "noreply@drivebook.si" });
+    const config = getConfig();
+    expect(config.providers.email).toBe("brevo");
+    expect(config.brevo).toEqual({ apiKey: "key", senderEmail: "noreply@drivebook.si", senderName: "DriveBook" });
+  });
+
+  it("passes a custom brevo sender name through", () => {
+    setEnv({ BREVO_API_KEY: "key", BREVO_SENDER_EMAIL: "a@b.si", BREVO_SENDER_NAME: "Avto Hiša" });
+    expect(getConfig().brevo?.senderName).toBe("Avto Hiša");
+  });
+
+  it("enables cloudflare when token and zone are set", () => {
+    setEnv({ CLOUDFLARE_API_TOKEN: "cf-token", CLOUDFLARE_ZONE_ID: "zone" });
+    const config = getConfig();
+    expect(config.providers.cloudflare).toBe(true);
+    expect(config.cloudflare).toEqual({ apiToken: "cf-token", zoneId: "zone" });
+  });
+
+  it("never throws for missing provider keys in production", () => {
+    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" });
+    expect(getConfig().providers).toEqual({ sms: "console", email: "console", cloudflare: false });
+  });
+});
+
+describe("isReservedSlug", () => {
+  it("matches case-insensitively", () => {
+    expect(isReservedSlug("APP")).toBe(true);
+    expect(isReservedSlug("www")).toBe(true);
+    expect(isReservedSlug("admin")).toBe(true);
+    expect(isReservedSlug("demo")).toBe(false);
+  });
+});
