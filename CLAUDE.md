@@ -13,6 +13,8 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run db:migrate` — apply pending migrations · `npm run db:seed` — run the idempotent seed
 - `npm run worker` — notification worker (pg-boss `notify.email` / `notify.sms`); runs as the `worker` compose service, `web` never depends on it
 - `npm run create-superadmin -- --email x` — create/invite a backoffice superadmin and print the set-password link
+- `npm run user-admin -- deactivate --surface dealer|backoffice --email x` — deactivate a user on that surface and revoke all of their sessions (unknown e-mail exits non-zero)
+- `npm run user-admin -- resend-invite --surface dealer|backoffice --email x` — re-issue an invited user's 7-day set-password link, queue the invitation e-mail and print the link
 
 FARM-RUN-CONTRACT
 ```
@@ -123,3 +125,6 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Phones: one full-width column. From `md`/`lg`: multi-column via `Grid` (e.g. list + detail, cards 2–3 up, a `lg:col-span-8` main + `lg:col-span-4` aside).
 - Components that can live in both a main column and an aside (`DriveTicket`, `HoursStrip`) respond to their **container** (`@container`, `@md:`/`@2xl:`), not the viewport. Do the same for new signature-level components.
 - Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; pass `menu={{ label }}` to show the same items in the compact disclosure menu (`CompactMenu`) there.
+
+## Decisions
+- Until user-management UI exists, deactivation and invitation resend are operator actions via `npm run user-admin` (deactivate / resend-invite).
