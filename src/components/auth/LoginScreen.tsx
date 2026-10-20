@@ -1,5 +1,10 @@
 import { getTranslations } from "next-intl/server";
-import { AppHeader, Button, Card, Container, Input, PageHeader, Shell, Stack, Text } from "@/components/ui";
+import { redirect } from "next/navigation";
+import { AppHeader, Card, Container, PageHeader, Shell, Stack } from "@/components/ui";
+import { getSurfaceBasePath } from "@/server/auth/permissions";
+import { getCurrentSession } from "@/server/auth/session";
+import { loginAction } from "./actions";
+import { LoginForm } from "./LoginForm";
 
 export type LoginSurface = "dealer" | "backoffice";
 
@@ -13,29 +18,36 @@ export async function loginTitle(surface: LoginSurface) {
   return t(keys[surface].title);
 }
 
-// Mocked sign-in: no action and a disabled submit, so the form can never be sent.
 export async function LoginScreen({ surface }: { surface: LoginSurface }) {
+  const basePath = await getSurfaceBasePath();
+  if (await getCurrentSession(surface)) redirect(`${basePath}/`);
+
   const t = await getTranslations("auth");
+  const labels = {
+    email: t("email"),
+    password: t("password"),
+    submit: t("submit"),
+    forgotPassword: t("forgotPassword"),
+    totpLabel: t("totpLabel"),
+    totpHint: t("totpHint"),
+    totpSubmit: t("totpSubmit"),
+    errors: {
+      invalid: t("errorInvalid"),
+      rate_limited: t("errorRateLimited"),
+      totp_invalid: t("errorTotpInvalid"),
+    },
+  };
   return (
     <Shell header={<AppHeader />}>
       <Container width="narrow" className="py-10 md:py-16">
         <Stack gap={8}>
           <PageHeader eyebrow={t(keys[surface].eyebrow)} title={t(keys[surface].title)} />
           <Card pad="lg">
-            <form noValidate>
-              <Stack gap={6}>
-                <Input label={t("email")} name="email" type="email" autoComplete="email" />
-                <Input label={t("password")} name="password" type="password" autoComplete="current-password" />
-                <Text size="small" tone="muted">
-                  {t("placeholderNote")}
-                </Text>
-                <div>
-                  <Button type="submit" disabled>
-                    {t("submit")}
-                  </Button>
-                </div>
-              </Stack>
-            </form>
+            <LoginForm
+              action={loginAction.bind(null, surface)}
+              labels={labels}
+              forgotPasswordHref={`${basePath}/forgot-password`}
+            />
           </Card>
         </Stack>
       </Container>

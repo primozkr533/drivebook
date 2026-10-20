@@ -76,7 +76,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 ## Routing
 Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired up by `src/proxy.ts`.
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
-- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to the login page)
+- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the signed-in home, which redirects to `/login` without a session; the dev aliases set `x-drivebook-base-path` to `/_dev/app` / `/_dev/admin`, read via `getSurfaceBasePath()`)
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
