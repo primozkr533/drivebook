@@ -5,6 +5,7 @@ export const BASE_PATH_HEADER = "x-drivebook-base-path";
 // Built rather than a literal so route crawlers don't take the rewrite target for a page.
 export const NOT_FOUND_PATH = ["", "_404"].join("/");
 export const DEV_INDEX_PATH = "/dev";
+export const DEV_INBOX_PATH = "/dev/inbox";
 
 // Root-host paths that, with dev aliases on, redirect to the alias that actually serves them.
 const DEV_REDIRECTS: [string, string][] = [
@@ -19,6 +20,8 @@ const DEV_REDIRECTS: [string, string][] = [
 export type RouteConfig = {
   baseDomain: string;
   devAliases: boolean;
+  // Defaults to devAliases; DEV_INBOX_ENABLED can serve the inbox alone in production.
+  devInbox?: boolean;
   resolveSlug: (slug: string) => Promise<ResolvedDealerSlug>;
   protocol?: string;
 };
@@ -92,6 +95,9 @@ export async function routeRequest(host: string, pathname: string, search: strin
   }
 
   const devPath = underPrefix(pathname, "/_dev");
+  if ((devPath === "/inbox" || devPath === "/inbox/") && (cfg.devInbox ?? cfg.devAliases)) {
+    return { kind: "rewrite", pathname: DEV_INBOX_PATH, search };
+  }
   if (cfg.devAliases && devPath !== null) {
     if (devPath === "" || devPath === "/") return { kind: "rewrite", pathname: DEV_INDEX_PATH, search };
     const app = underPrefix(devPath, "/app");
