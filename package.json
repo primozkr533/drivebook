@@ -14,7 +14,8 @@
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:seed": "tsx src/db/seed-cli.ts",
     "worker": "tsx src/worker.ts",
-    "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts"
+    "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts",
+    "user-admin": "tsx src/server/auth/user-admin-cli.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.0",

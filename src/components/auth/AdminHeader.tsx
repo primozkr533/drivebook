@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { AppHeader, Text } from "@/components/ui";
+import { Text } from "@/components/ui";
 import type { AuthSurface } from "@/server/auth/session";
+import { ActiveNavHeader } from "./ActiveNavHeader";
 import { LogoutButton } from "./LogoutButton";
 
 export async function AdminHeader({
@@ -17,7 +18,7 @@ export async function AdminHeader({
   const t = await getTranslations("account");
   const nav = [{ label: t("navAccount"), href: `${basePath}/account` }];
   return (
-    <AppHeader
+    <ActiveNavHeader
       context={
         <Text as="span" size="small" tone="ink" className="font-[650]" data-testid="header-context">
           {context}
