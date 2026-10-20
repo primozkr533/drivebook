@@ -1,0 +1,11 @@
+# Dev stack. Phase 1 adds Postgres (+ worker) here; the web service must keep
+# starting on its own (no service_healthy gate) so /design is always reachable.
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - BASE_DOMAIN=${BASE_DOMAIN:-drivebook.localhost}
+    restart: unless-stopped

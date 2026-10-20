@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Tailwind theme = a thin mapping onto tokens.css. Default palettes, radii,
+   fonts and shadows are RESET so off-system utilities (bg-blue-500,
+   rounded-lg, shadow-md…) don't exist. Spacing uses the 4px token unit. */
+@theme inline {
+  --color-*: initial;
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-wash: var(--signal-wash);
+  --color-on-signal: var(--on-signal);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-ok: var(--ok);
+  --color-ok-wash: var(--ok-wash);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+  --color-transparent: transparent;
+
+  --font-*: initial;
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --text-*: initial;
+  --text-mega: var(--text-mega);
+  --text-mega--line-height: var(--lh-mega);
+  --text-mega--letter-spacing: var(--track-mega);
+  --text-d1: var(--text-d1);
+  --text-d1--line-height: var(--lh-d1);
+  --text-d1--letter-spacing: var(--track-d1);
+  --text-h1: var(--text-h1);
+  --text-h1--line-height: var(--lh-h1);
+  --text-h1--letter-spacing: var(--track-h1);
+  --text-h2: var(--text-h2);
+  --text-h2--line-height: var(--lh-h2);
+  --text-h2--letter-spacing: var(--track-h2);
+  --text-h3: var(--text-h3);
+  --text-h3--line-height: var(--lh-h3);
+  --text-h3--letter-spacing: var(--track-h3);
+  --text-lead: var(--text-lead);
+  --text-lead--line-height: var(--lh-lead);
+  --text-body: var(--text-body);
+  --text-body--line-height: var(--lh-body);
+  --text-small: var(--text-small);
+  --text-small--line-height: var(--lh-small);
+  --text-code: var(--text-code);
+  --text-code--line-height: var(--lh-code);
+  --text-caption: var(--text-caption);
+  --text-caption--line-height: var(--lh-caption);
+  --text-micro: var(--text-micro);
+  --text-micro--line-height: var(--lh-micro);
+  --text-micro--letter-spacing: var(--track-micro);
+
+  --spacing: var(--space-unit);
+
+  --radius-*: initial;
+  --radius-sharp: var(--radius-sharp);
+  --radius-soft: var(--radius-soft);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-*: initial;
+  --shadow-hard: var(--shadow-hard);
+  --shadow-hard-signal: var(--shadow-hard-signal);
+  --shadow-float: var(--shadow-float);
+
+  --ease-out: var(--ease-out);
+  --ease-snap: var(--ease-snap);
+
+  --container-page: var(--container-max);
+  --container-narrow: var(--container-narrow);
+}
+
+@layer base {
+  html {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-stretch: var(--stretch-body);
+    font-weight: var(--weight-body);
+    font-size: 100%;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body { min-height: 100dvh; background: var(--ground); }
+  ::selection { background: var(--signal); color: var(--on-signal); }
+  :focus-visible { outline: none; box-shadow: var(--focus-ring); }
+}
+
+@layer utilities {
+  /* The display register: expanded, heavy, tight. Use with restraint. */
+  .type-display {
+    font-family: var(--font-display);
+    font-stretch: var(--stretch-display);
+    font-weight: var(--weight-display);
+  }
+  /* Utility register: mono, uppercase, tracked. Labels, codes, meta. */
+  .type-utility {
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--track-micro);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Signature chamfer — the plate-cut corner. */
+  .cut-tr { clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+  .cut-br { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%); }
+  .cut-2 {
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .cut-lg { --cut: var(--cut-lg); }
+
+  /* Lane-marking divider: dashed rule like a road centre line. */
+  .lane-rule {
+    height: var(--rule-bold);
+    background: repeating-linear-gradient(90deg, var(--line-strong) 0 18px, transparent 18px 30px);
+  }
+}
+
+/* The single reveal moment: the drive ticket arrives, then is stamped. */
+@keyframes ticket-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes stamp-in {
+  0%   { transform: scale(1.6) rotate(-14deg); opacity: 0; }
+  60%  { transform: scale(0.96) rotate(-8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anim-ticket { animation: ticket-in var(--dur-reveal) var(--ease-out) both; }
+  .anim-stamp  { animation: stamp-in calc(var(--dur-reveal) * 0.7) var(--ease-snap) calc(var(--dur-reveal) * 0.8) both; }
+}
