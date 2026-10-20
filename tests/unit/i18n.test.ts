@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { messages } from "./i18n";
 
 const dir = join(process.cwd(), "messages/sl");
-const namespaces = ["common", "dealerPage", "auth", "privacy", "errors", "dev"];
+const namespaces = ["common", "dealerPage", "auth", "privacy", "errors", "dev", "email", "account", "inbox"];
 
 describe("sl messages", () => {
   it("has exactly the expected namespace files", () => {
