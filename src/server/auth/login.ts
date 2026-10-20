@@ -75,8 +75,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
 
   const email = normalizeEmail(input.email);
   if (await isLoginRateLimited(surface, email, ip)) {
-    await fail(input, email, null, "rate_limited");
-    return { ok: false, error: "rate_limited" };
+    return blocked(input, email, null);
   }
 
   const user = email ? await findUserByEmail(surface, email) : null;
@@ -110,8 +109,7 @@ async function loginWithTotp(input: LoginInput, pendingToken: string): Promise<L
   }
 
   if (await isLoginRateLimited(surface, user.email, ip)) {
-    await fail(input, user.email, user, "rate_limited");
-    return { ok: false, error: "rate_limited" };
+    return blocked(input, user.email, user);
   }
 
   if (!verifyTotpCode(decryptTotpSecret(user.totpSecretEnc), input.totpCode ?? "")) {
@@ -137,6 +135,16 @@ async function succeed(input: LoginInput, user: LoginUser): Promise<LoginResult>
 
 async function fail(input: LoginInput, email: string, user: LoginUser | null, reason: string): Promise<void> {
   await recordLoginAttempt(input.surface, email, input.ip, false);
+  await auditFailure(input, email, user, reason);
+}
+
+// Blocked attempts are audited but not counted, so they can't keep sliding the lockout window.
+async function blocked(input: LoginInput, email: string, user: LoginUser | null): Promise<LoginResult> {
+  await auditFailure(input, email, user, "rate_limited");
+  return { ok: false, error: "rate_limited" };
+}
+
+async function auditFailure(input: LoginInput, email: string, user: LoginUser | null, reason: string): Promise<void> {
   await writeAuthAudit({
     surface: input.surface,
     action: "auth.login.failure",
