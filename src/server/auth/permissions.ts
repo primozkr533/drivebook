@@ -54,11 +54,11 @@ export async function requireDealerRole(ctx: DealerContext, allowed: DealerRole[
   return { userId: user.id, role: user.role, dealerId: sessionCtx.dealerId };
 }
 
-export async function requireBackofficeUser(): Promise<{ user: BackofficeUser }> {
+export async function requireBackofficeUser(): Promise<{ user: BackofficeUser; sessionId: string }> {
   const current = await getCurrentSession("backoffice");
   if (!current) return redirectToLogin();
   const { id, email, role } = current.user;
-  return { user: { id, email, role } };
+  return { user: { id, email, role }, sessionId: current.session.id };
 }
 
 export async function requireBackofficeRole(allowed: BackofficeRole[]): Promise<BackofficeActor> {

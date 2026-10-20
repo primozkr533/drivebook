@@ -218,6 +218,7 @@ describe("getDealerContextFromSession", () => {
     expect(result?.ctx.dealerId).toBe(seeded.dealerUser.dealerId);
     expect(result?.ctx.slug).toBe("demo");
     expect(result?.user).toEqual({ id: seeded.dealerUser.id, email: "owner@demo.si", role: "owner" });
+    expect(result?.sessionId).toEqual(expect.any(String));
   });
 
   it("returns null without a dealer session", async () => {
