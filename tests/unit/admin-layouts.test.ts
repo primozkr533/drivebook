@@ -24,10 +24,12 @@ const mocks = vi.hoisted(() => ({
   backofficeSession: null as unknown,
   getDealerName: vi.fn(),
   getAccountSummary: vi.fn(),
+  pathname: "/",
 }));
 
 vi.mock("next/headers", () => ({ headers: async () => mocks.headers }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => mocks.pathname,
   redirect: (url: string) => {
     throw Object.assign(new Error("NEXT_REDIRECT"), { url });
   },
@@ -48,6 +50,7 @@ beforeEach(() => {
   mocks.headers = new Headers();
   mocks.dealerSession = null;
   mocks.backofficeSession = null;
+  mocks.pathname = "/";
   vi.clearAllMocks();
 });
 
@@ -119,6 +122,26 @@ describe.each(surfaces)("$name (app) group", ({ Layout, Home, Account, alias, si
     expect(html).toContain('data-testid="logout"');
     expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*data-testid="compact-menu-button"/);
     expect(html).toMatch(/data-testid="compact-menu-panel"[^>]*hidden|hidden[^>]*data-testid="compact-menu-panel"/);
+  });
+
+  it.each(["", alias])("marks Account active in the inline nav and the compact menu on the account page (base path %j)", async (basePath) => {
+    signIn();
+    mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
+    const href = `${basePath}/account`;
+    const link = new RegExp(`<a[^>]*href="${href}"[^>]*>${account.navAccount}</a>`, "g");
+
+    for (const pathname of [href, `${href}/2fa`]) {
+      mocks.pathname = pathname;
+      const links = (await render(createElement(Layout, { children: child }))).match(link) ?? [];
+      expect(links).toHaveLength(2);
+      for (const a of links) expect(a).toContain('aria-current="page"');
+    }
+
+    for (const pathname of [basePath || "/", `${href}x`, ["", "other", "account"].join("/")]) {
+      mocks.pathname = pathname;
+      const html = await render(createElement(Layout, { children: child }));
+      expect(html).not.toContain('aria-current="page"');
+    }
   });
 
   it("renders the account page for the signed-in user", async () => {
