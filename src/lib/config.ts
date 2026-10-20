@@ -13,6 +13,12 @@ export type Config = {
   runMigrationsOnStart: boolean;
   seedOnStart: boolean;
   seedSuperadminEmail: string;
+  authSecret: string;
+  farmTestAuth: boolean;
+  devInboxEnabled: boolean;
+  notifyFake: boolean;
+  publicUrlScheme: "http" | "https";
+  publicUrlPort: string | null;
   providers: {
     sms: "twilio" | "console";
     email: "brevo" | "console";
@@ -62,6 +68,8 @@ const DEFAULT_DATABASE_URL = "postgres://drivebook:drivebook@localhost:5432/driv
 const DEFAULT_TEST_DATABASE_URL = "postgres://drivebook:drivebook@localhost:5432/drivebook_test";
 const DEFAULT_SUPERADMIN_EMAIL = "admin@drivebook.localhost";
 const DEFAULT_BREVO_SENDER_NAME = "DriveBook";
+const DEV_AUTH_SECRET = "drivebook-dev-auth-secret-not-for-production";
+const MIN_AUTH_SECRET_LENGTH = 32;
 
 type Env = Record<string, string | undefined>;
 
@@ -76,6 +84,23 @@ function readBool(env: Env, name: string, fallback: boolean): boolean {
   if (["true", "1", "yes", "on"].includes(value)) return true;
   if (["false", "0", "no", "off"].includes(value)) return false;
   throw new Error(`Invalid boolean for ${name}: "${value}"`);
+}
+
+function readFlag(env: Env, name: string): boolean {
+  return read(env, name) === "1";
+}
+
+function readScheme(env: Env): "http" | "https" {
+  const value = read(env, "PUBLIC_URL_SCHEME")?.toLowerCase() ?? "https";
+  if (value === "http" || value === "https") return value;
+  throw new Error(`Invalid PUBLIC_URL_SCHEME: "${value}" (expected http or https)`);
+}
+
+function readPort(env: Env): string | null {
+  const value = read(env, "PUBLIC_URL_PORT");
+  if (value === undefined) return null;
+  if (/^\d{1,5}$/.test(value)) return value;
+  throw new Error(`Invalid PUBLIC_URL_PORT: "${value}"`);
 }
 
 function readAppEnv(env: Env): AppEnv {
@@ -97,14 +122,20 @@ function buildConfig(env: Env): Config {
 
   const rawDatabaseUrl = read(env, "DATABASE_URL");
   const rawBaseDomain = read(env, "BASE_DOMAIN");
+  const rawAuthSecret = read(env, "AUTH_SECRET");
   if (isProduction) {
     const missing = [
       rawDatabaseUrl ? null : "DATABASE_URL",
       rawBaseDomain ? null : "BASE_DOMAIN",
+      rawAuthSecret ? null : "AUTH_SECRET",
     ].filter((name): name is string => name !== null);
     if (missing.length > 0) {
       throw new Error(`Missing required environment variables for production: ${missing.join(", ")}`);
     }
+  }
+
+  if (rawAuthSecret !== undefined && rawAuthSecret.length < MIN_AUTH_SECRET_LENGTH) {
+    throw new Error(`AUTH_SECRET must be at least ${MIN_AUTH_SECRET_LENGTH} characters`);
   }
 
   const twilioSid = read(env, "TWILIO_ACCOUNT_SID");
@@ -141,6 +172,12 @@ function buildConfig(env: Env): Config {
     runMigrationsOnStart: readBool(env, "RUN_MIGRATIONS_ON_START", true),
     seedOnStart: readBool(env, "SEED_ON_START", !isProduction),
     seedSuperadminEmail: read(env, "SEED_SUPERADMIN_EMAIL") ?? DEFAULT_SUPERADMIN_EMAIL,
+    authSecret: rawAuthSecret ?? DEV_AUTH_SECRET,
+    farmTestAuth: readFlag(env, "FARM_TEST_AUTH"),
+    devInboxEnabled: !isProduction || readFlag(env, "DEV_INBOX_ENABLED"),
+    notifyFake: readFlag(env, "NOTIFY_FAKE"),
+    publicUrlScheme: readScheme(env),
+    publicUrlPort: readPort(env),
     providers: {
       sms: twilio ? "twilio" : "console",
       email: brevo ? "brevo" : "console",
@@ -157,6 +194,12 @@ let cached: Config | undefined;
 export function getConfig(): Config {
   cached ??= Object.freeze(buildConfig(process.env));
   return cached;
+}
+
+export function surfaceOrigin(surface: "dealer" | "backoffice", config: Config = getConfig()): string {
+  const host = `${surface === "dealer" ? "app" : "admin"}.${config.baseDomain}`;
+  const port = config.publicUrlPort ? `:${config.publicUrlPort}` : "";
+  return `${config.publicUrlScheme}://${host}${port}`;
 }
 
 export function resetConfigForTests(): void {
