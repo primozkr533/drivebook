@@ -5,7 +5,7 @@ import { AppHeader, Card, Container, PageHeader, Shell, Stack } from "@/componen
 import { inspectLinkToken, type LinkPurpose } from "@/server/auth/links";
 import { PASSWORD_MIN_LENGTH } from "@/server/auth/password";
 import { getSurfaceBasePath } from "@/server/auth/permissions";
-import { getCurrentSession, type AuthSurface } from "@/server/auth/session";
+import { getCurrentSession, getDealerContextFromSession, type AuthSurface } from "@/server/auth/session";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { forgotPasswordAction, setPasswordAction } from "./link-actions";
 import { LinkStatus, SetPasswordForm, type SetPasswordLabels } from "./SetPasswordForm";
@@ -96,7 +96,9 @@ export async function SetPasswordScreen({
 
 export async function ForgotPasswordScreen({ surface }: { surface: AuthSurface }) {
   const basePath = await getSurfaceBasePath();
-  if (await getCurrentSession(surface)) redirect(`${basePath}/`);
+  // Dealer home also needs the dealer row (requireDealerUser); a bare session would loop back here.
+  const signedIn = surface === "dealer" ? await getDealerContextFromSession() : await getCurrentSession(surface);
+  if (signedIn) redirect(`${basePath}/`);
 
   const t = await getTranslations("auth");
   return (
