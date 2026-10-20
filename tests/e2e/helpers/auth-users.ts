@@ -3,8 +3,9 @@ import { eq, inArray, or, type SQL } from "drizzle-orm";
 import { generateSync } from "otplib";
 import { getDb } from "@/db/client";
 import { DEMO_DEALER_SLUG } from "@/db/demo";
-import { backofficeUsers, dealers, dealerUsers, loginAttempts } from "@/db/schema";
+import { authTokens, backofficeUsers, dealers, dealerUsers, loginAttempts } from "@/db/schema";
 import { hashPassword } from "@/server/auth/password";
+import { hashToken, newOpaqueToken } from "@/server/auth/tokens";
 import { encryptTotpSecret, generateTotpSecret } from "@/server/auth/totp";
 
 // Throwaway users in the running stack's database (DATABASE_URL, the compose db on localhost by default).
@@ -83,8 +84,32 @@ export async function clearLoginAttempts({ emails = [], ips = [] }: { emails?: s
   if (where.length) await getDb().delete(loginAttempts).where(or(...where));
 }
 
-// Sessions cascade with the user; login_attempts are cleared too so reruns start clean.
+export type LinkTokenOptions = { state?: "valid" | "expired" | "used" };
+
+// Inserts the row the links service would issue, so a link can be opened without reading the e-mail.
+export async function issueLinkToken(
+  user: Pick<E2eUser, "surface" | "id">,
+  purpose: "invite" | "reset",
+  { state = "valid" }: LinkTokenOptions = {},
+): Promise<string> {
+  const token = newOpaqueToken();
+  const now = Date.now();
+  await getDb()
+    .insert(authTokens)
+    .values({
+      surface: user.surface,
+      userId: user.id,
+      purpose,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(state === "expired" ? now - 60_000 : now + 60 * 60 * 1000),
+      usedAt: state === "used" ? new Date(now) : null,
+    });
+  return token;
+}
+
+// Sessions cascade with the user; auth_tokens (no FK) and login_attempts are cleared too so reruns start clean.
 export async function deleteUsers(users: E2eUser[]): Promise<void> {
+  if (users.length) await getDb().delete(authTokens).where(inArray(authTokens.userId, users.map((u) => u.id)));
   const ids = (surface: E2eUser["surface"]) => users.filter((u) => u.surface === surface).map((u) => u.id);
   if (ids("dealer").length) await getDb().delete(dealerUsers).where(inArray(dealerUsers.id, ids("dealer")));
   if (ids("backoffice").length) {
