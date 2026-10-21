@@ -11,7 +11,7 @@ async function requestedSurface(request: Request): Promise<string | null> {
   if (!body) return "dealer";
   try {
     const parsed: unknown = JSON.parse(body);
-    if (parsed === null || typeof parsed !== "object") return null;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     const surface = (parsed as { surface?: unknown }).surface;
     return surface === undefined ? "dealer" : typeof surface === "string" ? surface : null;
   } catch {
