@@ -1,10 +1,13 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { expect, test, type Page } from "@playwright/test";
+import sharp from "sharp";
+import carsMessages from "../../messages/sl/cars.json";
 import dealerPage from "../../messages/sl/dealerPage.json";
 import { getDb } from "@/db/client";
 import { DEMO_DEALER_SLUG } from "@/db/demo";
 import { cars, dealers } from "@/db/schema";
+import { MAX_CAR_IMAGE_BYTES } from "@/lib/car-image-limits";
 import {
   clearLoginAttempts,
   closeDb,
@@ -130,6 +133,44 @@ test("added car with an uploaded image shows on the public page, deep links, dea
 
   await page.goto(SITE);
   await expect(publicCard(page, model)).toHaveCount(1);
+});
+
+test("a ~5 MB phone JPEG uploads and the car saves with an image", async ({ page }) => {
+  const model = modelName("Superb");
+  models.push(model);
+  const width = 1600;
+  const height = 1200;
+  // Random noise barely compresses, so this lands at ~5 MB.
+  const jpeg = await sharp(randomBytes(width * height * 3), { raw: { width, height, channels: 3 } })
+    .jpeg({ quality: 100, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+  expect(jpeg.byteLength).toBeGreaterThan(4 * 1024 * 1024);
+  expect(jpeg.byteLength).toBeLessThanOrEqual(MAX_CAR_IMAGE_BYTES);
+  await signIn(page, owner);
+
+  await page.goto(app("cars", "new"));
+  await fillCar(page, { make: "Škoda", model, year: "2022", price: "32900" });
+  await page.getByTestId("car-image-file").setInputFiles({ name: "phone.jpg", mimeType: "image/jpeg", buffer: jpeg });
+  await saveAndFindId(page, model);
+
+  await page.goto(SITE);
+  const image = publicCard(page, model).getByTestId("car-image");
+  await expect(image).toHaveAttribute("src", /^\/api\/files\/cars\/[^/]+\.webp$/);
+  const imageRes = await page.request.get(ROOT + (await image.getAttribute("src")));
+  expect(imageRes.status()).toBe(200);
+  expect(imageRes.headers()["content-type"]).toBe("image/webp");
+});
+
+test("an image over the size limit is refused in the form with 'too large'", async ({ page }) => {
+  await signIn(page, owner);
+  await page.goto(app("cars", "new"));
+  await fillCar(page, { make: "Škoda", model: modelName("Kodiaq"), year: "2023", price: "41900" });
+  await page
+    .getByTestId("car-image-file")
+    .setInputFiles({ name: "huge.jpg", mimeType: "image/jpeg", buffer: Buffer.alloc(MAX_CAR_IMAGE_BYTES + 1) });
+  await page.getByTestId("car-save").click();
+  await expect(page.getByText(carsMessages.errors.too_large, { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/cars\/new$/);
 });
 
 test("a Salesperson can add and edit a car", async ({ page }) => {

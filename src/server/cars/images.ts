@@ -2,9 +2,10 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import sharp from "sharp";
 import { newPublicId } from "@/db/ids";
+import { MAX_CAR_IMAGE_BYTES } from "@/lib/car-image-limits";
 import { getStorage } from "@/server/storage";
 
-export const MAX_CAR_IMAGE_BYTES = 10 * 1024 * 1024;
+export { MAX_CAR_IMAGE_BYTES };
 export const CAR_IMAGE_MAX_WIDTH = 1200;
 const WEBP_QUALITY = 80;
 const DOWNLOAD_TIMEOUT_MS = 10_000;

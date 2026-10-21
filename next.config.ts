@@ -7,8 +7,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   serverExternalPackages: ["pg", "pg-boss", "sharp"],
-  // A logo may be up to 2 MB; the default 1 MB limit would reject it before the action runs.
-  experimental: { serverActions: { bodySizeLimit: "3mb" } },
+  // A car image may be up to 10 MB (logos 2 MB); leave room for multipart overhead and the other fields.
+  experimental: { serverActions: { bodySizeLimit: "12mb" } },
 };
 
 export default withNextIntl(nextConfig);
