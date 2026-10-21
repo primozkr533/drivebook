@@ -1,8 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
-import { DealerReadOnlyError, ForbiddenError, requireDealerUser } from "@/server/auth/permissions";
+import { notFound, redirect } from "next/navigation";
+import {
+  DealerReadOnlyError,
+  ForbiddenError,
+  getSurfaceBasePath,
+  requireDealerUser,
+} from "@/server/auth/permissions";
 import { fetchAvtonetListing, type AvtonetFailure } from "@/server/cars/avtonet";
 import {
   CarNotFoundError,
@@ -12,6 +17,8 @@ import {
   type CarFieldError,
   type CarImageInput,
 } from "@/server/data/cars";
+import { parseCarStatusFilter } from "./form-model";
+import { carsListHref, type CarListNotice } from "./notice";
 
 const CARS_LIST_PATH = "/dealer-admin/cars";
 
@@ -121,11 +128,17 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
 
 export async function setCarActiveAction(form: FormData): Promise<void> {
   const { ctx } = await requireDealerUser();
+  let notice: CarListNotice | undefined;
   try {
     await setCarActive(ctx, text(form, "id"), text(form, "active") === "1");
   } catch (err) {
     if (err instanceof CarNotFoundError) notFound();
-    throw err;
+    if (err instanceof ForbiddenError) notice = "forbidden";
+    else if (err instanceof DealerReadOnlyError) notice = "readOnly";
+    else throw err;
+  }
+  if (notice) {
+    redirect(carsListHref(`${await getSurfaceBasePath()}/cars`, parseCarStatusFilter(text(form, "filter")), notice));
   }
   revalidateCars(ctx.slug);
 }

@@ -189,3 +189,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Car images are never hot-linked: uploads and image URLs are downloaded, resized to max 1200 px wide, re-encoded as WebP and stored under cars/<publicId>.webp; replacing an image deletes the old file after commit.
 - avto.net auto-fill only fetches URLs on avto.net or its subdomains (10 s timeout, realistic User-Agent) and never blocks saving: any failure or block shows a notice and manual entry always works.
 - A car's deep link is {scheme}://{slug}.{BASE_DOMAIN}{port}/?car={publicId}, shown with CopyLink in the cars list.
+- Car actions on a read_only/suspended dealer (save, deactivate, reactivate) never crash: the list toggles redirect back to the cars list with a status query param, and the list shows the restricted-account notice (`errors.readOnly`).
