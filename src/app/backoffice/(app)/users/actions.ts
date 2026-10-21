@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { ForbiddenError, getSurfaceBasePath, requireBackofficeUser } from "@/server/auth/permissions";
+import { savedQuery } from "../saved";
 import { deactivateBackofficeUser, inviteBackofficeUser } from "@/server/data/backoffice/users";
 
 const roles = ["support", "superadmin"] as const;
@@ -28,8 +29,8 @@ async function refuseForbidden<S>(run: () => Promise<S>, forbidden: S): Promise<
   }
 }
 
-async function usersPath() {
-  return `${await getSurfaceBasePath()}/users`;
+async function usersPath(change: "invite" | "deactivate") {
+  return `${await getSurfaceBasePath()}/users?${savedQuery(change)}`;
 }
 
 export async function inviteUserAction(_prev: InviteUserState, form: FormData): Promise<InviteUserState> {
@@ -42,7 +43,7 @@ export async function inviteUserAction(_prev: InviteUserState, form: FormData): 
     return r.ok ? null : { values, error: r.error };
   }, { values, error: "forbidden" });
   if (result) return result;
-  redirect(await usersPath());
+  redirect(await usersPath("invite"));
 }
 
 export async function deactivateUserAction(
@@ -57,5 +58,5 @@ export async function deactivateUserAction(
     return { error: r.error === "self" ? "self" : "notFound" };
   }, { error: "forbidden" });
   if (result) return result;
-  redirect(await usersPath());
+  redirect(await usersPath("deactivate"));
 }

@@ -49,7 +49,8 @@ async function redirectOf(promise: Promise<unknown>): Promise<string | undefined
   return undefined;
 }
 
-const detail = (change: string) => `${["", "_dev", "admin", "dealers", "d-1"].join("/")}?saved=${change}`;
+const detail = (change: string) =>
+  new RegExp(`^${["", "_dev", "admin", "dealers", "d-1"].join("/")}\\?saved=${change}&t=[a-z0-9]+$`);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,17 +70,17 @@ beforeEach(() => {
 describe("action → service mapping", () => {
   it("updateDealerAction passes name, planId and notes", async () => {
     const values = { name: "Avto Novak", planId: "p2", notes: "VIP" };
-    expect(await redirectOf(actions.updateDealerAction("d-1", {}, form(values)))).toBe(detail("profile"));
+    expect(await redirectOf(actions.updateDealerAction("d-1", {}, form(values)))).toMatch(detail("profile"));
     expect(mocks.updateDealer).toHaveBeenCalledWith("d-1", values);
   });
 
   it("changeDealerSlugAction passes the slug", async () => {
-    expect(await redirectOf(actions.changeDealerSlugAction("d-1", {}, form({ slug: "novak-2" })))).toBe(detail("slug"));
+    expect(await redirectOf(actions.changeDealerSlugAction("d-1", {}, form({ slug: "novak-2" })))).toMatch(detail("slug"));
     expect(mocks.changeDealerSlug).toHaveBeenCalledWith("d-1", "novak-2");
   });
 
   it.each(["suspended", "active"] as const)("setDealerStatusAction passes status %s", async (status) => {
-    expect(await redirectOf(actions.setDealerStatusAction("d-1", {}, form({ status })))).toBe(detail("status"));
+    expect(await redirectOf(actions.setDealerStatusAction("d-1", {}, form({ status })))).toMatch(detail("status"));
     expect(mocks.setDealerStatus).toHaveBeenCalledWith("d-1", status);
   });
 
@@ -94,17 +95,24 @@ describe("action → service mapping", () => {
 
   it("extendLicenceAction passes validUntil and note", async () => {
     const values = { validUntil: "2028-01-31", note: "račun 2026-114" };
-    expect(await redirectOf(actions.extendLicenceAction("d-1", {}, form(values)))).toBe(detail("licence"));
+    expect(await redirectOf(actions.extendLicenceAction("d-1", {}, form(values)))).toMatch(detail("licence"));
     expect(mocks.extendLicence).toHaveBeenCalledWith("d-1", values);
   });
 
+  it("two saves of the same kind redirect to different URLs so the form remounts", async () => {
+    const values = { validUntil: "2028-01-31", note: "račun" };
+    const first = await redirectOf(actions.extendLicenceAction("d-1", {}, form(values)));
+    const second = await redirectOf(actions.extendLicenceAction("d-1", {}, form(values)));
+    expect(first).not.toBe(second);
+  });
+
   it("recordDpaSignedAction passes signedAt", async () => {
-    expect(await redirectOf(actions.recordDpaSignedAction("d-1", {}, form({ signedAt: "2026-10-01" })))).toBe(detail("dpa"));
+    expect(await redirectOf(actions.recordDpaSignedAction("d-1", {}, form({ signedAt: "2026-10-01" })))).toMatch(detail("dpa"));
     expect(mocks.recordDpaSigned).toHaveBeenCalledWith("d-1", { signedAt: "2026-10-01" });
   });
 
   it("resendOwnerInvitationAction resends for the dealer", async () => {
-    expect(await redirectOf(actions.resendOwnerInvitationAction("d-1", {}, form({})))).toBe(detail("invite"));
+    expect(await redirectOf(actions.resendOwnerInvitationAction("d-1", {}, form({})))).toMatch(detail("invite"));
     expect(mocks.resendOwnerInvitation).toHaveBeenCalledWith("d-1");
   });
 });

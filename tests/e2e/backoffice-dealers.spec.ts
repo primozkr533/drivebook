@@ -209,6 +209,35 @@ test("two licence extensions are listed newest first with the previous and new d
   await expect(cells(2).nth(3)).toHaveText(formatIsoDate("2030-12-31"));
 });
 
+test("a valid licence extension after a failed one clears the error", async ({ page }) => {
+  await signIn(page, track(await createBackofficeUser({ role: "superadmin" })));
+  await createDealer(page, { licence: "2030-12-31" });
+  const form = page.getByTestId("dealer-licence-form");
+  const required = form.getByText(backoffice.dealerDetail.errors.required);
+
+  await page.getByTestId("dealer-licence-valid-until").fill("2031-12-31");
+  await page.getByTestId("dealer-licence-submit").click();
+  await expect(required).toBeVisible();
+  await expect(page.getByTestId("dealer-licence-valid-until")).toHaveValue("2031-12-31");
+
+  const note = `Račun ${suffix()}`;
+  await page.getByTestId("dealer-licence-note").fill(note);
+  await page.getByTestId("dealer-licence-submit").click();
+  await expect(page.getByTestId("dealer-notice")).toHaveText(backoffice.dealerDetail.saved.licence);
+  await expect(required).toHaveCount(0);
+  await expect(page.getByTestId("dealer-licence-row").first().locator("td").nth(4)).toHaveText(note);
+
+  await expect(page.getByTestId("dealer-licence-note")).toHaveValue("");
+  await page.getByTestId("dealer-licence-valid-until").fill("2032-06-30");
+  await page.getByTestId("dealer-licence-submit").click();
+  await expect(required).toBeVisible();
+  await page.getByTestId("dealer-licence-note").fill(`Račun ${suffix()}`);
+  await page.getByTestId("dealer-licence-submit").click();
+  await expect(page.getByTestId("dealer-licence-current")).toHaveText(formatIsoDate("2032-06-30"));
+  await expect(required).toHaveCount(0);
+  await expect(page.getByTestId("dealer-licence-row")).toHaveCount(3);
+});
+
 // Backoffice-created dealers have no phone yet, so the suspended page uses the no-phone message.
 test("suspending shows the suspended message on the public page and reactivating restores it", async ({ page }) => {
   await signIn(page, track(await createBackofficeUser({ role: "superadmin" })));

@@ -5,6 +5,7 @@ import { requireBackofficeUser } from "@/server/auth/permissions";
 import { listBackofficeUsers, type BackofficeUserStatus } from "@/server/data/backoffice/users";
 import { deactivateUserAction, inviteUserAction } from "./actions";
 import { DeactivateUserForm, InviteUserForm, type UserErrors } from "./UserForms";
+import { savedFormKey } from "../saved";
 
 const statusTone = { active: "ok", invited: "warn", deactivated: "neutral" } as const satisfies Record<BackofficeUserStatus, string>;
 
@@ -12,9 +13,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("backoffice"))("users.title") };
 }
 
-export default async function BackofficeUsersPage() {
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function BackofficeUsersPage({ searchParams }: Props) {
   const { user } = await requireBackofficeUser();
-  const [t, users] = await Promise.all([getTranslations("backoffice"), listBackofficeUsers()]);
+  const [query, t, users] = await Promise.all([searchParams, getTranslations("backoffice"), listBackofficeUsers()]);
+  const formKey = savedFormKey(query);
   const canManage = user.role === "superadmin";
   const columns = ["email", "role", "status"] as const;
   const errors: UserErrors = {
@@ -71,6 +75,7 @@ export default async function BackofficeUsersPage() {
                     <td className="px-4 py-3">
                       {u.status !== "deactivated" && u.id !== user.id && (
                         <DeactivateUserForm
+                          key={formKey}
                           action={deactivateUserAction.bind(null, u.id)}
                           labels={{ submit: t("users.deactivate"), errors }}
                         />
@@ -96,6 +101,7 @@ export default async function BackofficeUsersPage() {
             <Card className="lg:col-span-4">
               <CardHeader title={t("users.inviteTitle")} />
               <InviteUserForm
+                key={formKey}
                 action={inviteUserAction}
                 labels={{
                   email: t("users.fields.email"),

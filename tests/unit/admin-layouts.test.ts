@@ -263,7 +263,7 @@ describe("backoffice dealers", () => {
     expect(html).toContain(`>${dealersT.statuses.suspended}<`);
     expect(html).toMatch(/bg-ok-wash[^"]*"><span[^>]*><\/span>Aktiven/);
     expect(html).toMatch(/bg-danger-wash[^"]*"><span[^>]*><\/span>Začasno ustavljen/);
-    expect(html).not.toMatch(/<a[^>]*href="[^"]*\/dealers\/[^"]*"/);
+    expect(html).toMatch(/<a[^>]*href="\/dealers\/d1"[^>]*data-testid="dealer-row-link"/);
   });
 
   it("passes the search and status filter from the query and keeps them in the GET form", async () => {
@@ -329,7 +329,7 @@ describe("backoffice plans", () => {
     { id: "p1", code: "osnovni", name: "Osnovni", monthlySmsQuota: 300, maxUsers: 3, notes: null, isDefault: true, dealerCount: 2 },
     { id: "p2", code: "pro", name: "Pro", monthlySmsQuota: 1000, maxUsers: 10, notes: "Za večje salone", isDefault: false, dealerCount: 0 },
   ];
-  const renderPlan = (id: string) => render(createElement(BackofficePlanPage, { params: Promise.resolve({ id }) }));
+  const renderPlan = (id: string) => render(createElement(BackofficePlanPage, { params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }));
 
   it.each(["", "/_dev/admin"])("marks Paketi active in the inline nav and the compact menu (base path %j)", async (basePath) => {
     signInAs("support");

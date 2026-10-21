@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { ForbiddenError, getSurfaceBasePath, requireBackofficeUser } from "@/server/auth/permissions";
+import { savedQuery } from "../saved";
 import {
   changeDealerSlug,
   createDealer,
@@ -77,7 +78,7 @@ async function runDealerChange<V extends Record<string, string>>(
     throw err;
   }
   if (!result.ok) return { values, field: result.field, error: result.error };
-  redirect(`${await getSurfaceBasePath()}/dealers/${id}?saved=${change}`);
+  redirect(`${await getSurfaceBasePath()}/dealers/${id}?${savedQuery(change)}`);
 }
 
 export async function updateDealerAction(id: string, _prev: DealerFormState, form: FormData) {

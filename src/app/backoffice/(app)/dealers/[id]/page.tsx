@@ -27,6 +27,7 @@ import {
   DealerSlugForm,
   type DealerFormErrors,
 } from "./DealerDetailForms";
+import { savedFormKey } from "../../saved";
 
 const statusTone = { active: "ok", suspended: "danger", read_only: "warn" } as const satisfies Record<DealerStatus, string>;
 const ownerTone = { invited: "warn", active: "ok", deactivated: "neutral" } as const;
@@ -84,6 +85,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
   // The dev aliases serve the backoffice on hosts where dealer subdomains may not resolve.
   const publicHref = basePath ? `/_dev/site/${dealer.slug}` : dealerSiteOrigin(dealer.slug);
   const suspended = dealer.status === "suspended";
+  const formKey = savedFormKey(query);
 
   return (
     <Container className="py-10 md:py-16">
@@ -118,6 +120,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
               <CardHeader title={t("dealerDetail.profile.title")} />
               {canEdit ? (
                 <DealerProfileForm
+                  key={formKey}
                   action={updateDealerAction.bind(null, dealer.id)}
                   initial={{ name: dealer.name, planId: dealer.plan.id, notes: dealer.notes ?? "" }}
                   plans={plans.map((p) => ({ id: p.id, name: p.name }))}
@@ -148,6 +151,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
               <Stack gap={6}>
                 {canEdit ? (
                   <DealerSlugForm
+                    key={formKey}
                     action={changeDealerSlugAction.bind(null, dealer.id)}
                     initial={dealer.slug}
                     labels={{
@@ -198,6 +202,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
                   <Stack gap={3}>
                     <span className="type-utility text-muted">{t("dealerDetail.licence.extendTitle")}</span>
                     <DealerLicenceForm
+                      key={formKey}
                       action={extendLicenceAction.bind(null, dealer.id)}
                       labels={{
                         validUntil: t("dealerDetail.licence.fields.validUntil"),
@@ -259,6 +264,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
                 </dl>
                 {canEdit ? (
                   <DealerButtonForm
+                    key={formKey}
                     action={setDealerStatusAction.bind(null, dealer.id)}
                     hidden={{ status: suspended ? "active" : "suspended" }}
                     variant={suspended ? "secondary" : "danger"}
@@ -286,6 +292,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
                 </dl>
                 {canEdit ? (
                   <DealerDpaForm
+                    key={formKey}
                     action={recordDpaSignedAction.bind(null, dealer.id)}
                     initial={dealer.dpaSignedAt ?? ljubljanaNow().dateISO}
                     labels={{ signedAt: t("dealerDetail.dpa.signedAt"), submit: t("dealerDetail.dpa.submit"), errors }}
@@ -312,6 +319,7 @@ export default async function BackofficeDealerPage({ params, searchParams }: Pro
                   </dl>
                   {canEdit && dealer.owner.status === "invited" ? (
                     <DealerButtonForm
+                      key={formKey}
                       action={resendOwnerInvitationAction.bind(null, dealer.id)}
                       variant="secondary"
                       submit={t("dealerDetail.owner.resend")}

@@ -52,14 +52,14 @@ beforeEach(() => {
 
 it("creates a plan from the form fields and redirects to the list", async () => {
   mocks.createPlan.mockResolvedValue({ ok: true, plan: { id: "p1" } });
-  expect(await redirectOf(savePlanAction(null, {}, form(planForm)))).toBe("/_dev/admin/plans");
+  expect(await redirectOf(savePlanAction(null, {}, form(planForm)))).toMatch(/^\/_dev\/admin\/plans\?saved=create&t=[a-z0-9]+$/);
   expect(mocks.createPlan).toHaveBeenCalledWith({ name: " Pro ", monthlySmsQuota: 300, maxUsers: 5, notes: "za večje" });
   expect(mocks.updatePlan).not.toHaveBeenCalled();
 });
 
 it("updates the bound plan id and redirects to the list", async () => {
   mocks.updatePlan.mockResolvedValue({ ok: true, plan: { id: "p1" } });
-  expect(await redirectOf(savePlanAction("p1", {}, form(planForm)))).toBe("/_dev/admin/plans");
+  expect(await redirectOf(savePlanAction("p1", {}, form(planForm)))).toMatch(/^\/_dev\/admin\/plans\?saved=update&t=[a-z0-9]+$/);
   expect(mocks.updatePlan).toHaveBeenCalledWith("p1", { name: " Pro ", monthlySmsQuota: 300, maxUsers: 5, notes: "za večje" });
 });
 
@@ -97,7 +97,7 @@ it("rethrows unexpected errors", async () => {
 
 it("deletes the bound plan and redirects to the list", async () => {
   mocks.deletePlan.mockResolvedValue({ ok: true });
-  expect(await redirectOf(deletePlanAction("p1", {}, form({ id: "other" })))).toBe("/_dev/admin/plans");
+  expect(await redirectOf(deletePlanAction("p1", {}, form({ id: "other" })))).toMatch(/^\/_dev\/admin\/plans\?saved=delete&t=[a-z0-9]+$/);
   expect(mocks.deletePlan).toHaveBeenCalledWith("p1");
 });
 
