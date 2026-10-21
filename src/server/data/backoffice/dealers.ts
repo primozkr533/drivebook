@@ -380,10 +380,17 @@ export async function updateDealer(
         ? await tx.select({ id: plans.id }).from(plans).where(eq(plans.id, input.planId)).limit(1)
         : [];
       if (!plan) reject({ ok: false, field: "planId", error: "unknown" });
-      await tx.update(dealers).set({ name, planId: input.planId, notes, updatedAt: new Date() }).where(eq(dealers.id, id));
+      // legalName follows a rename only while nobody has set it apart from name.
+      const legalName = dealer.legalName === dealer.name ? name : dealer.legalName;
+      await tx
+        .update(dealers)
+        .set({ name, legalName, planId: input.planId, notes, updatedAt: new Date() })
+        .where(eq(dealers.id, id));
+      const legalNameChange =
+        legalName === dealer.legalName ? null : { before: { legalName: dealer.legalName }, after: { legalName } };
       return {
-        before: { name: dealer.name, planId: dealer.planId, notes: dealer.notes },
-        after: { name, planId: input.planId, notes },
+        before: { name: dealer.name, planId: dealer.planId, notes: dealer.notes, ...legalNameChange?.before },
+        after: { name, planId: input.planId, notes, ...legalNameChange?.after },
       };
     },
     (changes) => ({ action: "dealer.update", entity: "dealer", entityId: id, dealerId: id, details: changes }),
