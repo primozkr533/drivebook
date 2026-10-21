@@ -1,5 +1,6 @@
 // Real-database tests: start Postgres with `docker compose up -d db` (uses TEST_DATABASE_URL).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { cars, dealers, dealerSlugHistory, openingHours, plans } from "@/db/schema";
 import { listActiveCars, getCar } from "@/server/data/cars";
@@ -77,6 +78,25 @@ describe("resolveDealerSlug", () => {
     if (resolved.kind !== "current") return;
     expect(resolved.ctx).toMatchObject({ slug: "demo", status: "active" });
     expect(resolved.dealer).toMatchObject({ name: "Demo", logoUrl: null, websiteUrl: null, status: "active" });
+  });
+
+  it("exposes the dealer's public settings and the logo as an app-relative file URL", async () => {
+    await db
+      .update(dealers)
+      .set({
+        logoKey: "logos/abc123.png",
+        mapsUrl: "https://maps.app.goo.gl/x",
+        privacyUrl: "https://demo.si/zasebnost",
+      })
+      .where(eq(dealers.slug, "demo"));
+    const resolved = await resolveDealerSlug("demo");
+    if (resolved.kind !== "current") throw new Error("expected current");
+    expect(resolved.dealer).toMatchObject({
+      email: "info@demo.si",
+      googleMapsUrl: "https://maps.app.goo.gl/x",
+      privacyPolicyUrl: "https://demo.si/zasebnost",
+      logoUrl: "/api/files/logos/abc123.png",
+    });
   });
 
   it("redirects an old slug to the current one", async () => {

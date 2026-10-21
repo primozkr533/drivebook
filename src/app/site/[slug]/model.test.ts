@@ -12,8 +12,8 @@ const dealer: PublicDealer = {
   phone: "+386 1 234 56 78",
   email: "info@demo.test",
   websiteUrl: null,
-  mapsUrl: null,
-  privacyUrl: null,
+  googleMapsUrl: null,
+  privacyPolicyUrl: null,
   primaryColor: "#0055AA",
   logoUrl: null,
   status: "active",
@@ -74,8 +74,8 @@ describe("buildDealerPageModel", () => {
     expect(build().telHref).toBe("tel:+38612345678");
   });
 
-  it("prefers the dealer's mapsUrl", () => {
-    expect(build({ dealer: { ...dealer, mapsUrl: "https://maps.app.goo.gl/x" } }).mapsHref).toBe(
+  it("prefers the dealer's googleMapsUrl", () => {
+    expect(build({ dealer: { ...dealer, googleMapsUrl: "https://maps.app.goo.gl/x" } }).mapsHref).toBe(
       "https://maps.app.goo.gl/x",
     );
   });
@@ -110,9 +110,9 @@ describe("buildDealerPageModel", () => {
     expect(m.mapsHref).toBeNull();
   });
 
-  it("hides the maps link without an address even when mapsUrl is set", () => {
+  it("hides the maps link without an address even when googleMapsUrl is set", () => {
     const m = build({
-      dealer: { ...dealer, addressLine: "", postalCode: "", city: "", mapsUrl: "https://maps.app.goo.gl/x" },
+      dealer: { ...dealer, addressLine: "", postalCode: "", city: "", googleMapsUrl: "https://maps.app.goo.gl/x" },
     });
     expect(m.mapsHref).toBeNull();
   });
@@ -138,7 +138,7 @@ describe("buildDealerPageModel", () => {
   });
 
   it("links the dealer's own privacy policy when set", () => {
-    expect(build({ dealer: { ...dealer, privacyUrl: "https://demo.si/zasebnost" } }).privacy).toEqual({
+    expect(build({ dealer: { ...dealer, privacyPolicyUrl: "https://demo.si/zasebnost" } }).privacy).toEqual({
       href: "https://demo.si/zasebnost",
       external: true,
     });
@@ -147,6 +147,54 @@ describe("buildDealerPageModel", () => {
   it("falls back to the platform notice under the base path", () => {
     expect(build({ basePath: "/_dev/site/demo" }).privacy).toEqual({ href: "/_dev/site/demo/zasebnost", external: false });
     expect(build().privacy.href).toBe(["", "zasebnost"].join("/"));
+  });
+
+  it("exposes a mailto: link only when the e-mail is set", () => {
+    expect(build()).toMatchObject({ email: "info@demo.test", emailHref: "mailto:info@demo.test" });
+    for (const email of ["", "  "]) {
+      expect(build({ dealer: { ...dealer, email } })).toMatchObject({ email: null, emailHref: null });
+    }
+  });
+
+  it("has no closed dates and keeps today's hours without closures", () => {
+    const m = build({ hours: [{ isoWeekday: 2, opensAt: "08:00", closesAt: "16:00" }] });
+    expect(m.closedDates).toEqual([]);
+    expect(m.days[1]).toEqual({ short: "Tor", ranges: [["08:00", "16:00"]] });
+  });
+
+  it("marks today closed by a custom closure and lists it with its reason", () => {
+    const m = build({
+      hours: [{ isoWeekday: 2, opensAt: "08:00", closesAt: "16:00" }],
+      closures: {
+        today: { closed: true, reason: "closure", closureReason: "Inventura" },
+        upcoming: [
+          { date: "2026-10-20", reason: "closure", closureReason: "Inventura" },
+          { date: "2026-10-21", reason: "closure", closureReason: "Inventura" },
+        ],
+      },
+    });
+    expect(m.days[1]).toEqual({ short: "Tor", ranges: [], note: "Inventura" });
+    expect(m.closedDates).toEqual([
+      { date: "20. 10. 2026", label: "Inventura" },
+      { date: "21. 10. 2026", label: "Inventura" },
+    ]);
+  });
+
+  it("names holidays by key and leaves closures without a reason unlabelled", () => {
+    const names: Record<string, string> = { reformation: "dan reformacije" };
+    const m = build({
+      holidayName: (key) => names[key],
+      closures: {
+        today: { closed: true, reason: "holiday", holidayKey: "reformation" },
+        upcoming: [
+          { date: "2026-10-20", reason: "holiday", holidayKey: "reformation" },
+          { date: "2026-10-22", reason: "closure", closureReason: null },
+          { date: "2026-10-23", reason: "holiday" },
+        ],
+      },
+    });
+    expect(m.days[1]).toMatchObject({ ranges: [], note: "dan reformacije" });
+    expect(m.closedDates.map((c) => c.label)).toEqual(["dan reformacije", null, null]);
   });
 
   it("builds all seven lanes with closed days empty and today as a 0-based index", () => {
