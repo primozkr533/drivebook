@@ -42,7 +42,7 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
 - `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
-- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by `GET /api/files/{key}` (`src/app/api/files/[...key]/route.ts`)
+- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by the files route (`src/app/api/files/[...key]/route.ts`, see `## API Contract`)
 - `src/app/site/[slug]/` — public dealer site
 - `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
 - `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
