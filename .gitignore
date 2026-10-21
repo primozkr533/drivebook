@@ -10,3 +10,4 @@ playwright-report/
 coverage/
 /data/
 !.env.example
+/dist/

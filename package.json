@@ -15,7 +15,8 @@
     "db:seed": "tsx src/db/seed-cli.ts",
     "worker": "tsx src/worker.ts",
     "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts",
-    "user-admin": "tsx src/server/auth/user-admin-cli.ts"
+    "user-admin": "tsx src/server/auth/user-admin-cli.ts",
+    "build:cli": "esbuild src/worker.ts src/db/migrate-cli.ts src/db/seed-cli.ts src/server/auth/create-superadmin-cli.ts src/server/auth/user-admin-cli.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outdir=dist --entry-names=[name] --out-extension:.js=.cjs --log-level=warning"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.0",
@@ -43,6 +44,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitest/coverage-v8": "^5.0.5",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.0",
