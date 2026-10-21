@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { ForbiddenError, getSurfaceBasePath, requireBackofficeUser } from "@/server/auth/permissions";
+import { savedQuery } from "../saved";
 import { createPlan, deletePlan, updatePlan, type PlanField } from "@/server/data/backoffice/plans";
 
 export type PlanFormState = {
@@ -29,8 +30,8 @@ async function refuseForbidden<S>(run: () => Promise<S>, forbidden: S): Promise<
   }
 }
 
-async function plansPath() {
-  return `${await getSurfaceBasePath()}/plans`;
+async function plansPath(change: string) {
+  return `${await getSurfaceBasePath()}/plans?${savedQuery(change)}`;
 }
 
 export async function savePlanAction(id: string | null, _prev: PlanFormState, form: FormData): Promise<PlanFormState> {
@@ -53,7 +54,7 @@ export async function savePlanAction(id: string | null, _prev: PlanFormState, fo
     return "field" in r ? { values, field: r.field, error: r.error } : { values, error: r.error };
   }, { values, error: "forbidden" });
   if (result) return result;
-  redirect(await plansPath());
+  redirect(await plansPath(id === null ? "create" : "update"));
 }
 
 export async function deletePlanAction(id: string, _prev: DeletePlanState, _form: FormData): Promise<DeletePlanState> {
@@ -63,5 +64,5 @@ export async function deletePlanAction(id: string, _prev: DeletePlanState, _form
     return r.ok ? null : { error: r.error };
   }, { error: "forbidden" });
   if (result) return result;
-  redirect(await plansPath());
+  redirect(await plansPath("delete"));
 }

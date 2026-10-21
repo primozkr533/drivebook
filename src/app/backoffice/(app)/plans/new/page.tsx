@@ -7,16 +7,19 @@ import { DEFAULT_MONTHLY_SMS_QUOTA } from "@/server/data/backoffice/plans";
 import { savePlanAction } from "../actions";
 import { planFormLabels } from "../labels";
 import { PlanForm } from "../PlanForm";
+import { savedFormKey } from "../../saved";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("backoffice"))("plans.newTitle") };
 }
 
-export default async function BackofficeNewPlanPage() {
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function BackofficeNewPlanPage({ searchParams }: Props) {
   const { user } = await requireBackofficeUser();
   const basePath = await getSurfaceBasePath();
   if (user.role !== "superadmin") redirect(`${basePath}/plans`);
-  const [t, labels] = await Promise.all([getTranslations("backoffice"), planFormLabels("add")]);
+  const [query, t, labels] = await Promise.all([searchParams, getTranslations("backoffice"), planFormLabels("add")]);
 
   return (
     <Container width="narrow" className="py-10 md:py-16">
@@ -32,6 +35,7 @@ export default async function BackofficeNewPlanPage() {
         />
         <Card>
           <PlanForm
+            key={savedFormKey(query)}
             action={savePlanAction.bind(null, null)}
             initial={{ name: "", monthlySmsQuota: String(DEFAULT_MONTHLY_SMS_QUOTA), maxUsers: "", notes: "" }}
             labels={labels}
