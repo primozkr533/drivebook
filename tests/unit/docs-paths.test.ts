@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const docs = ["CLAUDE.md", "README.md"];
+const docs = ["CLAUDE.md", "README.md", "docs/deploy.md"];
 
 function documentedPaths(doc: string): string[] {
   const text = readFileSync(join(process.cwd(), doc), "utf8");
   const tokens = [...text.matchAll(new RegExp("`([^`\\s]+)`", "g"))].map((m) => m[1]);
   return [
-    ...new Set(tokens.filter((t) => /^(src|tests|messages|drizzle)\/|^\.env\.example$/.test(t) && !/[*{]/.test(t))),
+    ...new Set(tokens.filter((t) => /^(src|tests|messages|drizzle|docker|docs)\/|^\.env\.example$|^docker-compose[\w.]*\.yml$/.test(t) && !/[*{]/.test(t))),
   ];
 }
 

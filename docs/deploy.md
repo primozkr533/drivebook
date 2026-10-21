@@ -13,7 +13,7 @@ Production runs on one Hetzner Cloud server with `docker-compose.prod.yml`:
 
 Caddy gets one wildcard certificate for `drivebook.si` and `*.drivebook.si` via the Cloudflare DNS-01 challenge, so the DNS records stay DNS-only.
 
-All commands below run on the server from the checkout directory. Clone into a directory named `drivebook` (e.g. under `/opt`) so the compose project — and with it the volume and network names used in the backup section (`drivebook_backups`, `drivebook_storage`, `drivebook_default`) — is `drivebook`.
+All commands below run on the server from the checkout directory. Clone into a directory named `drivebook` so the compose project — and with it the volume and network names used in the backup section (`drivebook_backups`, `drivebook_storage`, `drivebook_default`) — is `drivebook`.
 
 ## 1. Hetzner Cloud server
 

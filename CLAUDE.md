@@ -15,6 +15,7 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run create-superadmin -- --email x` — create/invite a backoffice superadmin and print the set-password link
 - `npm run user-admin -- deactivate --surface dealer|backoffice --email x` — deactivate a user on that surface and revoke all of their sessions (unknown e-mail exits non-zero)
 - `npm run user-admin -- resend-invite --surface dealer|backoffice --email x` — re-issue an invited user's 7-day set-password link, queue the invitation e-mail and print the link
+- `docker compose -f docker-compose.prod.yml up -d --build` — production stack (reads `.env`; Caddy on 80/443, `migrate` runs before `web`/`worker`); see `docs/deploy.md`
 
 FARM-RUN-CONTRACT
 ```
@@ -50,6 +51,10 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/app/backoffice/(app)/dealers`, `src/app/backoffice/(app)/plans`, `src/app/backoffice/(app)/users` — operator pages (Support: read-only UI, writes refused on the server)
 - `src/i18n/request.ts` + `messages/sl/` — translations (backoffice strings in `messages/sl/backoffice.json`)
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
+- `docker-compose.prod.yml` — production stack (`db`, one-shot `migrate`, `web`, `worker`, `backup`, `caddy`; only `caddy` publishes ports); `docker-compose.prod.local.yml` overrides it for a local run
+- `docker/caddy` — Caddy image (xcaddy + Cloudflare DNS) and `docker/caddy/Caddyfile` (wildcard certificate via DNS-01, reverse proxy to `web:3000`)
+- `docker/backup` — backup image: nightly `pg_dump` + uploads archive, retention, `docker/backup/restore.sh`, round-trip check `docker/backup/test-restore.sh`
+- `docs/deploy.md` — production/staging deployment, backups and updates
 
 ## Required environment variables
 All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
@@ -75,6 +80,13 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `BREVO_SENDER_NAME` — display name on outgoing email
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token for dealer custom domains
 - `CLOUDFLARE_ZONE_ID` — Cloudflare zone ID for dealer custom domains
+- `ALLOW_FAKE_PROVIDERS` — `1` lets a production `web`/`worker` start with the fake SMS/e-mail adapters (staging only; off by default)
+
+Production stack only (`docker-compose.prod.yml`, Caddy, backup; not read by the app):
+- `ACME_EMAIL` — contact e-mail for Let's Encrypt certificates
+- `CLOUDFLARE_DNS_API_TOKEN` — Cloudflare token with Zone:DNS:Edit on the zone, for Caddy's DNS-01 wildcard certificate (separate from `CLOUDFLARE_API_TOKEN`)
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` — production Postgres container credentials; compose builds `DATABASE_URL` from them (`POSTGRES_PASSWORD` is required)
+- `BACKUP_RETENTION_DAYS` — days of nightly backups kept in the `backups` volume (default 14)
 
 ## API Contract
 - `POST /api/test/login`
@@ -164,3 +176,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Uploaded files use unique keys (`logos/<publicId>.<ext>`) and are served with `Cache-Control: public, max-age=31536000, immutable`; replacing a logo deletes the old file after commit. The logo type is detected from content; unsafe SVGs are rejected, and SVGs are served with a sandbox CSP.
 - `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
+- Production refuses to start with fake SMS/e-mail providers unless ALLOW_FAKE_PROVIDERS=1 (staging only).
