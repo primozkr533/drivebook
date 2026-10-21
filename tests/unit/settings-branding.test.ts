@@ -282,6 +282,20 @@ describe("uploadLogo", () => {
     ["external href", svg('<image href="https://evil.example/x.png"/>')],
     ["external xlink:href", svg('<use xlink:href="//evil.example/s.svg#a"/>')],
     ["external url()", svg('<rect style="fill:url(https://evil.example/p)"/>')],
+    [
+      "a namespace-prefixed <script>",
+      svg('<s:script xmlns:s="http://www.w3.org/2000/svg">alert(1)</s:script>'),
+    ],
+    [
+      "a namespace-prefixed <foreignObject>",
+      svg('<x:foreignObject xmlns:x="http://www.w3.org/2000/svg"/>'),
+    ],
+    [
+      "an <animate> setting href via a character reference",
+      svg('<a><animate attributeName="href" values="jav&#x61;script:alert(1)"/><rect/></a>'),
+    ],
+    ["a <set> element", svg('<a><set attributeName="href" to="#a"/><rect/></a>')],
+    ["a namespace-prefixed onload=", svg('<rect x:onload="alert(1)"/>')],
   ])("rejects an SVG with %s", async (_label, bytes) => {
     expect(await upload(bytes, "logo.svg")).toEqual({
       ok: false,

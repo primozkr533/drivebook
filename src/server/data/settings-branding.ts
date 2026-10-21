@@ -64,10 +64,13 @@ function detectLogoType(bytes: Uint8Array): { type: LogoType; svg?: string } | n
 
 // The logo is served from our origin, so anything that could run script or load a third-party resource is refused.
 export function isUnsafeSvg(svg: string): boolean {
-  if (/<script/i.test(svg)) return true;
-  if (/<foreignObject/i.test(svg)) return true;
+  if (/<(?:[\w.-]+:)?(?:script|foreignObject|handler)\b/i.test(svg)) return true;
+  // Animation can set href to a javascript: URL; a logo has no need for it.
+  if (/<(?:[\w.-]+:)?(?:animate|animateMotion|set)\b/i.test(svg)) return true;
+  // Character references can hide forbidden words from the checks below.
+  if (/&(?!(?:amp|lt|gt|quot|apos);)/.test(svg)) return true;
   if (/javascript:/i.test(svg)) return true;
-  if (/[\s"'/]on[a-z]+\s*=/i.test(svg)) return true;
+  if (/[\s"'/:]on[a-z]+\s*=/i.test(svg)) return true;
   if (/<!ENTITY/i.test(svg)) return true;
   if (/\bhref\s*=\s*(?!["']?\s*#)/i.test(svg)) return true;
   if (/url\(\s*(?!["']?\s*#)/i.test(svg) || /@import/i.test(svg)) return true;
