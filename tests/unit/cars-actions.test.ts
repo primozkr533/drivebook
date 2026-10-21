@@ -203,6 +203,31 @@ describe("saveCarAction validation and images", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
+  it.each(["12.500", "12 500", "12 500", "12.500 €", "€12.500", "12,500", "12500"])(
+    "saves the Slovenian-formatted price %j as 12500",
+    async (price) => {
+      const id = await createdId({ price });
+      expect((await carRow(id)).priceEur).toBe(12500);
+    },
+  );
+
+  it.each(["abc", "12.5", "12,50", "12€500"])("rejects the price %j with a field error", async (price) => {
+    expect(await saveCarAction(null, carForm({ price }))).toMatchObject({
+      ok: false,
+      fieldErrors: { price: "invalid" },
+      values: { price },
+    });
+    expect(await db.select().from(cars)).toHaveLength(0);
+  });
+
+  it("keeps year parsing strict", async () => {
+    expect(await saveCarAction(null, carForm({ year: "2.020" }))).toMatchObject({
+      ok: false,
+      fieldErrors: { year: "invalid" },
+    });
+    expect(await db.select().from(cars)).toHaveLength(0);
+  });
+
   it("stores an uploaded file, preferring it over imageUrl", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
