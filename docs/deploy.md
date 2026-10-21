@@ -95,8 +95,8 @@ chmod 600 .env
 | `SEED_ON_START` | `0` — otherwise the demo dealer is seeded into production |
 | `SEED_SUPERADMIN_EMAIL` | empty (the first Superadmin is created in step 5) |
 | `PUBLIC_URL_SCHEME` / `PUBLIC_URL_PORT` | not used by the prod stack (links are always `https`, no port) |
-| `ACME_EMAIL` | your contact e-mail for Let's Encrypt |
-| `CLOUDFLARE_DNS_API_TOKEN` | the token from step 2 |
+| `ACME_EMAIL` | required; your contact e-mail for Let's Encrypt |
+| `CLOUDFLARE_DNS_API_TOKEN` | required; the token from step 2 |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | real Twilio credentials and sender (E.164) |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | real Brevo key and a verified sender |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID` | for dealer custom domains (optional) |
@@ -208,11 +208,11 @@ Compose rebuilds the image, runs `migrate` first, and only starts the new `web` 
 
 ## Trying the production stack locally
 
-`docker-compose.prod.local.yml` overrides the prod stack for a local run (`drivebook.localhost`, Caddy internal TLS, fake providers, demo seed, and its own fixed local `AUTH_SECRET` and Postgres password). Compose checks the `AUTH_SECRET` / `POSTGRES_PASSWORD` guards of `docker-compose.prod.yml` before applying the override, so export any non-empty value for them in the shell you run compose from:
+`docker-compose.prod.local.yml` overrides the prod stack for a local run (`drivebook.localhost`, Caddy internal TLS, fake providers, demo seed, and its own fixed local `AUTH_SECRET` and Postgres password). Compose checks the `AUTH_SECRET` / `POSTGRES_PASSWORD` / `ACME_EMAIL` / `CLOUDFLARE_DNS_API_TOKEN` guards of `docker-compose.prod.yml` before applying the override (Caddy uses `Caddyfile.local` with internal TLS, so the ACME values are never used), so export any non-empty value for them in the shell you run compose from:
 
 ```bash
 cp .env.example .env
-export AUTH_SECRET=local POSTGRES_PASSWORD=local
+export AUTH_SECRET=local POSTGRES_PASSWORD=local ACME_EMAIL=local CLOUDFLARE_DNS_API_TOKEN=local
 docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml up -d --build
 curl -k --resolve demo.drivebook.localhost:443:127.0.0.1 https://demo.drivebook.localhost/
 ```
