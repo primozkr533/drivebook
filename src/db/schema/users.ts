@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { bigint, check, index, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { createdAt, tstz, updatedAt } from "./columns";
 import { dealers } from "./dealers";
 import { backofficeRole, dealerRole, userStatus } from "./enums";
@@ -20,6 +20,7 @@ export const dealerUsers = pgTable(
     status: userStatus("status").notNull().default("invited"),
     totpSecretEnc: text("totp_secret_enc"),
     totpEnabledAt: tstz("totp_enabled_at"),
+    totpLastStep: bigint("totp_last_step", { mode: "number" }),
     lastLoginAt: tstz("last_login_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -41,6 +42,7 @@ export const backofficeUsers = pgTable(
     status: userStatus("status").notNull().default("invited"),
     totpSecretEnc: text("totp_secret_enc"),
     totpEnabledAt: tstz("totp_enabled_at"),
+    totpLastStep: bigint("totp_last_step", { mode: "number" }),
     lastLoginAt: tstz("last_login_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
