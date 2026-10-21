@@ -209,7 +209,7 @@ describe("cars list page", () => {
     expect(html.match(/data-testid="car-add"/g)).toHaveLength(1);
   });
 
-  it.each(["readOnly", "forbidden"] as const)("renders the %s notice for ?notice= and keeps the filter", async (notice) => {
+  it.each(["readOnly", "forbidden", "limit"] as const)("renders the %s notice for ?notice= and keeps the filter", async (notice) => {
     mocks.listCarsForAdmin.mockResolvedValue([car()]);
     const html = decode(
       await render(await CarsPage({ searchParams: Promise.resolve({ status: "inactive", notice }) })),

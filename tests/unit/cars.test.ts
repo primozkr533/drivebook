@@ -35,6 +35,7 @@ vi.mock("@/server/storage", () => ({ getStorage: () => storage }));
 const { DealerReadOnlyError, ForbiddenError } = await import("@/server/auth/permissions");
 const { setDbForTests } = await import("@/server/data/db");
 const {
+  CarLimitError,
   CarNotFoundError,
   createCar,
   getCar,
@@ -283,6 +284,57 @@ describe("validation", () => {
       errors: { image: "blocked_host" },
     });
     expect(await db.select().from(cars)).toHaveLength(0);
+  });
+});
+
+describe("plan maxCars", () => {
+  const setMaxCars = async (maxCars: number) =>
+    db.update(plans).set({ maxCars }).where(eq(plans.id, a.dealer.planId));
+
+  it("refuses a second active car at maxCars=1 and allows it after deactivating the first", async () => {
+    await setMaxCars(1);
+    const first = await created(a.ctx);
+    const auditCount = (await audits()).length;
+
+    await expect(createCar(a.ctx, input({ model: "Second", avtonetUrl: "" }))).rejects.toBeInstanceOf(CarLimitError);
+    expect(await db.select().from(cars)).toHaveLength(1);
+    expect(await audits()).toHaveLength(auditCount);
+
+    await setCarActive(a.ctx, first.id, false);
+    expect((await createCar(a.ctx, input({ model: "Second", avtonetUrl: "" }))).ok).toBe(true);
+  });
+
+  it("refuses reactivating over the limit but never refuses deactivation or an inactive create", async () => {
+    await setMaxCars(1);
+    const first = await created(a.ctx);
+    const inactive = await created(a.ctx, { model: "Parked", avtonetUrl: "", active: false });
+    expect(inactive.active).toBe(false);
+
+    await expect(setCarActive(a.ctx, inactive.id, true)).rejects.toBeInstanceOf(CarLimitError);
+    expect((await carRow(inactive.id)).active).toBe(false);
+    expect(await setCarActive(a.ctx, first.id, true)).toMatchObject({ active: true });
+
+    await setMaxCars(0);
+    expect(await setCarActive(a.ctx, first.id, false)).toMatchObject({ active: false });
+    expect(await setCarActive(a.ctx, first.id, false)).toMatchObject({ active: false });
+  });
+
+  it("removes the stored image when the create is refused", async () => {
+    await setMaxCars(0);
+    await expect(createCar(a.ctx, input({ image: { kind: "upload", bytes: await png() } }))).rejects.toBeInstanceOf(
+      CarLimitError,
+    );
+    expect(await storedFiles()).toEqual([]);
+  });
+
+  it("does not count another dealer's cars", async () => {
+    await setMaxCars(1);
+    signIn(b.ctx);
+    await created(b.ctx);
+    signIn(a.ctx);
+    expect((await createCar(a.ctx, input())).ok).toBe(true);
+    signIn(b.ctx);
+    await expect(createCar(b.ctx, input({ model: "Second", avtonetUrl: "" }))).rejects.toBeInstanceOf(CarLimitError);
   });
 });
 
