@@ -3,6 +3,7 @@ import { prerender } from "react-dom/static";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "./i18n";
+import { addDays, formatIsoDate, ljubljanaNow } from "@/lib/date";
 import DealerAppLayout from "@/app/dealer-admin/(app)/layout";
 import DealerHomePage from "@/app/dealer-admin/(app)/page";
 import DealerAccountPage from "@/app/dealer-admin/(app)/account/page";
@@ -16,6 +17,7 @@ import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
 import { requireOwnerPage } from "@/app/dealer-admin/(app)/owner-gate";
+import { BOOKING_RULE_DEFAULTS } from "@/server/data/settings-booking";
 import SettingsLayout from "@/app/dealer-admin/(app)/settings/layout";
 import SettingsHomePage from "@/app/dealer-admin/(app)/settings/page";
 import SettingsDealerPage from "@/app/dealer-admin/(app)/settings/dealer/page";
@@ -27,7 +29,18 @@ import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings" | "settingsDealer" | "dealerUsers") => {
+  getTranslations: async (
+    namespace:
+      | "auth"
+      | "account"
+      | "backoffice"
+      | "settings"
+      | "settingsBooking"
+      | "settingsDealer"
+      | "settingsClosures"
+      | "holidays"
+      | "dealerUsers",
+  ) => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -43,8 +56,12 @@ const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(),
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
+  getOpeningHours: vi.fn(),
+  getBookingRules: vi.fn(),
   getDealerSettings: vi.fn(),
   listDealerUsers: vi.fn(),
+  listHolidays: vi.fn(),
+  listClosures: vi.fn(),
   pathname: "/",
 }));
 
@@ -80,6 +97,13 @@ vi.mock("@/server/data/dealer-users", () => ({
   reactivateDealerUser: vi.fn(),
 }));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
+vi.mock("@/server/data/settings-hours", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-hours")>()),
+  getOpeningHours: mocks.getOpeningHours,
+  listHolidays: mocks.listHolidays,
+  listClosures: mocks.listClosures,
+}));
+vi.mock("@/app/dealer-admin/(app)/settings/hours/actions", () => ({ saveOpeningHoursAction: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
   getPlan: mocks.getPlan,
@@ -88,11 +112,17 @@ vi.mock("@/server/data/backoffice/plans", () => ({
   deletePlan: vi.fn(),
   DEFAULT_MONTHLY_SMS_QUOTA: 300,
 }));
+vi.mock("@/server/data/settings-booking", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-booking")>()),
+  getBookingRules: mocks.getBookingRules,
+}));
 vi.mock("@/server/data/backoffice/users", () => ({
   listBackofficeUsers: mocks.listBackofficeUsers,
   inviteBackofficeUser: vi.fn(),
   deactivateBackofficeUser: vi.fn(),
 }));
+
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 
 const ctx = { dealerId: "dealer-1", slug: "demo", status: "active" };
 
@@ -102,6 +132,8 @@ beforeEach(() => {
   mocks.backofficeSession = null;
   mocks.pathname = "/";
   vi.clearAllMocks();
+  mocks.listHolidays.mockResolvedValue([]);
+  mocks.listClosures.mockResolvedValue([]);
 });
 
 async function render(node: ReactNode) {
@@ -492,6 +524,7 @@ describe("dealer settings shell", () => {
   const owner = { id: "u1", email: "lastnik@demo.si", role: "owner" };
   const salesperson = { id: "u3", email: "prodajalec@demo.si", role: "salesperson" };
   const signInAs = (user: typeof owner, basePath = "/_dev/app") => {
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS });
     mocks.dealerSession = { ctx, user, sessionId: "s1" };
     mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
     mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
@@ -570,17 +603,28 @@ describe("dealer settings shell", () => {
     expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
   });
 
-  it("renders every remaining settings stub for an Owner and access denied for a Salesperson", async () => {
+  it("renders every remaining settings page for an Owner and access denied for a Salesperson", async () => {
+    const testIds: Record<(typeof stubSections)[number], string> = {
+      branding: "settings-branding",
+      booking: "settings-booking",
+      hours: "hours-editor",
+      closures: "settings-closures",
+    };
+    mocks.getOpeningHours.mockResolvedValue({ 1: [{ opens: "08:00", closes: "12:00" }], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] });
+    const renderPage = async (Page: (typeof stubPages)[number]) =>
+      render(createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: await Page() }));
     for (const [i, Page] of stubPages.entries()) {
       signInAs(owner);
-      const html = await render(createElement(Page));
-      expect(html).toContain(`data-testid="settings-${stubSections[i]}"`);
+      const html = await renderPage(Page);
+      expect(html).toContain(`data-testid="${testIds[stubSections[i]]}"`);
       expect(html).not.toContain("access-denied");
 
       signInAs(salesperson);
-      const denied = await render(createElement(Page));
+      const calls = mocks.getOpeningHours.mock.calls.length;
+      const denied = await renderPage(Page);
       expect(denied).toContain('data-testid="access-denied"');
-      expect(denied).not.toContain(`settings-${stubSections[i]}`);
+      expect(denied).not.toContain(testIds[stubSections[i]]);
+      expect(mocks.getOpeningHours.mock.calls.length).toBe(calls);
     }
     signInAs(salesperson);
     expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
@@ -626,6 +670,43 @@ describe("dealer settings shell", () => {
     expect(denied).toContain('data-testid="access-denied"');
     expect(denied).not.toContain("settings-dealer-profile");
     expect(mocks.getDealerSettings).not.toHaveBeenCalled();
+  });
+
+  it("renders holidays per year with translated names and upcoming closures with their reason", async () => {
+    signInAs(owner);
+    const year = Number(ljubljanaNow().dateISO.slice(0, 4));
+    const today = ljubljanaNow().dateISO;
+    mocks.listHolidays.mockResolvedValue([
+      { id: "h1", date: `${year}-12-25`, key: "christmas", year, openAnyway: false },
+      { id: "h2", date: `${year + 1}-12-25`, key: "christmas", year: year + 1, openAnyway: true },
+      { id: "h3", date: `${year + 1}-06-25`, key: "statehood", year: year + 1, openAnyway: false },
+    ]);
+    mocks.listClosures.mockResolvedValue([
+      { id: "old", startDate: addDays(today, -10), endDate: addDays(today, -9), reason: "Preteklo" },
+      { id: "c1", startDate: addDays(today, 3), endDate: addDays(today, 3), reason: null },
+      { id: "c2", startDate: addDays(today, 5), endDate: addDays(today, 9), reason: "Inventura" },
+    ]);
+    const html = await render(createElement(SettingsClosuresPage));
+    const t = messages.settingsClosures;
+
+    const thisYear = html.slice(html.indexOf(`data-testid="holidays-${year}"`), html.indexOf(`data-testid="holidays-${year + 1}"`));
+    const nextYear = html.slice(html.indexOf(`data-testid="holidays-${year + 1}"`));
+    expect(thisYear).toContain(`25. 12. ${year}`);
+    expect(thisYear).toContain(messages.holidays.christmas);
+    expect(thisYear).not.toContain(messages.holidays.statehood);
+    expect(nextYear).toContain(messages.holidays.statehood);
+    expect(html).toMatch(/data-testid="holiday-open-h2"[^>]*checked|checked=""[^>]*data-testid="holiday-open-h2"/);
+    expect(html).not.toMatch(/checked=""[^>]*data-testid="holiday-open-h1"/);
+    expect(html.match(new RegExp(t.holidays.openAnyway, "g"))).toHaveLength(3);
+    expect(html).toContain("md:grid-cols-2");
+
+    for (const field of ["startDate", "endDate", "reason"]) expect(html).toContain(`name="${field}"`);
+    expect(html).toContain(t.closures.noReason);
+    expect(html).toContain("Inventura");
+    expect(html).toContain(`${formatIsoDate(addDays(today, 5))} – ${formatIsoDate(addDays(today, 9))}`);
+    expect(html).toContain('data-testid="closure-delete-c1"');
+    expect(html).not.toContain("Preteklo");
+    expect(mocks.listHolidays).toHaveBeenCalledWith(ctx);
   });
 
   const usersT = messages.dealerUsers;
@@ -681,5 +762,27 @@ describe("dealer settings shell", () => {
     expect(denied).not.toContain("dealer-users");
     expect(denied).not.toContain(usersT.title + "</h1>");
     expect(mocks.listDealerUsers).not.toHaveBeenCalled();
+  });
+
+  it("shows the booking rules form with the current values, hours for notice and cut-off", async () => {
+    signInAs(owner);
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS, minNoticeMinutes: 180 });
+    const html = await render(createElement(SettingsBookingPage));
+    const bookingT = messages.settingsBooking;
+    const value = (name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0].match(/value="([^"]*)"/)?.[1];
+    expect(mocks.getBookingRules).toHaveBeenCalledWith(ctx);
+    expect(value("testDriveMinutes")).toBe("45");
+    expect(value("viewingMinutes")).toBe("30");
+    expect(value("otherMinutes")).toBe("30");
+    expect(value("capacity")).toBe("1");
+    expect(value("minNoticeHours")).toBe("3");
+    expect(value("horizonDays")).toBe("14");
+    expect(value("bufferMinutes")).toBe("15");
+    expect(value("cancelCutoffHours")).toBe("2");
+    expect(html).toMatch(/<option value="15" selected="">15 min<\/option>/);
+    expect(html).toContain(bookingT.fields.minNoticeHours);
+    expect(html).toContain("0–168 h");
+    expect(html).toContain("15–240 min");
+    expect(html).toContain(bookingT.reset);
   });
 });

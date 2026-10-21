@@ -1,1 +1,52 @@
-{}
+{
+  "title": "Pravila rezervacij",
+  "description": "Trajanje terminov, zmogljivost in časovne omejitve, ki veljajo za spletne rezervacije.",
+  "groups": {
+    "durations": "Trajanje terminov",
+    "capacity": "Zmogljivost in razpored",
+    "timing": "Časovne omejitve"
+  },
+  "fields": {
+    "testDriveMinutes": "Testna vožnja (min)",
+    "viewingMinutes": "Ogled vozila (min)",
+    "otherMinutes": "Drugo (min)",
+    "capacity": "Hkratni termini",
+    "minNoticeHours": "Najmanj vnaprej (h)",
+    "horizonDays": "Rezervacije do (dni vnaprej)",
+    "bufferMinutes": "Premor med termini (min)",
+    "cancelCutoffHours": "Rok za odpoved (h)",
+    "slotIntervalMinutes": "Razmik začetkov terminov (min)"
+  },
+  "hints": {
+    "testDriveMinutes": "Dolžina termina za testno vožnjo. Dovoljeno {range}, v korakih po {step} min.",
+    "viewingMinutes": "Dolžina termina za ogled vozila. Dovoljeno {range}, v korakih po {step} min.",
+    "otherMinutes": "Dolžina drugih terminov. Dovoljeno {range}, v korakih po {step} min.",
+    "capacity": "Koliko strank lahko rezervira isti termin. Dovoljeno {range}.",
+    "minNoticeHours": "Kako zgodaj pred začetkom je treba rezervirati. Dovoljeno {range}.",
+    "horizonDays": "Kako daleč vnaprej so termini na voljo. Dovoljeno {range}.",
+    "bufferMinutes": "Prosti čas po vsakem terminu. Dovoljeno {range}.",
+    "cancelCutoffHours": "Do kdaj pred začetkom lahko stranka odpove. Dovoljeno {range}.",
+    "slotIntervalMinutes": "Na koliko minut se začenjajo termini."
+  },
+  "range": {
+    "minutes": "{min}–{max} min",
+    "hours": "{min}–{max} h",
+    "days": "{min}–{max} dni",
+    "count": "{min}–{max}"
+  },
+  "slotOption": "{value} min",
+  "submit": "Shrani",
+  "reset": "Ponastavi na privzeto",
+  "resetHint": "Obrazec je izpolnjen s privzetimi vrednostmi. Shranijo se šele, ko kliknete Shrani.",
+  "saved": "Pravila rezervacij so shranjena.",
+  "errors": {
+    "required": "Vnesite vrednost.",
+    "notInteger": "Vnesite celo število.",
+    "notWholeMinutes": "Vnesite število ur, ki ustreza celim minutam.",
+    "outOfRange": "Vrednost mora biti v razponu {range}.",
+    "invalidStep": "Vnesite večkratnik števila {step}.",
+    "invalidOption": "Izberite eno od ponujenih vrednosti.",
+    "forbidden": "Pravila rezervacij lahko spreminja le lastnik trgovca.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}

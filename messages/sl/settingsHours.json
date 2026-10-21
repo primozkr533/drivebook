@@ -1,1 +1,36 @@
-{}
+{
+  "title": "Delovni čas",
+  "description": "Za vsak dan v tednu določite, kdaj ste odprti. Dan brez terminov je zaprt.",
+  "weekdays": {
+    "1": "Ponedeljek",
+    "2": "Torek",
+    "3": "Sreda",
+    "4": "Četrtek",
+    "5": "Petek",
+    "6": "Sobota",
+    "7": "Nedelja"
+  },
+  "closed": "Zaprto",
+  "opens": "Od",
+  "closes": "Do",
+  "addRange": "Dodaj termin",
+  "removeRange": "Odstrani",
+  "removeRangeLabel": "Odstrani termin {opens}–{closes} ({day})",
+  "copyMonday": "Kopiraj ponedeljek na delavnike",
+  "save": "Shrani delovni čas",
+  "saving": "Shranjujem …",
+  "saved": "Delovni čas je shranjen.",
+  "hasErrors": "Popravite označene termine.",
+  "preview": {
+    "title": "Predogled",
+    "hint": "Tako bo delovni čas prikazan na vaši javni strani. Predogled vključuje neshranjene spremembe."
+  },
+  "errors": {
+    "invalid_time": "Vnesite veljaven čas na 15 minut natančno.",
+    "end_before_start": "Konec mora biti po začetku.",
+    "overlap": "Termin se prekriva z drugim terminom istega dne.",
+    "too_many": "Dan ima lahko največ {max} termine.",
+    "forbidden": "Delovni čas lahko ureja le lastnik trgovca.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}
