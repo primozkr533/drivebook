@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { rewriteSurfaceLink, type SurfaceOrigins } from "./rewrite-links";
 
 const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
 // Sentence punctuation right after a link belongs to the text, not the URL.
@@ -18,14 +19,14 @@ export function splitLinks(text: string): TextPart[] {
   return parts;
 }
 
-export function TextBody({ text }: { text: string }) {
+export function TextBody({ text, origins }: { text: string; origins: SurfaceOrigins | null }) {
   return (
     <p className="whitespace-pre-wrap break-words font-mono text-caption text-ink-2">
       {splitLinks(text).map((part, i) =>
         part.kind === "link" ? (
           <a
             key={i}
-            href={part.value}
+            href={origins ? rewriteSurfaceLink(part.value, origins) : part.value}
             data-testid="inbox-link"
             className="text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
           >

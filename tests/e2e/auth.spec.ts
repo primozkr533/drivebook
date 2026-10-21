@@ -116,9 +116,10 @@ test("password reset through the dev inbox link", async ({ page }) => {
   }).toPass({ timeout: 30_000 });
 
   const link = message.getByTestId("inbox-link").filter({ hasText: "reset-password" }).first();
-  const resetUrl = await link.getAttribute("href");
+  // The href is rewritten to the localhost dev alias; this test follows the mailed app. URL itself.
+  const resetUrl = await link.textContent();
   expect(resetUrl).toContain(url("app", "reset-password"));
-  await link.click();
+  await page.goto(resetUrl!);
 
   await page.getByTestId("new-password").fill(NEW_PASSWORD);
   await page.getByTestId("confirm-password").fill(NEW_PASSWORD);

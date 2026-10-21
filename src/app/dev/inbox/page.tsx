@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AppHeader, Badge, Card, CardHeader, Container, Eyebrow, PageHeader, Shell, Stack, Text } from "@/components/ui";
-import { getConfig } from "@/lib/config";
+import { getConfig, surfaceOrigin } from "@/lib/config";
 import { formatDate, formatTime } from "@/lib/date";
 import { listDevOutbox } from "@/server/notify/outbox";
 import { HtmlPreview } from "./HtmlPreview";
+import { rewriteHtmlLinks } from "./rewrite-links";
 import { TextBody } from "./TextBody";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Routing already 404s this in production without DEV_INBOX_ENABLED; this guards direct renders.
 export default async function DevInboxPage() {
-  const { isProduction, devInboxEnabled } = getConfig();
+  const { isProduction, devInboxEnabled, devAliases } = getConfig();
   if (isProduction && !devInboxEnabled) notFound();
 
   const t = await getTranslations("inbox");
   const messages = await listDevOutbox();
+  // The /_dev/app and /_dev/admin aliases don't exist in production, even with DEV_INBOX_ENABLED.
+  const origins = devAliases ? { dealer: surfaceOrigin("dealer"), backoffice: surfaceOrigin("backoffice") } : null;
 
   return (
     <Shell header={<AppHeader />}>
@@ -57,10 +60,15 @@ export default async function DevInboxPage() {
                       </dl>
                       <div className="flex flex-col gap-2 border-t border-dashed border-line pt-4">
                         <Eyebrow>{t("textBody")}</Eyebrow>
-                        <TextBody text={m.textBody} />
+                        <TextBody text={m.textBody} origins={origins} />
                       </div>
                       {m.htmlBody && (
-                        <HtmlPreview html={m.htmlBody} showLabel={t("showHtml")} hideLabel={t("hideHtml")} title={t("htmlPreview")} />
+                        <HtmlPreview
+                          html={origins ? rewriteHtmlLinks(m.htmlBody, origins) : m.htmlBody}
+                          showLabel={t("showHtml")}
+                          hideLabel={t("hideHtml")}
+                          title={t("htmlPreview")}
+                        />
                       )}
                     </Stack>
                   </Card>

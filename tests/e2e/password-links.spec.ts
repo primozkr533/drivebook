@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import auth from "../../messages/sl/auth.json";
 import {
@@ -13,6 +14,7 @@ import {
 const BASE_DOMAIN = process.env.BASE_DOMAIN ?? "drivebook.localhost";
 const host = (label: string) => `http://${label}.${BASE_DOMAIN}:3000`;
 const url = (label: string, ...segments: string[]) => [host(label), ...segments].join("/");
+const ROOT = "http://localhost:3000";
 
 const NEW_PASSWORD = "nova-Geslo-2026!";
 const tooShort = auth.errorPasswordTooShort.replace("{min}", "10");
@@ -115,4 +117,34 @@ test("the login page links to forgot-password", async ({ page }) => {
   await page.getByRole("link", { name: auth.forgotPassword }).click();
   await expect(page).toHaveURL(url("admin", "forgot-password"));
   await expect(page.getByTestId("forgot-email")).toBeVisible();
+});
+
+test("a reset link opened from the dev inbox on localhost stays on the localhost origin", async ({ page }) => {
+  const user = track(await createDealerUser());
+  // A per-run client IP keeps this request clear of the shared per-IP limit.
+  await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${randomInt(1, 255)}` });
+  await page.goto([ROOT, "_dev", "app", "forgot-password"].join("/"));
+  await page.getByTestId("forgot-email").fill(user.email);
+  await page.getByTestId("forgot-submit").click();
+  await expect(page.getByTestId("forgot-sent")).toHaveText(auth.forgotSent);
+
+  // The worker sends the e-mail asynchronously, so poll the inbox until it lands.
+  const message = page.getByTestId("inbox-message").filter({ hasText: user.email }).first();
+  await expect(async () => {
+    await page.goto(`${ROOT}/_dev/inbox`);
+    await expect(message).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+
+  const link = message.getByTestId("inbox-link").filter({ hasText: "reset-password" }).first();
+  await expect(link).toContainText(url("app", "reset-password"));
+  expect(await link.getAttribute("href")).toMatch(/^\/_dev\/app\/reset-password\/[^/?#]+$/);
+  await link.click();
+  await expect(page).toHaveURL((u) => u.origin === ROOT && /^\/_dev\/app\/reset-password\//.test(u.pathname));
+
+  await page.getByTestId("new-password").fill(NEW_PASSWORD);
+  await page.getByTestId("confirm-password").fill(NEW_PASSWORD);
+  await page.getByTestId("set-password-submit").click();
+  await expect(page).toHaveURL((u) => u.origin === ROOT && /^\/_dev\/app(\/account)?\/?$/.test(u.pathname));
+  await expect(page.getByTestId("signed-in-as")).toContainText(user.email);
+  expect(await cookie(page, "db_app_session")).toMatchObject({ httpOnly: true, domain: "localhost" });
 });

@@ -1,6 +1,7 @@
 import { prerender } from "react-dom/static";
 import { createTranslator } from "next-intl";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetConfigForTests } from "@/lib/config";
 import { messages } from "./i18n";
 import type { DevOutboxMessage } from "@/server/notify/outbox";
 
@@ -29,6 +30,15 @@ const count = (html: string, needle: string) => html.split(needle).length - 1;
 
 beforeEach(() => {
   rows.length = 0;
+  vi.stubEnv("BASE_DOMAIN", "drivebook.localhost");
+  vi.stubEnv("PUBLIC_URL_SCHEME", "http");
+  vi.stubEnv("PUBLIC_URL_PORT", "3000");
+  resetConfigForTests();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetConfigForTests();
 });
 
 describe("dev inbox page", () => {
@@ -60,7 +70,8 @@ describe("dev inbox page", () => {
     expect(html).toContain(`>${inbox.title}</h1>`);
     expect(count(html, 'data-testid="inbox-message"')).toBe(2);
     expect(count(html, 'data-testid="inbox-link"')).toBe(1);
-    expect(html).toContain('href="http://app.drivebook.localhost:3000/set-password?token=abc"');
+    expect(html).toContain('href="/_dev/app/set-password?token=abc"');
+    expect(html).toContain(">http://app.drivebook.localhost:3000/set-password?token=abc</a>");
     expect(html).toContain(inbox.channel.email);
     expect(html).toContain(inbox.channel.sms);
     expect(html).toContain("kupec@example.si");
@@ -71,6 +82,31 @@ describe("dev inbox page", () => {
     expect(html).toContain("6. 1. 2026 00:30");
     expect(count(html, inbox.showHtml)).toBe(1);
     expect(html).not.toContain("<iframe");
+  });
+
+  it("keeps the real surface links in production with DEV_INBOX_ENABLED, where the dev aliases don't exist", async () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("DEV_INBOX_ENABLED", "1");
+    vi.stubEnv("DATABASE_URL", "postgres://u:p@localhost:5432/drivebook");
+    vi.stubEnv("AUTH_SECRET", "x".repeat(32));
+    vi.stubEnv("PUBLIC_URL_SCHEME", "https");
+    vi.stubEnv("PUBLIC_URL_PORT", "");
+    resetConfigForTests();
+    rows.push({
+      id: "p",
+      channel: "email",
+      recipient: "kupec@example.si",
+      sender: "DriveBook",
+      subject: "Ponastavitev gesla",
+      textBody: "Ponastavite geslo: https://admin.drivebook.localhost/reset-password/abc",
+      htmlBody: null,
+      createdAt: new Date("2026-10-20T08:05:00Z"),
+    });
+    const html = await render();
+
+    expect(html).toContain('href="https://admin.drivebook.localhost/reset-password/abc"');
+    expect(html).not.toContain("/_dev/app");
+    expect(html).not.toContain("/_dev/admin");
   });
 
   it("shows the empty state", async () => {
