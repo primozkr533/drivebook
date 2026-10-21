@@ -65,7 +65,7 @@ export async function main(argv: string[], io: Io = console): Promise<number> {
   }
 }
 
-if (process.argv[1]?.endsWith("user-admin-cli.ts")) {
+if (/user-admin-cli\.(ts|cjs)$/.test(process.argv[1] ?? "")) {
   main(process.argv.slice(2))
     .catch((error: unknown) => {
       console.error(error);
