@@ -18,7 +18,7 @@ export type AuditEntry = {
 export async function withDealerMutation<T>(
   ctx: DealerContext,
   fn: (tx: Tx) => Promise<T>,
-  audit?: AuditEntry,
+  audit?: AuditEntry | ((result: T) => AuditEntry),
 ): Promise<T> {
   return db().transaction(async (tx) => {
     // ctx.status may be stale; FOR SHARE blocks a concurrent status change until this write commits.
@@ -31,15 +31,16 @@ export async function withDealerMutation<T>(
     if (dealer.status === "read_only" || dealer.status === "suspended") throw new DealerReadOnlyError();
 
     const result = await fn(tx);
-    if (audit) {
+    const entry = typeof audit === "function" ? audit(result) : audit;
+    if (entry) {
       await tx.insert(auditLog).values({
         dealerId: ctx.dealerId,
-        actorKind: audit.actorKind ?? "system",
-        actorId: audit.actorId ?? null,
-        action: audit.action,
-        entity: audit.entity,
-        entityId: audit.entityId ?? null,
-        data: audit.data ?? {},
+        actorKind: entry.actorKind ?? "system",
+        actorId: entry.actorId ?? null,
+        action: entry.action,
+        entity: entry.entity,
+        entityId: entry.entityId ?? null,
+        data: entry.data ?? {},
       });
     }
     return result;

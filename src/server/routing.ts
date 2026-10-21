@@ -7,6 +7,7 @@ export const NOT_FOUND_PATH = ["", "_404"].join("/");
 export const DEV_INDEX_PATH = "/dev";
 export const DEV_INBOX_PATH = "/dev/inbox";
 export const TEST_LOGIN_PATH = "/api/test/login";
+export const FILES_PATH_PREFIX = "/api/files/";
 
 // Root-host paths that, with dev aliases on, redirect to the alias that actually serves them.
 const DEV_REDIRECTS: [string, string][] = [
@@ -94,6 +95,9 @@ async function dealerSite(
 }
 
 export async function routeRequest(host: string, pathname: string, search: string, cfg: RouteConfig): Promise<RouteResult> {
+  // Stored files (dealer logos) are shown on public dealer pages, so every host serves them.
+  if (pathname.startsWith(FILES_PATH_PREFIX)) return { kind: "next" };
+
   const { hostname, port } = splitHost(host);
   const base = cfg.baseDomain;
 
