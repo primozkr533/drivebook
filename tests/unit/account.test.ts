@@ -232,3 +232,44 @@ describe("disabling 2FA", () => {
     expect(audits).toHaveLength(1);
   });
 });
+
+describe("users of a read_only dealer", () => {
+  beforeEach(async () => {
+    await db.update(dealers).set({ status: "read_only" }).where(eq(dealers.id, seeded.dealer.id));
+  });
+
+  it("can change their password, with an audit row", async () => {
+    const userId = seeded.dealerUser.id;
+    const token = await createSession("dealer", userId, meta);
+    const session = (await validateSessionToken("dealer", token))!.session;
+
+    expect(
+      await changePassword("dealer", userId, {
+        currentPassword: PASSWORD,
+        newPassword: "a brand new password",
+        currentSessionId: session.id,
+      }),
+    ).toEqual({ ok: true });
+    const [user] = await db.select().from(dealerUsers).where(eq(dealerUsers.id, userId));
+    expect(await verifyPassword(user.passwordHash!, "a brand new password")).toBe(true);
+    expect(await auditRows("auth.password.changed")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
+  });
+
+  it("can start, enable and disable 2FA, each with an audit row", async () => {
+    const userId = seeded.dealerUser.id;
+    const setup = await startTotpSetup("dealer", userId);
+    expect(await auditRows("auth.totp.setup_started")).toMatchObject([
+      { dealerId: seeded.dealer.id, actorId: userId, entityId: userId },
+    ]);
+
+    expect(await confirmTotpSetup("dealer", userId, generateSync({ secret: setup.secret }))).toEqual({ ok: true });
+    expect((await getAccountSummary("dealer", userId)).totpEnabled).toBe(true);
+    expect(await auditRows("auth.totp.enabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
+
+    expect(
+      await disableTotp("dealer", userId, { password: PASSWORD, code: generateSync({ secret: setup.secret }) }),
+    ).toEqual({ ok: true });
+    expect((await getAccountSummary("dealer", userId)).totpEnabled).toBe(false);
+    expect(await auditRows("auth.totp.disabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
+  });
+});
