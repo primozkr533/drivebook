@@ -1,1 +1,65 @@
-{}
+{
+  "title": "Uporabniki",
+  "description": "Uporabniki, ki imajo dostop do skrbništva trgovca.",
+  "usage": {
+    "label": "Uporabniki v paketu",
+    "value": "{used} / {max}",
+    "unlimited": "neomejeno",
+    "note": "Šteti so aktivni in povabljeni uporabniki."
+  },
+  "listTitle": "Seznam uporabnikov",
+  "empty": "Trgovec še nima uporabnikov.",
+  "you": "vi",
+  "never": "Še nikoli",
+  "columns": {
+    "name": "Ime",
+    "email": "E-pošta",
+    "role": "Vloga",
+    "status": "Stanje",
+    "lastLogin": "Zadnja prijava",
+    "actions": "Dejanja"
+  },
+  "roles": {
+    "owner": "Lastnik",
+    "salesperson": "Prodajalec"
+  },
+  "statuses": {
+    "active": "Aktiven",
+    "invited": "Povabljen",
+    "deactivated": "Deaktiviran"
+  },
+  "invite": {
+    "title": "Povabi uporabnika",
+    "hint": "Povabljeni prejme e-poštno sporočilo s povezavo za nastavitev gesla, ki velja 7 dni.",
+    "limitReached": "Dosegli ste največje število uporabnikov v paketu ({max}). Za novo povabilo deaktivirajte uporabnika ali nadgradite paket.",
+    "fields": {
+      "email": "E-pošta",
+      "name": "Ime in priimek",
+      "role": "Vloga"
+    },
+    "submit": "Pošlji povabilo"
+  },
+  "actions": {
+    "role": "Vloga",
+    "saveRole": "Shrani vlogo",
+    "deactivate": "Deaktiviraj",
+    "reactivate": "Ponovno aktiviraj"
+  },
+  "saved": {
+    "invite": "Povabilo je poslano.",
+    "role": "Vloga je spremenjena.",
+    "deactivate": "Uporabnik je deaktiviran.",
+    "reactivate": "Uporabnik je ponovno aktiviran."
+  },
+  "errors": {
+    "email": "Vnesite veljaven e-poštni naslov.",
+    "name": "Vnesite ime (največ 100 znakov).",
+    "role": "Izberite vlogo.",
+    "taken": "Uporabnik s tem e-poštnim naslovom že obstaja.",
+    "limit_reached": "Dosegli ste največje število uporabnikov v paketu.",
+    "last_owner": "Trgovec mora imeti vsaj enega aktivnega lastnika.",
+    "not_deactivated": "Uporabnik ni deaktiviran.",
+    "forbidden": "Uporabnike lahko upravlja le lastnik trgovca.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}

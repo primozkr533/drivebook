@@ -20,7 +20,7 @@ export default async function PrivacyPage({ params }: Props) {
   if (resolved.kind !== "current") notFound();
   const { dealer } = resolved;
   // The dealer's own notice takes precedence over the platform default.
-  if (dealer.privacyUrl) redirect(dealer.privacyUrl);
+  if (dealer.privacyPolicyUrl) redirect(dealer.privacyPolicyUrl);
 
   const t = await getTranslations("privacy");
   const basePath = (await headers()).get(BASE_PATH_HEADER) ?? "";
