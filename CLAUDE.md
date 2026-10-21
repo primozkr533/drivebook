@@ -35,11 +35,14 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/db/` — schema (`src/db/schema/`), client, migrate, seed, `newPublicId` (`src/db/ids.ts`)
 - `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
 - `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
+- `src/server/data/settings-dealer.ts`, `src/server/data/settings-branding.ts`, `src/server/data/settings-booking.ts`, `src/server/data/settings-hours.ts`, `src/server/data/dealer-users.ts` — Owner-only settings services (every function calls `requireDealerRole(ctx, ['owner'])` first)
+- `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getClosedDatesBetween` (shared with the phase-2 slot engine)
+- `src/app/dealer-admin/(app)/settings/*` (`src/app/dealer-admin/(app)/settings/`) and `src/app/dealer-admin/(app)/users` — Owner settings and users pages, gated by `requireOwnerPage()` in `src/app/dealer-admin/(app)/owner-gate.tsx`
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
 - `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
-- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by `GET /api/files/{key}` (`src/app/api/files/[...key]/route.ts`)
+- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by the files route (`src/app/api/files/[...key]/route.ts`, see `## API Contract`)
 - `src/app/site/[slug]/` — public dealer site
 - `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
 - `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
@@ -155,3 +158,9 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Holiday names are not hardcoded: `slovenianWorkFreeDays` (`src/lib/date.ts`) returns stable `key`s, and the Slovenian name comes from `messages/sl/holidays.json` by key.
 - Public pages never render empty dealer contact data: every public page that shows the address or phone (dealer page, privacy page, and any later one) builds the address with `dealerAddress()` and switches to a translation variant without the address/phone when it is empty.
 - A dealer's `legalName` starts equal to `name` (set by `createDealer`). The back-office rename (`updateDealer`) keeps `legalName` in step with `name` only while the two are still equal; once `legalName` differs it is never overwritten by a rename.
+- Settings and Users pages and their server actions are Owner-only: Salespeople don't see the nav items, the pages render access denied, and actions are refused on the server.
+- Dealer user invites, reactivations and plan limits: invited + active users count toward the plan's max users; deactivated users don't. The last active Owner can't be demoted or deactivated. Inviting the e-mail of a deactivated user of the same dealer re-invites that row.
+- By-id dealer operations (users, closures, holidays) return not-found (HTTP 404) for ids of another dealer, never forbidden.
+- Uploaded files use unique keys (`logos/<publicId>.<ext>`) and are served with `Cache-Control: public, max-age=31536000, immutable`; replacing a logo deletes the old file after commit. The logo type is detected from content; unsafe SVGs are rejected, and SVGs are served with a sandbox CSP.
+- `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
+- The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
