@@ -17,6 +17,9 @@ vi.mock("@/server/auth/account", () => ({
   getAccountSummary: mocks.getAccountSummary,
   startTotpSetup: mocks.startTotpSetup,
 }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.9, 198.51.100.7" }),
+}));
 vi.mock("@/server/auth/permissions", () => ({
   requireDealerUser: mocks.requireDealerUser,
   requireBackofficeUser: mocks.requireBackofficeUser,
@@ -48,6 +51,7 @@ it("changes the password of the session user, keeping the current session", asyn
     currentPassword: "old",
     newPassword: "new-password-1",
     currentSessionId: "s1",
+    ip: "198.51.100.7",
   });
 });
 
@@ -95,11 +99,25 @@ it("starts, confirms and disables TOTP for the session user", async () => {
     enabled: false,
     status: "disabled",
   });
-  expect(mocks.disableTotp).toHaveBeenLastCalledWith("dealer", "dealer-user", { password: "p", code: "2" });
+  expect(mocks.disableTotp).toHaveBeenLastCalledWith("dealer", "dealer-user", { password: "p", code: "2", ip: "198.51.100.7" });
 });
 
 it("does not restart setup when 2FA is already on", async () => {
   mocks.getAccountSummary.mockResolvedValue({ totpEnabled: true });
   expect(await totpAction("backoffice", { enabled: false }, form({ intent: "start" }))).toEqual({ enabled: true });
   expect(mocks.startTotpSetup).not.toHaveBeenCalled();
+});
+
+it("surfaces the rate-limited error from both forms", async () => {
+  mocks.changePassword.mockResolvedValue({ ok: false, error: "rate_limited" });
+  expect(await changePasswordAction("dealer", {}, form({ newPassword: "x", confirmPassword: "x" }))).toEqual({
+    error: "rate_limited",
+  });
+
+  mocks.disableTotp.mockResolvedValue({ ok: false, error: "rate_limited" });
+  expect(await totpAction("backoffice", { enabled: true }, form({ intent: "disable", password: "p", code: "1" }))).toEqual({
+    enabled: true,
+    error: "rate_limited",
+  });
+  expect(mocks.disableTotp).toHaveBeenCalledWith("backoffice", "bo-user", { password: "p", code: "1", ip: "198.51.100.7" });
 });

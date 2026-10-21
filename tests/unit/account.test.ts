@@ -2,9 +2,19 @@
 import { and, eq } from "drizzle-orm";
 import { generateSync } from "otplib";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLog, backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers, plans } from "@/db/schema";
+import {
+  auditLog,
+  backofficeSessions,
+  backofficeUsers,
+  dealers,
+  dealerSessions,
+  dealerUsers,
+  loginAttempts,
+  plans,
+} from "@/db/schema";
 import { decryptTotpSecret } from "@/server/auth/totp";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
+import { isLoginRateLimited, LOGIN_MAX_ACCOUNT_FAILURES, recordLoginAttempt } from "@/server/auth/rate-limit";
 import { setDbForTests } from "@/server/data/db";
 import { getTestDb, truncateAll } from "../setup/db";
 
@@ -90,6 +100,7 @@ describe("changePassword", () => {
       currentPassword: "not the password",
       newPassword: "a brand new password",
       currentSessionId: "00000000-0000-0000-0000-000000000000",
+      ip: meta.ip,
     });
     expect(result).toEqual({ ok: false, error: "wrong_password" });
     expect(await auditRows("auth.password.changed")).toHaveLength(0);
@@ -100,6 +111,7 @@ describe("changePassword", () => {
       currentPassword: PASSWORD,
       newPassword: "short",
       currentSessionId: "00000000-0000-0000-0000-000000000000",
+      ip: meta.ip,
     });
     expect(result).toEqual({ ok: false, error: "too_short" });
   });
@@ -114,6 +126,7 @@ describe("changePassword", () => {
       currentPassword: PASSWORD,
       newPassword: "a brand new password",
       currentSessionId: currentSession.id,
+      ip: meta.ip,
     });
     expect(result).toEqual({ ok: true });
 
@@ -140,6 +153,7 @@ describe("changePassword", () => {
       currentPassword: PASSWORD,
       newPassword: "a brand new password",
       currentSessionId: currentSession.id,
+      ip: meta.ip,
     });
     expect(result).toEqual({ ok: true });
     expect(await db.select().from(backofficeSessions).where(eq(backofficeSessions.userId, userId))).toHaveLength(1);
@@ -197,7 +211,7 @@ describe("disabling 2FA", () => {
   }
 
   it("reports not_enabled when 2FA is off", async () => {
-    expect(await disableTotp("backoffice", seeded.backofficeUser.id, { password: PASSWORD, code: "123456" })).toEqual({
+    expect(await disableTotp("backoffice", seeded.backofficeUser.id, { password: PASSWORD, code: "123456", ip: meta.ip })).toEqual({
       ok: false,
       error: "not_enabled",
     });
@@ -208,18 +222,18 @@ describe("disabling 2FA", () => {
     const secret = await enable(userId);
 
     expect(
-      await disableTotp("backoffice", userId, { password: "not the password", code: generateSync({ secret }) }),
+      await disableTotp("backoffice", userId, { password: "not the password", code: generateSync({ secret }), ip: meta.ip }),
     ).toEqual({ ok: false, error: "wrong_password" });
     expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
 
-    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: wrongCode(secret) })).toEqual({
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: wrongCode(secret), ip: meta.ip })).toEqual({
       ok: false,
       error: "invalid_code",
     });
     expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
     expect(await auditRows("auth.totp.disabled")).toHaveLength(0);
 
-    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: generateSync({ secret }) })).toEqual({
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: generateSync({ secret }), ip: meta.ip })).toEqual({
       ok: true,
     });
     const [user] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, userId));
@@ -248,6 +262,7 @@ describe("users of a read_only dealer", () => {
         currentPassword: PASSWORD,
         newPassword: "a brand new password",
         currentSessionId: session.id,
+        ip: meta.ip,
       }),
     ).toEqual({ ok: true });
     const [user] = await db.select().from(dealerUsers).where(eq(dealerUsers.id, userId));
@@ -267,9 +282,108 @@ describe("users of a read_only dealer", () => {
     expect(await auditRows("auth.totp.enabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
 
     expect(
-      await disableTotp("dealer", userId, { password: PASSWORD, code: generateSync({ secret: setup.secret }) }),
+      await disableTotp("dealer", userId, { password: PASSWORD, code: generateSync({ secret: setup.secret }), ip: meta.ip }),
     ).toEqual({ ok: true });
     expect((await getAccountSummary("dealer", userId)).totpEnabled).toBe(false);
     expect(await auditRows("auth.totp.disabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
+  });
+});
+
+describe("failed credential checks", () => {
+  const SESSION_ID = "00000000-0000-0000-0000-000000000000";
+  const changeWith = (userId: string, currentPassword: string) =>
+    changePassword("dealer", userId, {
+      currentPassword,
+      newPassword: "a brand new password",
+      currentSessionId: SESSION_ID,
+      ip: meta.ip,
+    });
+
+  async function enableBackoffice() {
+    const userId = seeded.backofficeUser.id;
+    const setup = await startTotpSetup("backoffice", userId);
+    await confirmTotpSetup("backoffice", userId, generateSync({ secret: setup.secret }));
+    return { userId, secret: setup.secret };
+  }
+
+  it("locks changePassword after repeated wrong passwords, even for the correct one", async () => {
+    const userId = seeded.dealerUser.id;
+    for (let i = 0; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
+      expect(await changeWith(userId, "not the password")).toEqual({ ok: false, error: "wrong_password" });
+    }
+    expect(await changeWith(userId, PASSWORD)).toEqual({ ok: false, error: "rate_limited" });
+
+    const [user] = await db.select().from(dealerUsers).where(eq(dealerUsers.id, userId));
+    expect(await verifyPassword(user.passwordHash!, PASSWORD)).toBe(true);
+    expect(await auditRows("auth.password.changed")).toHaveLength(0);
+
+    const audits = await auditRows("auth.password.check_failed");
+    expect(audits).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+    expect(audits[0]).toMatchObject({
+      dealerId: seeded.dealer.id,
+      actorKind: "dealer_user",
+      actorId: userId,
+      entityId: userId,
+      data: { surface: "dealer", reason: "wrong_password", ip: meta.ip },
+    });
+    // The blocked attempt is not recorded, so it does not extend the lockout.
+    expect(await db.select().from(loginAttempts)).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+  });
+
+  it("shares the per-account counter with login in both directions", async () => {
+    const userId = seeded.dealerUser.id;
+    for (let i = 0; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
+      await recordLoginAttempt("dealer", "Owner@Demo.si", "10.0.0." + i, false);
+    }
+    expect(await changeWith(userId, PASSWORD)).toEqual({ ok: false, error: "rate_limited" });
+
+    await truncateAll();
+    seeded = await seedUsers();
+    for (let i = 0; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) await changeWith(seeded.dealerUser.id, "not the password");
+    expect(await isLoginRateLimited("dealer", "owner@demo.si", "10.9.9.9")).toBe(true);
+    expect(await isLoginRateLimited("backoffice", "owner@demo.si", "10.9.9.9")).toBe(false);
+  });
+
+  it("locks disableTotp after wrong passwords and codes, auditing each failure", async () => {
+    const { userId, secret } = await enableBackoffice();
+    const disable = (password: string, code: string) => disableTotp("backoffice", userId, { password, code, ip: meta.ip });
+
+    expect(await disable("not the password", generateSync({ secret }))).toEqual({ ok: false, error: "wrong_password" });
+    for (let i = 1; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
+      expect(await disable(PASSWORD, wrongCode(secret))).toEqual({ ok: false, error: "invalid_code" });
+    }
+    expect(await disable(PASSWORD, generateSync({ secret }))).toEqual({ ok: false, error: "rate_limited" });
+    expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
+
+    const audits = await auditRows("auth.totp.disable_failed");
+    expect(audits).toHaveLength(LOGIN_MAX_ACCOUNT_FAILURES);
+    expect(audits.map((a) => (a.data as { reason: string }).reason).sort()).toEqual([
+      "invalid_code",
+      "invalid_code",
+      "invalid_code",
+      "invalid_code",
+      "wrong_password",
+    ]);
+    expect(audits[0]).toMatchObject({ dealerId: null, actorKind: "backoffice_user", actorId: userId, entityId: userId });
+    expect(await isLoginRateLimited("backoffice", "admin@drivebook.si", "10.9.9.9")).toBe(true);
+  });
+
+  it("lets a correct first attempt succeed without recording a failure", async () => {
+    expect(await changeWith(seeded.dealerUser.id, PASSWORD)).toEqual({ ok: true });
+    const { userId, secret } = await enableBackoffice();
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: generateSync({ secret }), ip: meta.ip })).toEqual({
+      ok: true,
+    });
+    expect(await db.select().from(loginAttempts)).toHaveLength(0);
+    expect(await auditRows("auth.password.check_failed")).toHaveLength(0);
+    expect(await auditRows("auth.totp.disable_failed")).toHaveLength(0);
+  });
+
+  it("audits failures for users of a suspended dealer", async () => {
+    await db.update(dealers).set({ status: "suspended" }).where(eq(dealers.id, seeded.dealer.id));
+    expect(await changeWith(seeded.dealerUser.id, "not the password")).toEqual({ ok: false, error: "wrong_password" });
+    expect(await auditRows("auth.password.check_failed")).toMatchObject([
+      { dealerId: seeded.dealer.id, actorId: seeded.dealerUser.id },
+    ]);
   });
 });
