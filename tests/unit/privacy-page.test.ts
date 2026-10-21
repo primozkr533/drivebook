@@ -74,6 +74,38 @@ describe("privacyNotice", () => {
     expect(notice.back).toEqual({ label: p.back, href: "/_dev/site/demo/" });
   });
 
+  const noAddress = { addressLine: " ", postalCode: "", city: "  " };
+
+  it("drops the address from the controller sentence when it is empty", () => {
+    const notice = privacyNotice(t, { ...demo, ...noAddress }, "");
+    expect(notice.controller).toBe("Upravljavec osebnih podatkov je Avtohiša Demo d.o.o.");
+    expect(notice.contact).toBe("Kontakt upravljavca: info@demo.drivebook.localhost, +386 1 234 56 78.");
+  });
+
+  it("drops the phone from the contact sentence when it is empty", () => {
+    const notice = privacyNotice(t, { ...demo, phone: "   " }, "");
+    expect(notice.controller).toBe("Upravljavec osebnih podatkov je Avtohiša Demo d.o.o., Dunajska cesta 100, 1000 Ljubljana.");
+    expect(notice.contact).toBe("Kontakt upravljavca: info@demo.drivebook.localhost.");
+  });
+
+  it("drops both when address and phone are empty", () => {
+    const notice = privacyNotice(t, { ...demo, ...noAddress, legalName: "Avto Novak", phone: "" }, "");
+    expect(notice.controller).toBe("Upravljavec osebnih podatkov je Avto Novak.");
+    expect(notice.contact).toBe("Kontakt upravljavca: info@demo.drivebook.localhost.");
+    for (const s of [notice.controller, notice.contact]) {
+      expect(s).not.toMatch(/, ,|, \.|  /);
+    }
+  });
+
+  it("shows only the address parts that are present", () => {
+    expect(privacyNotice(t, { ...demo, addressLine: "", postalCode: "", city: " Maribor " }, "").controller).toBe(
+      "Upravljavec osebnih podatkov je Avtohiša Demo d.o.o., Maribor.",
+    );
+    expect(privacyNotice(t, { ...demo, postalCode: "", city: "" }, "").controller).toBe(
+      "Upravljavec osebnih podatkov je Avtohiša Demo d.o.o., Dunajska cesta 100.",
+    );
+  });
+
   it("links back to the host root when there is no base path", () => {
     expect(privacyNotice(t, demo, "").back.href).toBe("/");
   });

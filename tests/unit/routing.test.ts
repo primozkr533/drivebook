@@ -343,7 +343,7 @@ describe("routeRequest: renamed slug (real database)", () => {
     await truncateAll();
     const [plan] = await db
       .insert(plans)
-      .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, smsIncluded: 100, priceEurCents: 4900 })
+      .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, monthlySmsQuota: 100, priceEurCents: 4900 })
       .returning();
     const [dealer] = await db
       .insert(dealers)

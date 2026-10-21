@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { getConfig } from "@/lib/config";
+import { ljubljanaNow } from "@/lib/date";
 import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL } from "./demo";
 import type { Db } from "./client";
 import {
@@ -27,7 +28,9 @@ export const DEMO_CAR_IDS = {
 
 const LEGACY_DEMO_OWNER_EMAIL = "lastnik@demo.drivebook.localhost";
 
-const PLAN_CODE = "standard";
+export const DEFAULT_PLAN_CODE = "standard";
+const PLAN_MAX_USERS = 10;
+const PLAN_MONTHLY_SMS_QUOTA = 300;
 const AVTO_NET_DETAILS = "https://www.avto.net/Ads/details.asp?id=";
 
 const OPENING_HOURS: { isoWeekday: number; opensAt: string; closesAt: string }[] = [
@@ -41,8 +44,12 @@ const OPENING_HOURS: { isoWeekday: number; opensAt: string; closesAt: string }[]
 export async function runSeed(db: Db): Promise<void> {
   const { seedSuperadminEmail } = getConfig();
 
+  const validUntil = new Date(`${ljubljanaNow().dateISO}T00:00:00Z`);
+  validUntil.setUTCFullYear(validUntil.getUTCFullYear() + 1);
+  const licenceValidUntil = validUntil.toISOString().slice(0, 10);
+
   await db.transaction(async (tx) => {
-    const planId = await upsertPlan(tx);
+    const planId = await ensureDefaultPlan(tx);
 
     await tx
       .insert(backofficeUsers)
@@ -55,7 +62,7 @@ export async function runSeed(db: Db): Promise<void> {
       })
       .onConflictDoNothing({ target: backofficeUsers.email });
 
-    const dealerId = await upsertDemoDealer(tx, planId);
+    const dealerId = await upsertDemoDealer(tx, planId, licenceValidUntil);
 
     const [licence] = await tx
       .select({ id: dealerLicenceHistory.id })
@@ -68,6 +75,7 @@ export async function runSeed(db: Db): Promise<void> {
         planId,
         validFrom: new Date(),
         validTo: null,
+        validUntil: licenceValidUntil,
         note: "Seed",
       });
     }
@@ -185,27 +193,25 @@ export async function runSeed(db: Db): Promise<void> {
   });
 }
 
-async function upsertPlan(tx: Tx): Promise<string> {
-  const [plan] = await tx
+// Insert only: operators edit the default plan in the backoffice and a restart must not undo that.
+async function ensureDefaultPlan(tx: Tx): Promise<string> {
+  await tx
     .insert(plans)
     .values({
-      code: PLAN_CODE,
+      code: DEFAULT_PLAN_CODE,
       name: "Standard",
       maxCars: 50,
-      maxUsers: 10,
-      smsIncluded: 300,
+      maxUsers: PLAN_MAX_USERS,
+      monthlySmsQuota: PLAN_MONTHLY_SMS_QUOTA,
       priceEurCents: 4900,
     })
-    .onConflictDoUpdate({
-      target: plans.code,
-      set: { name: "Standard", maxCars: 50, maxUsers: 10, smsIncluded: 300, priceEurCents: 4900 },
-    })
-    .returning({ id: plans.id });
+    .onConflictDoNothing({ target: plans.code });
+  const [plan] = await tx.select({ id: plans.id }).from(plans).where(eq(plans.code, DEFAULT_PLAN_CODE));
   return plan.id;
 }
 
 // Existing demo dealer rows are left as-is so edits made in the admin survive a re-seed.
-async function upsertDemoDealer(tx: Tx, planId: string): Promise<string> {
+async function upsertDemoDealer(tx: Tx, planId: string, licenceValidUntil: string): Promise<string> {
   await tx
     .insert(dealers)
     .values({
@@ -223,6 +229,7 @@ async function upsertDemoDealer(tx: Tx, planId: string): Promise<string> {
       logoKey: null,
       status: "active",
       planId,
+      licenceValidUntil,
     })
     .onConflictDoNothing({ target: dealers.slug });
   const [dealer] = await tx

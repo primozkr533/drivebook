@@ -3,5 +3,5 @@ import { getSurfaceBasePath, requireBackofficeUser } from "@/server/auth/permiss
 
 export default async function BackofficeHomePage() {
   await requireBackofficeUser();
-  redirect(`${await getSurfaceBasePath()}/account`);
+  redirect(`${await getSurfaceBasePath()}/dealers`);
 }

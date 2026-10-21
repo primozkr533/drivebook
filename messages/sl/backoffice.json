@@ -1,0 +1,253 @@
+{
+  "dealers": {
+    "nav": "Trgovci",
+    "title": "Trgovci",
+    "description": "Vsi trgovci na platformi DriveBook.",
+    "search": "Iskanje",
+    "searchHint": "Del imena ali slug.",
+    "status": "Stanje",
+    "statusAll": "Vsa",
+    "submit": "Filtriraj",
+    "reset": "Počisti",
+    "statuses": {
+      "active": "Aktiven",
+      "suspended": "Začasno ustavljen",
+      "read_only": "Samo branje"
+    },
+    "columns": {
+      "name": "Ime",
+      "slug": "Slug",
+      "status": "Stanje",
+      "licenceValidUntil": "Licenca velja do",
+      "plan": "Paket"
+    },
+    "noLicence": "Ni določeno",
+    "empty": "Ni trgovcev, ki ustrezajo iskanju.",
+    "count": "{count, plural, one {# trgovec} two {# trgovca} few {# trgovci} other {# trgovcev}}",
+    "create": "Nov trgovec",
+    "new": {
+      "title": "Nov trgovec",
+      "description": "Ustvari trgovca, mu dodeli paket in licenco ter povabi lastnika.",
+      "back": "Nazaj na trgovce",
+      "submit": "Ustvari trgovca in pošlji povabilo",
+      "invited": "Trgovec je ustvarjen. Lastniku smo poslali povabilo za nastavitev gesla.",
+      "fields": {
+        "name": "Ime trgovca",
+        "slug": "Oznaka",
+        "ownerEmail": "E-pošta lastnika",
+        "planId": "Paket",
+        "licenceValidUntil": "Licenca velja do",
+        "notes": "Opombe"
+      },
+      "hints": {
+        "slug": "Male črke a–z, številke 0–9 in vezaj, od 3 do 40 znakov.",
+        "licenceValidUntil": "Datum ne sme biti v preteklosti.",
+        "notes": "Interne opombe, trgovec jih ne vidi."
+      },
+      "errors": {
+        "name": {
+          "required": "Vnesite ime trgovca."
+        },
+        "ownerEmail": {
+          "format": "Vnesite veljaven e-poštni naslov.",
+          "taken": "Uporabnik s tem e-poštnim naslovom že obstaja."
+        },
+        "planId": {
+          "unknown": "Izberite obstoječ paket."
+        },
+        "licenceValidUntil": {
+          "format": "Vnesite veljaven datum.",
+          "past": "Datum ne sme biti v preteklosti."
+        },
+        "forbidden": "Za to dejanje nimate pravic."
+      }
+    }
+  },
+  "plans": {
+    "nav": "Paketi",
+    "title": "Paketi",
+    "description": "Paketi, ki jih dodelite trgovcem: SMS kvota in število uporabnikov.",
+    "newTitle": "Nov paket",
+    "newDescription": "Nov paket je takoj na voljo za dodelitev trgovcem.",
+    "editTitle": "Paket {name}",
+    "viewDescription": "Podatki paketa.",
+    "create": "Nov paket",
+    "save": "Shrani",
+    "add": "Ustvari paket",
+    "delete": "Izbriši paket",
+    "back": "Nazaj na pakete",
+    "edit": "Uredi",
+    "deleteTitle": "Brisanje paketa",
+    "deleteHint": "Izbrišete lahko le paket, ki ga ne uporablja noben trgovec in ni privzeti.",
+    "default": "Privzeti",
+    "fields": {
+      "name": "Ime",
+      "monthlySmsQuota": "Mesečna SMS kvota",
+      "maxUsers": "Največ uporabnikov",
+      "notes": "Opombe"
+    },
+    "hints": {
+      "monthlySmsQuota": "Število SMS sporočil na mesec.",
+      "maxUsers": "Najmanj 1.",
+      "notes": "Interne opombe, trgovci jih ne vidijo."
+    },
+    "columns": {
+      "name": "Ime",
+      "monthlySmsQuota": "SMS / mesec",
+      "maxUsers": "Uporabniki",
+      "dealerCount": "Trgovci",
+      "notes": "Opombe"
+    },
+    "empty": "Ni paketov.",
+    "noNotes": "—",
+    "count": "{count, plural, one {# paket} two {# paketa} few {# paketi} other {# paketov}}",
+    "errors": {
+      "required": "Vnos je obvezen.",
+      "invalid": "Vnesite celo število v dovoljenem obsegu.",
+      "taken": "Paket s tem imenom že obstaja.",
+      "inUse": "Paketa ni mogoče izbrisati, ker ga uporablja trgovec ali je v zgodovini licenc.",
+      "default": "Privzetega paketa ni mogoče izbrisati.",
+      "notFound": "Paket ne obstaja več.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
+  },
+  "users": {
+    "nav": "Uporabniki",
+    "title": "Uporabniki",
+    "description": "Ekipa DriveBook z dostopom do zaledja.",
+    "columns": {
+      "email": "E-pošta",
+      "role": "Vloga",
+      "status": "Stanje"
+    },
+    "roles": {
+      "superadmin": "Superadmin",
+      "support": "Podpora"
+    },
+    "statuses": {
+      "invited": "Povabljen",
+      "active": "Aktiven",
+      "deactivated": "Deaktiviran"
+    },
+    "you": "Vi",
+    "deactivate": "Deaktiviraj",
+    "inviteTitle": "Povabi uporabnika",
+    "inviteHint": "Povabljeni prejme e-pošto s povezavo za nastavitev gesla, ki velja 7 dni.",
+    "fields": {
+      "email": "E-pošta",
+      "role": "Vloga"
+    },
+    "invite": "Pošlji povabilo",
+    "empty": "Ni uporabnikov.",
+    "count": "{count, plural, one {# uporabnik} two {# uporabnika} few {# uporabniki} other {# uporabnikov}}",
+    "errors": {
+      "email": "Vnesite veljaven e-poštni naslov.",
+      "role": "Izberite vlogo.",
+      "taken": "Uporabnik s tem e-poštnim naslovom že obstaja.",
+      "self": "Sebe ne morete deaktivirati.",
+      "notFound": "Uporabnik ne obstaja več.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
+  },
+  "slugErrors": {
+    "format": "Oznaka sme vsebovati le male črke a–z, številke 0–9 in vezaj.",
+    "length": "Oznaka mora imeti od 3 do 40 znakov.",
+    "reserved": "Ta oznaka je rezervirana.",
+    "taken": "Ta oznaka je že zasedena."
+  },
+  "dealerDetail": {
+    "back": "Nazaj na trgovce",
+    "publicPage": "Javna stran",
+    "readOnly": "Pregled trgovca. Spremembe lahko izvaja le superadmin.",
+    "invited": "Trgovec je ustvarjen. Lastniku smo poslali povabilo za nastavitev gesla.",
+    "saved": {
+      "profile": "Podatki so shranjeni.",
+      "slug": "Oznaka je spremenjena.",
+      "status": "Stanje trgovca je spremenjeno.",
+      "licence": "Licenca je podaljšana.",
+      "dpa": "Podpis DPA je zabeležen.",
+      "invite": "Povabilo je ponovno poslano."
+    },
+    "profile": {
+      "title": "Podatki",
+      "fields": {
+        "name": "Ime trgovca",
+        "planId": "Paket",
+        "notes": "Opombe"
+      },
+      "notesHint": "Interne opombe, trgovec jih ne vidi.",
+      "noNotes": "—",
+      "submit": "Shrani podatke"
+    },
+    "slug": {
+      "title": "Oznaka",
+      "current": "Trenutna oznaka",
+      "field": "Nova oznaka",
+      "hint": "Male črke a–z, številke 0–9 in vezaj, od 3 do 40 znakov. Stara oznaka bo preusmerjala na novo.",
+      "submit": "Spremeni oznako",
+      "history": "Prejšnje oznake",
+      "historyEmpty": "Oznaka še ni bila spremenjena.",
+      "replacedAt": "Zamenjana {date}"
+    },
+    "licence": {
+      "title": "Licenca",
+      "validUntil": "Velja do",
+      "none": "Ni določeno",
+      "extendTitle": "Podaljšaj licenco",
+      "fields": {
+        "validUntil": "Nova veljavnost do",
+        "note": "Opomba"
+      },
+      "noteHint": "Obvezno, npr. številka računa ali razlog podaljšanja.",
+      "submit": "Podaljšaj licenco",
+      "history": "Zgodovina licence",
+      "historyEmpty": "Ni zapisov.",
+      "columns": {
+        "createdAt": "Vneseno",
+        "plan": "Paket",
+        "previousValidUntil": "Prej do",
+        "validUntil": "Novo do",
+        "note": "Opomba"
+      }
+    },
+    "status": {
+      "title": "Status",
+      "current": "Trenutno stanje",
+      "suspend": "Začasno ustavi",
+      "reactivate": "Ponovno aktiviraj",
+      "suspendHint": "Javna stran ne prikazuje vozil, trgovec pa ne more spreminjati podatkov, dokler ga ne aktivirate.",
+      "reactivateHint": "Trgovec bo spet aktiven."
+    },
+    "dpa": {
+      "title": "DPA",
+      "signed": "Podpisan",
+      "notSigned": "Ni podpisan",
+      "signedAt": "Datum podpisa",
+      "submit": "Zabeleži podpis"
+    },
+    "owner": {
+      "title": "Lastnik",
+      "email": "E-pošta",
+      "status": "Stanje",
+      "statuses": {
+        "invited": "Povabljen",
+        "active": "Aktiven",
+        "deactivated": "Deaktiviran"
+      },
+      "none": "Trgovec nima lastnika.",
+      "resend": "Ponovno pošlji povabilo"
+    },
+    "errors": {
+      "required": "Vnos je obvezen.",
+      "unknown": "Izberite obstoječ paket.",
+      "format": "Vnesite veljaven datum.",
+      "past": "Datum ne sme biti v preteklosti.",
+      "beforeCurrent": "Novi datum ne sme biti pred trenutno veljavnostjo licence.",
+      "invalid": "Neveljavno stanje.",
+      "notFound": "Trgovec ne obstaja več.",
+      "notInvited": "Lastnik ni v stanju povabljen.",
+      "rateLimited": "Doseženo je največje število povabil v eni uri. Poskusite pozneje.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
+  }
+}

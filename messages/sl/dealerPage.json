@@ -8,6 +8,7 @@
   "bookingSoon": "Spletna rezervacija termina bo kmalu na voljo. Do takrat nas pokličite.",
   "suspendedTitle": "Stran trenutno ni na voljo",
   "suspendedBody": "Spletno naročanje pri tej avtohiši je začasno onemogočeno. Za informacije jih pokličite.",
+  "suspendedBodyNoPhone": "Spletno naročanje pri tej avtohiši trenutno ni mogoče. Poskusite znova pozneje.",
   "privacy": "Varstvo osebnih podatkov",
   "closed": "Zaprto",
   "carSelected": "Izbrano vozilo",

@@ -57,22 +57,28 @@ export default async function DealerPage({ params, searchParams }: Props) {
           )}
           <div className="min-w-0">
             <Heading size="d1">{dealer.name}</Heading>
-            <address className="mt-1 not-italic">
-              <Text>{dealer.addressLine}</Text>
-              <Text>
-                {dealer.postalCode} {dealer.city}
-              </Text>
-            </address>
+            {model.address && (
+              <address className="mt-1 not-italic">
+                {model.address.line && <Text>{model.address.line}</Text>}
+                {model.address.locality && <Text>{model.address.locality}</Text>}
+              </address>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <ButtonLink href={model.telHref} variant="brand">
-            {t("call")} <span className="tabular">{dealer.phone}</span>
-          </ButtonLink>
-          <ButtonLink href={model.mapsHref} variant="quiet" target="_blank" rel="noopener noreferrer">
-            {t("maps")}
-          </ButtonLink>
-        </div>
+        {(model.telHref || model.mapsHref) && (
+          <div className="flex flex-wrap items-center gap-3">
+            {model.telHref && (
+              <ButtonLink href={model.telHref} variant="brand">
+                {t("call")} <span className="tabular">{model.phone}</span>
+              </ButtonLink>
+            )}
+            {model.mapsHref && (
+              <ButtonLink href={model.mapsHref} variant="quiet" target="_blank" rel="noopener noreferrer">
+                {t("maps")}
+              </ButtonLink>
+            )}
+          </div>
+        )}
       </Container>
     </header>
   );
@@ -104,7 +110,7 @@ export default async function DealerPage({ params, searchParams }: Props) {
                     <Heading size="h2" id="suspended">
                       {t("suspendedTitle")}
                     </Heading>
-                    <Text>{t("suspendedBody")}</Text>
+                    <Text>{t(model.phone ? "suspendedBody" : "suspendedBodyNoPhone")}</Text>
                   </Stack>
                 </Card>
               ) : (

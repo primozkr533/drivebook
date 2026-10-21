@@ -79,6 +79,8 @@ export const holidayOverrides = pgTable(
       .notNull()
       .references(() => dealers.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
+    // slovenianWorkFreeDays key; null for dealer-defined days.
+    key: text("key"),
     name: text("name").notNull(),
     isOpen: boolean("is_open").notNull(),
     opensAt: time("opens_at"),

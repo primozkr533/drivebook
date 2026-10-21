@@ -202,6 +202,11 @@ export function surfaceOrigin(surface: "dealer" | "backoffice", config: Config =
   return `${config.publicUrlScheme}://${host}${port}`;
 }
 
+export function dealerSiteOrigin(slug: string, config: Config = getConfig()): string {
+  const port = config.publicUrlPort ? `:${config.publicUrlPort}` : "";
+  return `${config.publicUrlScheme}://${slug}.${config.baseDomain}${port}`;
+}
+
 export function resetConfigForTests(): void {
   cached = undefined;
 }

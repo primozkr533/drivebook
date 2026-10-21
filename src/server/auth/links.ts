@@ -128,6 +128,27 @@ export async function resendInvitation(
   return { ok: true, ...(await sendInvitation(surface, user, opts.now ?? new Date())) };
 }
 
+export async function linkCapReached(
+  surface: AuthSurface,
+  userId: string,
+  purpose: LinkPurpose,
+  now: Date,
+  executor: Executor = db(),
+): Promise<boolean> {
+  const [recent] = await executor
+    .select({ n: count() })
+    .from(authTokens)
+    .where(
+      and(
+        eq(authTokens.surface, surface),
+        eq(authTokens.userId, userId),
+        eq(authTokens.purpose, purpose),
+        gte(authTokens.createdAt, new Date(now.getTime() - RESET_RATE_WINDOW_MS)),
+      ),
+    );
+  return (recent?.n ?? 0) >= RESET_MAX_PER_HOUR;
+}
+
 // Every request is recorded before counting, so requests made while over the cap keep the IP blocked.
 async function ipOverResetCap(surface: AuthSurface, ip: string, now: Date): Promise<boolean> {
   await db().insert(passwordResetRequests).values({ surface, ip, createdAt: now });
@@ -158,18 +179,7 @@ export async function requestPasswordReset(
   // An invited user has no password to reset, so they get their invitation again instead.
   const purpose: LinkPurpose = user.status === "invited" ? "invite" : "reset";
 
-  const [recent] = await db()
-    .select({ n: count() })
-    .from(authTokens)
-    .where(
-      and(
-        eq(authTokens.surface, surface),
-        eq(authTokens.userId, user.id),
-        eq(authTokens.purpose, purpose),
-        gte(authTokens.createdAt, new Date(now.getTime() - RESET_RATE_WINDOW_MS)),
-      ),
-    );
-  if ((recent?.n ?? 0) >= RESET_MAX_PER_HOUR) return;
+  if (await linkCapReached(surface, user.id, purpose, now)) return;
 
   if (purpose === "invite") await sendInvitation(surface, user, now);
   else await sendPasswordReset(surface, user, now);
