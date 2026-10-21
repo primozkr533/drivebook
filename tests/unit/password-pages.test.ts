@@ -176,9 +176,10 @@ describe.each([
   });
 
   it("returns the same confirmation state whatever the e-mail", async () => {
+    mocks.headers = new Headers({ "x-forwarded-for": "10.0.0.1, 203.0.113.9" });
     for (const email of ["obstaja@drivebook.si", "ne-obstaja@drivebook.si"]) {
       expect(await forgotPasswordAction(surface, { sent: false }, form({ email }))).toEqual({ sent: true });
-      expect(mocks.requestPasswordReset).toHaveBeenLastCalledWith(surface, email);
+      expect(mocks.requestPasswordReset).toHaveBeenLastCalledWith(surface, email, "203.0.113.9");
     }
   });
 });
