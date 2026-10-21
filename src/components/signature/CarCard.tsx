@@ -33,11 +33,13 @@ const eur = new Intl.NumberFormat("sl-SI", { style: "currency", currency: "EUR",
  * CarCard — the public page's unit. `selected` = arrived via ?car={id}
  * (shown first, signal-framed). `deepLink` (admin) adds the copyable URL;
  * `showStatus` (admin) badges active cars too; `actions` (admin) sits at the foot.
+ * The image sits in a fixed 16:10 box (no CLS).
  */
 export function CarCard({
   car,
   selected = false,
   deepLink,
+  priority = false,
   showStatus = false,
   actions,
   labels = { selected: "Izbrano vozilo", listing: "Oglej si oglas na avto.net", inactive: "Neaktivno" },
@@ -45,6 +47,8 @@ export function CarCard({
   car: Car;
   selected?: boolean;
   deepLink?: string;
+  /** First card in the viewport: load its image eagerly with high priority. */
+  priority?: boolean;
   showStatus?: boolean;
   actions?: ReactNode;
   labels?: CarCardLabels;
@@ -64,7 +68,17 @@ export function CarCard({
       <div className={cx("relative aspect-[16/10] overflow-hidden bg-surface-2", dim)}>
         {car.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={car.imageUrl} alt="" className="size-full object-cover" loading="lazy" data-testid="car-image" />
+          <img
+            src={car.imageUrl}
+            alt=""
+            width={1200}
+            height={750}
+            sizes="(min-width: 1024px) 400px, (min-width: 640px) 50vw, 100vw"
+            decoding="async"
+            className="size-full object-cover"
+            data-testid="car-image"
+            {...(priority ? { loading: "eager", fetchPriority: "high" } : { loading: "lazy" })}
+          />
         ) : (
           <div className="grid size-full place-items-center p-6" data-testid="car-silhouette">
             <CarSilhouette body={car.body} className="w-4/5 max-w-[16rem] transition-transform duration-[var(--dur-base)] ease-out group-hover/car:translate-x-1" />

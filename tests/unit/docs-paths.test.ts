@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const docs = ["CLAUDE.md", "README.md", "docs/deploy.md"];
+const docs = ["CLAUDE.md", "README.md", "docs/deploy.md", "docs/performance.md"];
 
 function documentedPaths(doc: string): string[] {
   const text = readFileSync(join(process.cwd(), doc), "utf8");

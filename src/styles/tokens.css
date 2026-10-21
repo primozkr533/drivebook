@@ -48,9 +48,10 @@
   --on-brand:     var(--on-signal);
 
   /* ---- Type -------------------------------------------------------------- */
-  --font-display: "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-body:    "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  /* --font-archivo / --font-jetbrains-mono come from next/font (src/app/fonts.ts). */
+  --font-display: var(--font-archivo), "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body:    var(--font-archivo), "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, Menlo, monospace;
 
   --stretch-display: 125%;   /* expanded — the display register          */
   --stretch-body:    100%;

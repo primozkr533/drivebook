@@ -59,6 +59,8 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `docker/caddy` — Caddy image (xcaddy + Cloudflare DNS) and `docker/caddy/Caddyfile` (wildcard certificate via DNS-01, reverse proxy to `web:3000`)
 - `docker/backup` — backup image: nightly `pg_dump` + uploads archive, retention, `docker/backup/restore.sh`, round-trip check `docker/backup/test-restore.sh`
 - `docs/deploy.md` — production/staging deployment, backups and updates
+- `docs/performance.md` — how to measure the public dealer page with Lighthouse (mobile, 360 px) and the recorded score
+- `src/app/fonts.ts` + `src/fonts/` — self-hosted Archivo / JetBrains Mono subsets (`next/font/local`) behind `--font-archivo` / `--font-jetbrains-mono` in `src/styles/tokens.css`; rebuild them with `src/fonts/subset-font.py`
 
 ## Required environment variables
 All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
@@ -182,6 +184,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
 - Production refuses to start with fake SMS/e-mail providers unless ALLOW_FAKE_PROVIDERS=1 (staging only).
+- `NextIntlClientProvider` is mounted only in the admin `(app)` layouts (dealer admin and backoffice), not in the root layout, so public pages ship no intl runtime or messages. Client components elsewhere receive translated strings as props.
 - Cars are managed by Owners and Salespeople. Deactivated cars are hidden from every public read (list and ?car= deep link); by-id car operations for another dealer return not-found (404).
 - Car images are never hot-linked: uploads and image URLs are downloaded, resized to max 1200 px wide, re-encoded as WebP and stored under cars/<publicId>.webp; replacing an image deletes the old file after commit.
 - avto.net auto-fill only fetches URLs on avto.net or its subdomains (10 s timeout, realistic User-Agent) and never blocks saving: any failure or block shows a notice and manual entry always works.
