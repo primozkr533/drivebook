@@ -16,6 +16,7 @@ import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
 import { requireOwnerPage } from "@/app/dealer-admin/(app)/owner-gate";
+import { BOOKING_RULE_DEFAULTS } from "@/server/data/settings-booking";
 import SettingsLayout from "@/app/dealer-admin/(app)/settings/layout";
 import SettingsHomePage from "@/app/dealer-admin/(app)/settings/page";
 import SettingsDealerPage from "@/app/dealer-admin/(app)/settings/dealer/page";
@@ -27,7 +28,9 @@ import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings") => {
+  getTranslations: async (
+    namespace: "auth" | "account" | "backoffice" | "settings" | "settingsBooking" | "settingsDealer",
+  ) => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -44,6 +47,8 @@ const mocks = vi.hoisted(() => ({
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
   getOpeningHours: vi.fn(),
+  getBookingRules: vi.fn(),
+  getDealerSettings: vi.fn(),
   pathname: "/",
 }));
 
@@ -66,6 +71,11 @@ vi.mock("@/server/auth/session", () => ({
 vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
+vi.mock("@/server/data/settings-dealer", () => ({
+  getDealerSettings: mocks.getDealerSettings,
+  updateDealerProfile: vi.fn(),
+  updateSmsSettings: vi.fn(),
+}));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
 vi.mock("@/server/data/settings-hours", () => ({ getOpeningHours: mocks.getOpeningHours }));
 vi.mock("@/app/dealer-admin/(app)/settings/hours/actions", () => ({ saveOpeningHoursAction: vi.fn() }));
@@ -76,6 +86,10 @@ vi.mock("@/server/data/backoffice/plans", () => ({
   updatePlan: vi.fn(),
   deletePlan: vi.fn(),
   DEFAULT_MONTHLY_SMS_QUOTA: 300,
+}));
+vi.mock("@/server/data/settings-booking", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-booking")>()),
+  getBookingRules: mocks.getBookingRules,
 }));
 vi.mock("@/server/data/backoffice/users", () => ({
   listBackofficeUsers: mocks.listBackofficeUsers,
@@ -481,12 +495,14 @@ describe("dealer settings shell", () => {
   const owner = { id: "u1", email: "lastnik@demo.si", role: "owner" };
   const salesperson = { id: "u3", email: "prodajalec@demo.si", role: "salesperson" };
   const signInAs = (user: typeof owner, basePath = "/_dev/app") => {
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS });
     mocks.dealerSession = { ctx, user, sessionId: "s1" };
     mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
     mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
   };
   const sections = ["dealer", "branding", "booking", "hours", "closures"] as const;
-  const pages = [SettingsDealerPage, SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
+  const stubSections = ["branding", "booking", "hours", "closures"] as const;
+  const stubPages = [SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
   const navLink = (href: string, label: string) => new RegExp(`<a[^>]*href="${href}"[^>]*>${label}</a>`, "g");
 
   it("requireOwnerPage returns the session for an Owner and denies a Salesperson of the same dealer", async () => {
@@ -558,32 +574,73 @@ describe("dealer settings shell", () => {
     expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
   });
 
-  it("renders every settings page for an Owner and access denied for a Salesperson", async () => {
-    const testIds: Record<(typeof sections)[number], string> = {
-      dealer: "settings-dealer",
+  it("renders every remaining settings page for an Owner and access denied for a Salesperson", async () => {
+    const testIds: Record<(typeof stubSections)[number], string> = {
       branding: "settings-branding",
       booking: "settings-booking",
       hours: "hours-editor",
       closures: "settings-closures",
     };
     mocks.getOpeningHours.mockResolvedValue({ 1: [{ opens: "08:00", closes: "12:00" }], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] });
-    const renderPage = async (Page: (typeof pages)[number]) =>
+    const renderPage = async (Page: (typeof stubPages)[number]) =>
       render(createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: await Page() }));
-    for (const [i, Page] of pages.entries()) {
+    for (const [i, Page] of stubPages.entries()) {
       signInAs(owner);
       const html = await renderPage(Page);
-      expect(html).toContain(`data-testid="${testIds[sections[i]]}"`);
+      expect(html).toContain(`data-testid="${testIds[stubSections[i]]}"`);
       expect(html).not.toContain("access-denied");
 
       signInAs(salesperson);
       const calls = mocks.getOpeningHours.mock.calls.length;
       const denied = await renderPage(Page);
       expect(denied).toContain('data-testid="access-denied"');
-      expect(denied).not.toContain(testIds[sections[i]]);
+      expect(denied).not.toContain(testIds[stubSections[i]]);
       expect(mocks.getOpeningHours.mock.calls.length).toBe(calls);
     }
     signInAs(salesperson);
     expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
+  });
+
+  it("renders the dealer data and SMS forms for an Owner and access denied for a Salesperson", async () => {
+    const t = messages.settingsDealer;
+    mocks.getDealerSettings.mockResolvedValue({
+      name: "Avto Demo d.o.o.",
+      addressLine: "Dunajska 1",
+      postalCode: "1000",
+      city: "Ljubljana",
+      phone: "+38611234567",
+      email: "info@demo.si",
+      googleMapsUrl: null,
+      privacyPolicyUrl: null,
+      smsSenderName: null,
+      effectiveSmsSenderName: "Avto Demo d",
+      smsNotificationsEnabled: true,
+      notificationPhone: "+38641555218",
+    });
+    signInAs(owner);
+    const page = await SettingsDealerPage();
+    const html = await render(
+      createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: page }),
+    );
+    expect(mocks.getDealerSettings).toHaveBeenCalledWith(ctx);
+    expect(html).toContain('class="grid grid-cols-1 lg:grid-cols-2');
+    for (const text of [t.profile.title, t.sms.title, t.profile.fields.googleMapsUrl, t.sms.fields.smsSenderName, ">0/11<"]) {
+      expect(html).toContain(text);
+    }
+    for (const field of ["name", "addressLine", "postalCode", "city", "phone", "email", "googleMapsUrl", "privacyPolicyUrl",
+      "smsSenderName", "smsNotificationsEnabled", "notificationPhone"]) {
+      expect(html).toContain(`name="${field}"`);
+    }
+    expect(html).toContain('placeholder="Avto Demo d"');
+    expect(html).toContain('value="info@demo.si"');
+    expect(html).toMatch(/name="smsNotificationsEnabled"[^>]*checked/);
+
+    signInAs(salesperson);
+    mocks.getDealerSettings.mockClear();
+    const denied = await render(createElement(SettingsDealerPage));
+    expect(denied).toContain('data-testid="access-denied"');
+    expect(denied).not.toContain("settings-dealer-profile");
+    expect(mocks.getDealerSettings).not.toHaveBeenCalled();
   });
 
   it("renders the users stub for an Owner and access denied for a Salesperson", async () => {
@@ -597,5 +654,27 @@ describe("dealer settings shell", () => {
     expect(denied).toContain('data-testid="access-denied"');
     expect(denied).not.toContain("dealer-users");
     expect(denied).not.toContain(settingsT.users.title + "</h1>");
+  });
+
+  it("shows the booking rules form with the current values, hours for notice and cut-off", async () => {
+    signInAs(owner);
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS, minNoticeMinutes: 180 });
+    const html = await render(createElement(SettingsBookingPage));
+    const bookingT = messages.settingsBooking;
+    const value = (name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0].match(/value="([^"]*)"/)?.[1];
+    expect(mocks.getBookingRules).toHaveBeenCalledWith(ctx);
+    expect(value("testDriveMinutes")).toBe("45");
+    expect(value("viewingMinutes")).toBe("30");
+    expect(value("otherMinutes")).toBe("30");
+    expect(value("capacity")).toBe("1");
+    expect(value("minNoticeHours")).toBe("3");
+    expect(value("horizonDays")).toBe("14");
+    expect(value("bufferMinutes")).toBe("15");
+    expect(value("cancelCutoffHours")).toBe("2");
+    expect(html).toMatch(/<option value="15" selected="">15 min<\/option>/);
+    expect(html).toContain(bookingT.fields.minNoticeHours);
+    expect(html).toContain("0–168 h");
+    expect(html).toContain("15–240 min");
+    expect(html).toContain(bookingT.reset);
   });
 });
