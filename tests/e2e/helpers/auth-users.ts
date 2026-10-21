@@ -3,7 +3,18 @@ import { eq, inArray, or, type SQL } from "drizzle-orm";
 import { generateSync } from "otplib";
 import { getDb } from "@/db/client";
 import { DEMO_DEALER_SLUG } from "@/db/demo";
-import { authTokens, backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers, loginAttempts } from "@/db/schema";
+import { DEFAULT_PLAN_CODE } from "@/db/seed";
+import {
+  authTokens,
+  backofficeSessions,
+  backofficeUsers,
+  bookingRules,
+  dealers,
+  dealerSessions,
+  dealerUsers,
+  loginAttempts,
+  plans,
+} from "@/db/schema";
 import { hashPassword } from "@/server/auth/password";
 import { hashToken, newOpaqueToken } from "@/server/auth/tokens";
 import { encryptTotpSecret, generateTotpSecret } from "@/server/auth/totp";
@@ -59,6 +70,51 @@ export async function createDealerUser(
     .values({ ...values, dealerId: dealer.id, role: opts.role ?? "owner" })
     .returning({ id: dealerUsers.id });
   return { surface: "dealer", id: row!.id, email, password, totpSecret };
+}
+
+export type E2eDealer = { id: string; slug: string; name: string; email: string };
+
+// A throwaway dealer on the default plan, so specs that change settings leave the demo dealer untouched.
+export async function createDealer(opts: { name?: string; primaryColor?: string } = {}): Promise<E2eDealer> {
+  const [plan] = await getDb().select({ id: plans.id }).from(plans).where(eq(plans.code, DEFAULT_PLAN_CODE)).limit(1);
+  if (!plan) throw new Error(`Plan ${DEFAULT_PLAN_CODE} not found; is the stack seeded?`);
+  const suffix = randomUUID().slice(0, 8);
+  const values = {
+    slug: `e2e-${suffix}`,
+    name: opts.name ?? `E2E trgovec ${suffix}`,
+    email: `dealer-${suffix}@e2e.drivebook.si`,
+  };
+  const [row] = await getDb()
+    .insert(dealers)
+    .values({
+      ...values,
+      legalName: values.name,
+      addressLine: "",
+      postalCode: "",
+      city: "",
+      phone: "",
+      primaryColor: opts.primaryColor ?? "#1F4FD8",
+      planId: plan.id,
+      licenceValidUntil: "2099-12-31",
+    })
+    .returning({ id: dealers.id });
+  await getDb().insert(bookingRules).values({ dealerId: row!.id });
+  return { id: row!.id, ...values };
+}
+
+// Users, settings and sessions cascade with the dealer; auth_tokens have no FK, so they go first.
+export async function deleteDealers(list: Pick<E2eDealer, "id">[]): Promise<void> {
+  if (!list.length) return;
+  const dealerIds = list.map((d) => d.id);
+  const members = await getDb()
+    .select({ id: dealerUsers.id, email: dealerUsers.email })
+    .from(dealerUsers)
+    .where(inArray(dealerUsers.dealerId, dealerIds));
+  if (members.length) {
+    await getDb().delete(authTokens).where(inArray(authTokens.userId, members.map((m) => m.id)));
+    await clearLoginAttempts({ emails: members.map((m) => m.email) });
+  }
+  await getDb().delete(dealers).where(inArray(dealers.id, dealerIds));
 }
 
 export async function createBackofficeUser(
