@@ -10,6 +10,9 @@ import BackofficeAppLayout from "@/app/backoffice/(app)/layout";
 import BackofficeHomePage from "@/app/backoffice/(app)/page";
 import BackofficeAccountPage from "@/app/backoffice/(app)/account/page";
 import BackofficeDealersPage from "@/app/backoffice/(app)/dealers/page";
+import BackofficePlansPage from "@/app/backoffice/(app)/plans/page";
+import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
+import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
@@ -26,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   getDealerName: vi.fn(),
   getAccountSummary: vi.fn(),
   listDealers: vi.fn(),
+  listPlans: vi.fn(),
+  getPlan: vi.fn(),
   pathname: "/",
 }));
 
@@ -34,6 +39,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   redirect: (url: string) => {
     throw Object.assign(new Error("NEXT_REDIRECT"), { url });
+  },
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
   },
 }));
 vi.mock("@/server/auth/session", () => ({
@@ -46,6 +54,14 @@ vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers }));
+vi.mock("@/server/data/backoffice/plans", () => ({
+  listPlans: mocks.listPlans,
+  getPlan: mocks.getPlan,
+  createPlan: vi.fn(),
+  updatePlan: vi.fn(),
+  deletePlan: vi.fn(),
+  DEFAULT_MONTHLY_SMS_QUOTA: 300,
+}));
 
 const ctx = { dealerId: "dealer-1", slug: "demo", status: "active" };
 
@@ -73,6 +89,7 @@ async function redirectOf(promise: Promise<unknown>): Promise<string | undefined
 
 const account = messages.account;
 const dealersT = messages.backoffice.dealers;
+const plansT = messages.backoffice.plans;
 const child = createElement("p", { "data-testid": "child" }, "vsebina");
 
 const surfaces = [
@@ -256,5 +273,91 @@ describe("backoffice dealers", () => {
     mocks.listDealers.mockResolvedValue([]);
     await renderDealers({ status: "deleted" });
     expect(mocks.listDealers).toHaveBeenCalledWith({ q: undefined, status: undefined });
+  });
+});
+
+describe("backoffice plans", () => {
+  const signInAs = (role: "superadmin" | "support") => {
+    mocks.backofficeSession = { session: {}, user: { id: "u2", email: "ops@drivebook.si", role } };
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+  };
+  const plans = [
+    { id: "p1", code: "osnovni", name: "Osnovni", monthlySmsQuota: 300, maxUsers: 3, notes: null, isDefault: true, dealerCount: 2 },
+    { id: "p2", code: "pro", name: "Pro", monthlySmsQuota: 1000, maxUsers: 10, notes: "Za večje salone", isDefault: false, dealerCount: 0 },
+  ];
+  const renderPlan = (id: string) => render(createElement(BackofficePlanPage, { params: Promise.resolve({ id }) }));
+
+  it.each(["", "/_dev/admin"])("marks Paketi active in the inline nav and the compact menu (base path %j)", async (basePath) => {
+    signInAs("support");
+    mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
+    mocks.pathname = `${basePath}/plans/p1`;
+    const html = await render(createElement(BackofficeAppLayout, { children: child }));
+    const links = html.match(new RegExp(`<a[^>]*href="${basePath}/plans"[^>]*>${plansT.nav}</a>`, "g")) ?? [];
+    expect(links).toHaveLength(2);
+    for (const a of links) expect(a).toContain('aria-current="page"');
+  });
+
+  it("lists plans with quota, max users, dealer count and notes, and a create link for a Superadmin", async () => {
+    signInAs("superadmin");
+    mocks.listPlans.mockResolvedValue(plans);
+    const html = await render(createElement(BackofficePlansPage));
+    expect(html.match(/data-testid="plan-row"/g)).toHaveLength(2);
+    for (const text of [">Osnovni<", ">300<", ">3<", ">2<", plansT.noNotes, ">Pro<", ">1000<", ">10<", "Za večje salone", plansT.default]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toMatch(/<a[^>]*href="\/_dev\/admin\/plans\/new"[^>]*data-testid="plan-create"/);
+    expect(html).toMatch(/href="\/_dev\/admin\/plans\/p2"/);
+  });
+
+  it("hides the create control from Support", async () => {
+    signInAs("support");
+    mocks.listPlans.mockResolvedValue(plans);
+    const html = await render(createElement(BackofficePlansPage));
+    expect(html.match(/data-testid="plan-row"/g)).toHaveLength(2);
+    expect(html).not.toContain('data-testid="plan-create"');
+  });
+
+  it("prefills the new-plan form with a 300 SMS quota", async () => {
+    signInAs("superadmin");
+    const html = await render(createElement(BackofficeNewPlanPage));
+    for (const name of ["name", "maxUsers", "notes"]) expect(html).toMatch(new RegExp(`<input[^>]*name="${name}"`));
+    expect(html).toMatch(/<input[^>]*name="monthlySmsQuota"[^>]*value="300"/);
+    expect(html).toContain(`>${plansT.fields.monthlySmsQuota}</label>`);
+    expect(html).toContain('data-testid="plan-submit"');
+  });
+
+  it("sends Support away from the new-plan page", async () => {
+    signInAs("support");
+    expect(await redirectOf(render(createElement(BackofficeNewPlanPage)))).toBe("/_dev/admin/plans");
+  });
+
+  it("shows the edit and delete forms to a Superadmin", async () => {
+    signInAs("superadmin");
+    mocks.getPlan.mockResolvedValue(plans[1]);
+    const html = await renderPlan("p2");
+    expect(mocks.getPlan).toHaveBeenCalledWith("p2");
+    expect(html).toMatch(/<input[^>]*name="name"[^>]*value="Pro"/);
+    expect(html).toMatch(/<input[^>]*name="monthlySmsQuota"[^>]*value="1000"/);
+    expect(html).toMatch(/<input[^>]*name="maxUsers"[^>]*value="10"/);
+    expect(html).toMatch(/<input[^>]*name="notes"[^>]*value="Za večje salone"/);
+    expect(html).toContain('data-testid="plan-delete"');
+    expect(html).not.toContain('data-testid="plan-readonly"');
+  });
+
+  it("shows Support read-only values without edit or delete controls", async () => {
+    signInAs("support");
+    mocks.getPlan.mockResolvedValue(plans[1]);
+    const html = await renderPlan("p2");
+    expect(html).toContain('data-testid="plan-readonly"');
+    expect(html).toMatch(/data-testid="plan-value-monthlySmsQuota"[^>]*>1000</);
+    expect(html).toMatch(/data-testid="plan-value-notes"[^>]*>Za večje salone</);
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain("<input");
+  });
+
+  it("404s an unknown plan", async () => {
+    signInAs("superadmin");
+    mocks.getPlan.mockResolvedValue(null);
+    await expect(renderPlan("missing")).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });
