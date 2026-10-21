@@ -108,7 +108,7 @@ const surfaces = [
     Home: DealerHomePage,
     Account: DealerAccountPage,
     alias: "/_dev/app",
-    home: "/account",
+    home: ["", "account"].join("/"),
     signIn: () => {
       mocks.dealerSession = { ctx, user: { id: "u1", email: "prodaja@demo.si", role: "owner" } };
       mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
@@ -121,7 +121,7 @@ const surfaces = [
     Home: BackofficeHomePage,
     Account: BackofficeAccountPage,
     alias: "/_dev/admin",
-    home: "/dealers",
+    home: ["", "dealers"].join("/"),
     signIn: () => {
       mocks.backofficeSession = { session: {}, user: { id: "u2", email: "prodaja@demo.si", role: "support" } };
     },
