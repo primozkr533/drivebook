@@ -13,6 +13,7 @@ import BackofficeDealersPage from "@/app/backoffice/(app)/dealers/page";
 import BackofficePlansPage from "@/app/backoffice/(app)/plans/page";
 import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
+import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   listDealers: vi.fn(),
   listPlans: vi.fn(),
   getPlan: vi.fn(),
+  listBackofficeUsers: vi.fn(),
   pathname: "/",
 }));
 
@@ -62,6 +64,11 @@ vi.mock("@/server/data/backoffice/plans", () => ({
   deletePlan: vi.fn(),
   DEFAULT_MONTHLY_SMS_QUOTA: 300,
 }));
+vi.mock("@/server/data/backoffice/users", () => ({
+  listBackofficeUsers: mocks.listBackofficeUsers,
+  inviteBackofficeUser: vi.fn(),
+  deactivateBackofficeUser: vi.fn(),
+}));
 
 const ctx = { dealerId: "dealer-1", slug: "demo", status: "active" };
 
@@ -90,6 +97,7 @@ async function redirectOf(promise: Promise<unknown>): Promise<string | undefined
 const account = messages.account;
 const dealersT = messages.backoffice.dealers;
 const plansT = messages.backoffice.plans;
+const usersT = messages.backoffice.users;
 const child = createElement("p", { "data-testid": "child" }, "vsebina");
 
 const surfaces = [
@@ -359,5 +367,63 @@ describe("backoffice plans", () => {
     signInAs("superadmin");
     mocks.getPlan.mockResolvedValue(null);
     await expect(renderPlan("missing")).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});
+
+describe("backoffice users", () => {
+  const signInAs = (role: "superadmin" | "support") => {
+    mocks.backofficeSession = { session: {}, user: { id: "u2", email: "ops@drivebook.si", role } };
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+  };
+  const users = [
+    { id: "u2", email: "ops@drivebook.si", role: "superadmin", status: "active" },
+    { id: "u3", email: "nova@drivebook.si", role: "support", status: "invited" },
+    { id: "u4", email: "pomoc@drivebook.si", role: "support", status: "active" },
+    { id: "u5", email: "stari@drivebook.si", role: "support", status: "deactivated" },
+  ];
+  const rowOf = (html: string, email: string) =>
+    html.split("<tr").find((row) => row.includes('data-testid="user-row"') && row.includes(email)) ?? "";
+
+  it.each(["", "/_dev/admin"])("marks Uporabniki active in the inline nav and the compact menu (base path %j)", async (basePath) => {
+    signInAs("support");
+    mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
+    mocks.pathname = `${basePath}/users`;
+    const html = await render(createElement(BackofficeAppLayout, { children: child }));
+    const links = html.match(new RegExp(`<a[^>]*href="${basePath}/users"[^>]*>${usersT.nav}</a>`, "g")) ?? [];
+    expect(links).toHaveLength(2);
+    for (const a of links) expect(a).toContain('aria-current="page"');
+  });
+
+  it("lists users with role and status badges, the invite form and deactivate buttons for a Superadmin", async () => {
+    signInAs("superadmin");
+    mocks.listBackofficeUsers.mockResolvedValue(users);
+    const html = await render(createElement(BackofficeUsersPage));
+    expect(html.match(/data-testid="user-row"/g)).toHaveLength(4);
+    const labels = [usersT.roles.superadmin, usersT.roles.support, usersT.statuses.active, usersT.statuses.invited, usersT.statuses.deactivated];
+    for (const text of labels) expect(html).toContain(`>${text}<`);
+    expect(html).toMatch(/<input[^>]*name="email"/);
+    expect(html).toContain(`>${usersT.fields.email}</label>`);
+    expect(html).toMatch(/<select[^>]*name="role"/);
+    expect(html).toContain(`>${usersT.fields.role}</label>`);
+    expect(html.match(/data-testid="user-deactivate"/g)).toHaveLength(2);
+    expect(rowOf(html, "nova@drivebook.si")).toContain(`>${usersT.deactivate}<`);
+    expect(rowOf(html, "pomoc@drivebook.si")).toContain('data-testid="user-deactivate"');
+    expect(rowOf(html, "ops@drivebook.si")).not.toContain('data-testid="user-deactivate"');
+    expect(rowOf(html, "stari@drivebook.si")).not.toContain('data-testid="user-deactivate"');
+  });
+
+  it("shows Support the list without the invite form or deactivate buttons", async () => {
+    signInAs("support");
+    mocks.listBackofficeUsers.mockResolvedValue(users);
+    const html = await render(createElement(BackofficeUsersPage));
+    expect(html.match(/data-testid="user-row"/g)).toHaveLength(4);
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain('data-testid="user-deactivate"');
+  });
+
+  it("redirects to the login page without a session", async () => {
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+    expect(await redirectOf(render(createElement(BackofficeUsersPage)))).toBe("/_dev/admin/login");
+    expect(mocks.listBackofficeUsers).not.toHaveBeenCalled();
   });
 });

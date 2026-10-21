@@ -72,5 +72,43 @@
       "notFound": "Paket ne obstaja več.",
       "forbidden": "Za to dejanje nimate pravic."
     }
+  },
+  "users": {
+    "nav": "Uporabniki",
+    "title": "Uporabniki",
+    "description": "Ekipa DriveBook z dostopom do zaledja.",
+    "columns": {
+      "email": "E-pošta",
+      "role": "Vloga",
+      "status": "Stanje"
+    },
+    "roles": {
+      "superadmin": "Superadmin",
+      "support": "Podpora"
+    },
+    "statuses": {
+      "invited": "Povabljen",
+      "active": "Aktiven",
+      "deactivated": "Deaktiviran"
+    },
+    "you": "Vi",
+    "deactivate": "Deaktiviraj",
+    "inviteTitle": "Povabi uporabnika",
+    "inviteHint": "Povabljeni prejme e-pošto s povezavo za nastavitev gesla, ki velja 7 dni.",
+    "fields": {
+      "email": "E-pošta",
+      "role": "Vloga"
+    },
+    "invite": "Pošlji povabilo",
+    "empty": "Ni uporabnikov.",
+    "count": "{count, plural, one {# uporabnik} two {# uporabnika} few {# uporabniki} other {# uporabnikov}}",
+    "errors": {
+      "email": "Vnesite veljaven e-poštni naslov.",
+      "role": "Izberite vlogo.",
+      "taken": "Uporabnik s tem e-poštnim naslovom že obstaja.",
+      "self": "Sebe ne morete deaktivirati.",
+      "notFound": "Uporabnik ne obstaja več.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
   }
 }
