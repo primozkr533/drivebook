@@ -7,6 +7,7 @@ import { getSurfaceBasePath, requireDealerUser } from "@/server/auth/permissions
 import { listCarsForAdmin } from "@/server/data/cars";
 import { setCarActiveAction } from "./actions";
 import { CAR_STATUS_FILTERS, parseCarStatusFilter } from "./form-model";
+import { carsListHref, parseCarListNotice } from "./notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("cars"))("title") };
@@ -18,6 +19,7 @@ export default async function CarsPage({ searchParams }: Props) {
   const { ctx } = await requireDealerUser();
   const [query, basePath, t] = await Promise.all([searchParams, getSurfaceBasePath(), getTranslations("cars")]);
   const status = parseCarStatusFilter(query?.status);
+  const notice = parseCarListNotice(query?.notice);
   const cars = await listCarsForAdmin(ctx, { status });
   const listHref = `${basePath}/cars`;
   const addHref = `${listHref}/new`;
@@ -44,12 +46,19 @@ export default async function CarsPage({ searchParams }: Props) {
             ) : undefined
           }
         />
+        {notice && (
+          <Card tone="sunken" data-testid="cars-notice" data-state={notice}>
+            <Text tone="danger" role="alert">
+              {t(`errors.${notice}`)}
+            </Text>
+          </Card>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <nav aria-label={t("filterLabel")} className="flex flex-wrap gap-2" data-testid="cars-filter">
             {CAR_STATUS_FILTERS.map((s) => (
               <a
                 key={s}
-                href={`${listHref}?status=${s}`}
+                href={carsListHref(listHref, s)}
                 aria-current={s === status ? "page" : undefined}
                 className="rounded-pill"
                 data-testid={`cars-filter-${s}`}
@@ -88,6 +97,7 @@ export default async function CarsPage({ searchParams }: Props) {
                         </ButtonLink>
                         <form action={setCarActiveAction}>
                           <input type="hidden" name="id" value={car.id} />
+                          <input type="hidden" name="filter" value={status} />
                           <input type="hidden" name="active" value={car.active ? "0" : "1"} />
                           <Button
                             type="submit"
