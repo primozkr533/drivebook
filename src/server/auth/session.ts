@@ -4,6 +4,7 @@ import { getConfig } from "@/lib/config";
 import { backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers } from "@/db/schema";
 import { createDealerContext, type DealerContext } from "@/server/data/context";
 import { db } from "@/server/data/db";
+import type { Tx } from "@/server/data/mutate";
 import { sessionCookieSecure } from "@/server/routing";
 import { hashToken, newOpaqueToken } from "./tokens";
 
@@ -205,12 +206,11 @@ export async function revokeUserSessions(
   await db().delete(sessions).where(where);
 }
 
-export async function deactivateUser(surface: AuthSurface, userId: string): Promise<void> {
+export async function deactivateUser(surface: AuthSurface, userId: string, tx?: Tx): Promise<void> {
+  if (!tx) return db().transaction((own) => deactivateUser(surface, userId, own));
   const { sessions, users } = tables[surface];
-  await db().transaction(async (tx) => {
-    await tx.update(users).set({ status: "deactivated" }).where(eq(users.id, userId));
-    await tx.delete(sessions).where(eq(sessions.userId, userId));
-  });
+  await tx.update(users).set({ status: "deactivated" }).where(eq(users.id, userId));
+  await tx.delete(sessions).where(eq(sessions.userId, userId));
 }
 
 export type DealerSession = {
