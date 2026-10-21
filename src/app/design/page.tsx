@@ -87,6 +87,7 @@ export default function DesignPage() {
           context={<Eyebrow tone="ink">Design foundation · v1</Eyebrow>}
           nav={nav}
           actions={<ThemeToggle />}
+          menu={{ label: "Meni" }}
         />
       }
     >
@@ -394,6 +395,25 @@ export default function DesignPage() {
                 }
               />
             </Card>
+          </div>
+
+          <div>
+            <Eyebrow className="mb-3 block">AppHeader · menu — pod lg se navigacija skrije za gumb Meni</Eyebrow>
+            <div className="relative min-h-48 shadow-[inset_0_0_0_1px_var(--line)]" data-testid="design-compact-menu">
+              <AppHeader
+                context={<Text as="span" size="small">Avto Novak d.o.o.</Text>}
+                nav={[
+                  { label: "Račun", href: "#komponente", active: true },
+                  { label: "Vozila", href: "#podpis" },
+                ]}
+                actions={
+                  <Button variant="secondary" size="sm">
+                    Odjava
+                  </Button>
+                }
+                menu={{ label: "Meni", footer: <Text as="span" size="small">prodaja@avtonovak.si</Text> }}
+              />
+            </div>
           </div>
         </Stack>
       </Section>

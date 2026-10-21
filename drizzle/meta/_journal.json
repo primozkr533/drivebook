@@ -8,6 +8,20 @@
       "when": 1792523944672,
       "tag": "0000_phase1_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792534986225,
+      "tag": "0001_auth_and_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792541664144,
+      "tag": "0002_totp_last_step_and_password_reset_requests",
+      "breakpoints": true
     }
   ]
 }

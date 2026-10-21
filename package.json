@@ -12,15 +12,22 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",
-    "db:seed": "tsx src/db/seed-cli.ts"
+    "db:seed": "tsx src/db/seed-cli.ts",
+    "worker": "tsx src/worker.ts",
+    "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts",
+    "user-admin": "tsx src/server/auth/user-admin-cli.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.0",
     "@fontsource-variable/jetbrains-mono": "^5.2.0",
+    "@node-rs/argon2": "^2.2.2",
     "drizzle-orm": "^0.45.4",
     "next": "^16.0.0",
     "next-intl": "^4.14.9",
+    "otplib": "^13.5.0",
     "pg": "^8.23.1",
+    "pg-boss": "^12.38.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -29,6 +36,7 @@
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitest/coverage-v8": "^5.0.5",

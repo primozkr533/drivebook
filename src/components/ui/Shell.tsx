@@ -1,5 +1,6 @@
 import type { ElementType, ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { CompactMenu } from "./CompactMenu";
 
 /**
  * Layout primitives. EVERY screen is: <Shell header={…}> → <Container> → <Grid>/<Stack>.
@@ -67,15 +68,20 @@ export function Logo({ compact = false }: { compact?: boolean }) {
 
 export type NavItem = { label: string; href: string; active?: boolean };
 
-/** Top bar: logo · context · nav · actions. Hairline-ruled, sticky. */
+/**
+ * Top bar: logo · context · nav · actions. Hairline-ruled, sticky. The inline nav hides below
+ * `lg`; pass `menu` to show the same items in a compact disclosure menu there instead.
+ */
 export function AppHeader({
   context,
   nav = [],
   actions,
+  menu,
 }: {
   context?: ReactNode;
   nav?: NavItem[];
   actions?: ReactNode;
+  menu?: { label: string; footer?: ReactNode };
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-line-strong bg-ground/95 backdrop-blur-sm">
@@ -103,7 +109,10 @@ export function AppHeader({
             </a>
           ))}
         </nav>
-        {actions && <div className={cx("flex items-center gap-2", nav.length ? "" : "ml-auto")}>{actions}</div>}
+        {actions && <div className={cx("ml-auto flex items-center gap-2", nav.length > 0 && "lg:ml-0")}>{actions}</div>}
+        {menu && nav.length > 0 && (
+          <CompactMenu label={menu.label} nav={nav} footer={menu.footer} className={actions ? undefined : "ml-auto"} />
+        )}
       </Container>
     </header>
   );

@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getConfig } from "@/lib/config";
-import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG } from "./demo";
+import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL } from "./demo";
 import type { Db } from "./client";
 import {
   backofficeUsers,
@@ -14,7 +14,7 @@ import {
   plans,
 } from "./schema";
 
-export { DEMO_DEALER_SLUG, DEMO_OLD_SLUG };
+export { DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL };
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -24,6 +24,8 @@ export const DEMO_CAR_IDS = {
   clio: "bR5nW0tGk2YfA9xM",
   peugeot308: "Hc8uE4jP6sDq1VoT",
 } as const;
+
+const LEGACY_DEMO_OWNER_EMAIL = "lastnik@demo.drivebook.localhost";
 
 const PLAN_CODE = "standard";
 const AVTO_NET_DETAILS = "https://www.avto.net/Ads/details.asp?id=";
@@ -44,7 +46,13 @@ export async function runSeed(db: Db): Promise<void> {
 
     await tx
       .insert(backofficeUsers)
-      .values({ email: seedSuperadminEmail, name: "Super Admin", role: "superadmin", passwordHash: null })
+      .values({
+        email: seedSuperadminEmail.toLowerCase(),
+        name: "Super Admin",
+        role: "superadmin",
+        status: "active",
+        passwordHash: null,
+      })
       .onConflictDoNothing({ target: backofficeUsers.email });
 
     const dealerId = await upsertDemoDealer(tx, planId);
@@ -141,15 +149,27 @@ export async function runSeed(db: Db): Promise<void> {
       ])
       .onConflictDoNothing();
 
-    // The unique key is the expression (dealer_id, lower(email)), which a column target cannot name.
+    // Databases seeded before the owner got its fixed email would otherwise end up with two owners.
+    const [owner] = await tx
+      .select({ id: dealerUsers.id })
+      .from(dealerUsers)
+      .where(eq(dealerUsers.email, DEMO_OWNER_EMAIL));
+    if (!owner) {
+      await tx
+        .update(dealerUsers)
+        .set({ email: DEMO_OWNER_EMAIL })
+        .where(and(eq(dealerUsers.dealerId, dealerId), eq(dealerUsers.email, LEGACY_DEMO_OWNER_EMAIL)));
+    }
+
     await tx
       .insert(dealerUsers)
       .values([
         {
           dealerId,
-          email: "lastnik@demo.drivebook.localhost",
+          email: DEMO_OWNER_EMAIL,
           name: "Mojca Novak",
           role: "owner",
+          status: "active",
           passwordHash: null,
         },
         {
@@ -157,10 +177,11 @@ export async function runSeed(db: Db): Promise<void> {
           email: "prodaja@demo.drivebook.localhost",
           name: "Luka Kovač",
           role: "salesperson",
+          status: "active",
           passwordHash: null,
         },
       ])
-      .onConflictDoNothing();
+      .onConflictDoNothing({ target: dealerUsers.email });
   });
 }
 

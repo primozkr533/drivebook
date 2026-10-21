@@ -6,5 +6,6 @@
   "site": { "title": "Stran avtohiše (demo)", "body": "Javna stran demo avtohiše iz začetnih podatkov." },
   "app": { "title": "Skrbništvo avtohiše", "body": "Površina app. za avtohiše." },
   "admin": { "title": "Zaledni sistem", "body": "Površina admin. za upravljavce platforme." },
+  "inbox": { "title": "Razvojni nabiralnik", "body": "Poslana e-poštna sporočila in SMS-i iz lažnega ponudnika." },
   "design": { "title": "Oblikovni sistem", "body": "Primitivi in podpisne komponente." }
 }

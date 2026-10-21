@@ -5,6 +5,8 @@ export const BASE_PATH_HEADER = "x-drivebook-base-path";
 // Built rather than a literal so route crawlers don't take the rewrite target for a page.
 export const NOT_FOUND_PATH = ["", "_404"].join("/");
 export const DEV_INDEX_PATH = "/dev";
+export const DEV_INBOX_PATH = "/dev/inbox";
+export const TEST_LOGIN_PATH = "/api/test/login";
 
 // Root-host paths that, with dev aliases on, redirect to the alias that actually serves them.
 const DEV_REDIRECTS: [string, string][] = [
@@ -19,6 +21,8 @@ const DEV_REDIRECTS: [string, string][] = [
 export type RouteConfig = {
   baseDomain: string;
   devAliases: boolean;
+  // Defaults to devAliases; DEV_INBOX_ENABLED can serve the inbox alone in production.
+  devInbox?: boolean;
   resolveSlug: (slug: string) => Promise<ResolvedDealerSlug>;
   protocol?: string;
 };
@@ -51,11 +55,28 @@ function underPrefix(pathname: string, prefix: string): string | null {
 const isInternal = (pathname: string) => INTERNAL_PREFIXES.some((prefix) => underPrefix(pathname, prefix) !== null);
 
 function surface(internal: "/dealer-admin" | "/backoffice", path: string, search: string, aliasPrefix = ""): RouteResult {
-  if (path === "" || path === "/") return { kind: "redirect", status: 307, location: `${aliasPrefix}/login` };
   // Under a dev alias, a nested internal path goes back through root-host routing (its own alias).
   if (isInternal(path) && aliasPrefix) return { kind: "redirect", status: 307, location: `${path}${search}` };
   if (isInternal(path)) return notFound(search);
-  return { kind: "rewrite", pathname: `${internal}${path}`, search };
+  // The surface root is the signed-in home; its layout redirects to /login without a session.
+  return { kind: "rewrite", pathname: `${internal}${path}`, search, headers: { [BASE_PATH_HEADER]: aliasPrefix } };
+}
+
+// Where the gate-only test login sends the browser; null on dealer and admin. hosts, where it does not exist.
+export function testLoginRedirect(host: string, baseDomain: string): string | null {
+  const { hostname } = splitHost(host);
+  if (hostname === `app.${baseDomain}`) return "/";
+  if (hostname.endsWith(`.${baseDomain}`)) return null;
+  return "/_dev/app";
+}
+
+// Browsers drop Secure cookies set over plain http except on localhost, so dev-alias hosts such as
+// http://web:3000 get a non-Secure session cookie. Production (no dev aliases) is always Secure.
+export function sessionCookieSecure(headers: Headers, devAliases: boolean): boolean {
+  if (!devAliases) return true;
+  if (headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() === "https") return true;
+  const { hostname } = splitHost(requestHost(headers));
+  return hostname === "localhost" || hostname.endsWith(".localhost");
 }
 
 async function dealerSite(
@@ -78,7 +99,9 @@ export async function routeRequest(host: string, pathname: string, search: strin
 
   if (hostname.endsWith(`.${base}`)) {
     const label = hostname.slice(0, -(base.length + 1));
-    if (label === "app") return surface("/dealer-admin", pathname, search);
+    if (label === "app") {
+      return pathname === TEST_LOGIN_PATH ? { kind: "next" } : surface("/dealer-admin", pathname, search);
+    }
     if (label === "admin") return surface("/backoffice", pathname, search);
     const protocol = cfg.protocol ?? "http:";
     return dealerSite(
@@ -92,6 +115,9 @@ export async function routeRequest(host: string, pathname: string, search: strin
   }
 
   const devPath = underPrefix(pathname, "/_dev");
+  if ((devPath === "/inbox" || devPath === "/inbox/") && (cfg.devInbox ?? cfg.devAliases)) {
+    return { kind: "rewrite", pathname: DEV_INBOX_PATH, search };
+  }
   if (cfg.devAliases && devPath !== null) {
     if (devPath === "" || devPath === "/") return { kind: "rewrite", pathname: DEV_INDEX_PATH, search };
     const app = underPrefix(devPath, "/app");

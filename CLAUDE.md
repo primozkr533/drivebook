@@ -11,6 +11,10 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run test:e2e` — Playwright against the running stack (`npx playwright install chromium` once)
 - `npm run db:generate` — generate a Drizzle migration from `src/db/schema` into `drizzle/`
 - `npm run db:migrate` — apply pending migrations · `npm run db:seed` — run the idempotent seed
+- `npm run worker` — notification worker (pg-boss `notify.email` / `notify.sms`); runs as the `worker` compose service, `web` never depends on it
+- `npm run create-superadmin -- --email x` — create/invite a backoffice superadmin and print the set-password link
+- `npm run user-admin -- deactivate --surface dealer|backoffice --email x` — deactivate a user on that surface and revoke all of their sessions (unknown e-mail exits non-zero)
+- `npm run user-admin -- resend-invite --surface dealer|backoffice --email x` — re-issue an invited user's 7-day set-password link, queue the invitation e-mail and print the link
 
 FARM-RUN-CONTRACT
 ```
@@ -21,6 +25,7 @@ web-service: web
 web-port: 3000
 preview-path: /_dev/site/demo
 smoke: docker compose exec -T web wget -qO- --header='Host: demo.drivebook.localhost' http://localhost:3000/ | grep -q 'Octavia'
+test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session for the demo Owner; then open /_dev/app)
 ```
 
 ## Structure
@@ -31,9 +36,11 @@ smoke: docker compose exec -T web wget -qO- --header='Host: demo.drivebook.local
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
+- `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
 - `src/app/site/[slug]/` — public dealer site
-- `src/app/dealer-admin/` — `app.` surface (dealer admin)
-- `src/app/backoffice/` — `admin.` surface (backoffice)
+- `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
+- `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
+- `src/app/backoffice/` — `admin.` surface (backoffice); signed-in pages live in `(app)/`
 - `src/i18n/request.ts` + `messages/sl/` — translations
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
 
@@ -46,6 +53,12 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `RUN_MIGRATIONS_ON_START` — apply pending migrations when the server starts
 - `SEED_ON_START` — run the idempotent seed (default plan, superadmin, demo dealer) when the server starts
 - `SEED_SUPERADMIN_EMAIL` — email of the superadmin account created by the seed
+- `AUTH_SECRET` — secret (≥ 32 chars) that encrypts TOTP secrets at rest and signs the TOTP pending token; required in production
+- `FARM_TEST_AUTH` — `1` enables the gate-only test login route (off by default)
+- `DEV_INBOX_ENABLED` — `1` serves the dev inbox in production (always on outside production)
+- `NOTIFY_FAKE` — `1` forces the fake SMS/e-mail adapters even when provider keys are present
+- `PUBLIC_URL_SCHEME` — `https` (default) or `http` (dev); scheme for absolute links in e-mails
+- `PUBLIC_URL_PORT` — optional port appended to absolute links (`3000` in dev, empty in production)
 - `TWILIO_ACCOUNT_SID` — Twilio account SID for SMS
 - `TWILIO_AUTH_TOKEN` — Twilio auth token
 - `TWILIO_FROM_NUMBER` — Twilio sender number (E.164)
@@ -55,12 +68,20 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token for dealer custom domains
 - `CLOUDFLARE_ZONE_ID` — Cloudflare zone ID for dealer custom domains
 
+## API Contract
+- `POST /api/test/login`
+  - Exists only when `FARM_TEST_AUTH=1` (`getConfig().farmTestAuth`). Otherwise it responds 404 (exactly as an unknown route).
+  - Request body: none required. An optional JSON `{ "surface": "dealer" }` is accepted; only `dealer` is supported.
+  - Response 200 JSON: `{ "ok": true, "user": { "email": string, "role": "owner" }, "dealerSlug": string, "redirect": string }`. `redirect` is the dealer admin home for the request host (`/` on `app.` hosts, `/_dev/app` on non-dealer dev hosts).
+  - Sets the normal dealer session cookie `db_app_session` (httpOnly, Secure, SameSite=Lax, host-only) via `createSession` + `setSessionCookie` from `src/server/auth/session.ts`. Exception: with dev aliases on (never in production), a plain-http request on a host other than `localhost`/`*.localhost` (e.g. `http://web:3000`) gets the cookie without `Secure`, since browsers drop Secure cookies set over http there (`sessionCookieSecure` in `src/server/routing.ts`; the login form follows the same rule).
+  - Is not available on dealer subdomain hosts (404).
+
 ## Tenant isolation
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
 2. A `DealerContext` is created only by `resolveDealerSlug` (public host) or, later, by the authenticated session — never from IDs supplied in a request.
 3. Every dealer-scoped query filters by `ctx.dealerId`, including lookups by car ID (`getCar(ctx, id)`).
-4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction.
-5. Admin actions and routes call `requireDealerRole(ctx, roles)` / `requireBackofficeRole(roles)` first; both are stubs that throw until auth exists.
+4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction. Exception: self-service credential changes (see `## Decisions`).
+5. Admin pages, layouts and server actions first call `requireDealerUser()` / `requireBackofficeUser()` (`src/server/auth/permissions.ts`). These read the surface's own session cookie and redirect to that surface's `/login` when there is no valid session. Role checks use `requireDealerRole(ctx, roles)` (Owner / Salesperson) and `requireBackofficeRole(roles)` (Superadmin / Support). They throw `ForbiddenError` when the session user lacks the role or, for dealer users, when the session's dealer is not `ctx.dealerId`.
 6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first.
 7. Public IDs (cars) are unguessable `newPublicId()` values, never sequential.
 8. Reserved slugs (`RESERVED_SLUGS` in `src/lib/config.ts`) are never resolved as dealers.
@@ -68,7 +89,8 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 ## Routing
 Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired up by `src/proxy.ts`.
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
-- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` redirects to the login page)
+- `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the surface home in the `(app)` route group, whose layout redirects to `/login` without a session; login and password pages stay outside `(app)`; the proxy always sets `x-drivebook-base-path` there — empty on `app.`/`admin.`, `/_dev/app` / `/_dev/admin` under the dev aliases — read via `getSurfaceBasePath()`)
+- `/api/test/login` passes through untouched on `app.` and non-dealer hosts (dealer and `admin.` hosts 404 it)
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
@@ -102,4 +124,13 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Content width: `Container` (`--container-max` 1248 px, fluid `--gutter`); `width="narrow"` (704 px) only for single forms/reading. Never strand a phone-width column on desktop.
 - Phones: one full-width column. From `md`/`lg`: multi-column via `Grid` (e.g. list + detail, cards 2–3 up, a `lg:col-span-8` main + `lg:col-span-4` aside).
 - Components that can live in both a main column and an aside (`DriveTicket`, `HoursStrip`) respond to their **container** (`@container`, `@md:`/`@2xl:`), not the viewport. Do the same for new signature-level components.
-- Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; add a compact menu when real navigation exists.
+- Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; pass `menu={{ label }}` to show the same items in the compact disclosure menu (`CompactMenu`) there.
+
+## Decisions
+- Until user-management UI exists, deactivation and invitation resend are operator actions via `npm run user-admin` (deactivate / resend-invite).
+- Self-service credential changes (own password change, TOTP setup/enable/disable in `src/server/auth/account.ts`) are exempt from `withDealerMutation`'s read_only/suspended block, so users of a restricted dealer can still secure their accounts; they must still write `audit_log` in the same transaction.
+- Session cookie renewal: `src/proxy.ts` re-issues the surface session cookie on `app.`/`admin.` requests (and on `/_dev/app/*`, `/_dev/admin/*`) once the session has passed `SESSION_REFRESH_AFTER_MS` since its last refresh. Page navigation alone therefore keeps the 30-day sliding expiry alive. Server Components never set cookies.
+- TOTP codes are single-use. The last accepted time step is stored per user (`totp_last_step`). Codes at or before it are rejected at login, at 2FA setup confirmation and when 2FA is turned off.
+- Account-page credential checks (the current password when changing the password; the password + code when turning 2FA off) count toward the same per-account failure limit and lockout as login. Every failed check is written to audit_log.
+- Forgot password for an `invited` user (no password set yet) re-sends the invitation, under the same 3-per-hour per-account link cap. Deactivated users get nothing. The response is always the same generic message.
+- Password-reset requests are also capped per client IP (via `clientIp`) per surface: 10 per hour, counted in `password_reset_requests`. Over the cap, no e-mail is sent and the usual generic message is shown.

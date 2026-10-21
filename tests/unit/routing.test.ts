@@ -3,7 +3,15 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dealers, dealerSlugHistory, plans } from "@/db/schema";
 import { setDbForTests } from "@/server/data/db";
 import { resolveDealerSlug, type ResolvedDealerSlug } from "@/server/data/dealers";
-import { NOT_FOUND_PATH, requestHost, routeRequest, type RouteConfig } from "@/server/routing";
+import {
+  NOT_FOUND_PATH,
+  requestHost,
+  routeRequest,
+  TEST_LOGIN_PATH,
+  sessionCookieSecure,
+  testLoginRedirect,
+  type RouteConfig,
+} from "@/server/routing";
 import { getTestDb, truncateAll } from "../setup/db";
 
 function config(overrides: Partial<RouteConfig> = {}): RouteConfig {
@@ -61,18 +69,35 @@ describe("routeRequest: hosts", () => {
     expect(cfg.resolveSlug).toHaveBeenCalledWith("demo");
   });
 
-  it("redirects app. and admin. roots to /login and rewrites their paths", async () => {
-    expect(await route("app.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
-    expect(await route("admin.drivebook.localhost", "/")).toEqual({ kind: "redirect", status: 307, location: path("login") });
+  it("rewrites app. and admin. roots to the surface home with an empty base path", async () => {
+    const empty = { "x-drivebook-base-path": "" };
+    expect(await route("app.drivebook.localhost", "/")).toEqual({
+      kind: "rewrite",
+      pathname: "/dealer-admin/",
+      search: "",
+      headers: empty,
+    });
+    expect(await route("admin.drivebook.localhost", "/")).toEqual({
+      kind: "rewrite",
+      pathname: "/backoffice/",
+      search: "",
+      headers: empty,
+    });
     expect(await route("app.drivebook.localhost", path("login"))).toEqual({
       kind: "rewrite",
       pathname: "/dealer-admin/login",
       search: "",
+      headers: empty,
     });
     expect(await route("admin.drivebook.localhost", `${path("login")}?next=x`)).toEqual({
       kind: "rewrite",
       pathname: "/backoffice/login",
       search: "?next=x",
+      headers: empty,
+    });
+    expect(await route("app.drivebook.localhost", path("account"))).toMatchObject({
+      pathname: "/dealer-admin/account",
+      headers: empty,
     });
   });
 
@@ -140,6 +165,60 @@ describe("routeRequest: 404s and isolation", () => {
   });
 });
 
+describe("routeRequest: gate-only test login", () => {
+  it("passes the test login through untouched on app. and non-dealer hosts", async () => {
+    expect(await route("app.drivebook.localhost", TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+    expect(await route("app.drivebook.localhost:3000", TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+    for (const host of ["localhost:3000", "web:3000", "drivebook.localhost"]) {
+      expect(await route(host, TEST_LOGIN_PATH)).toEqual({ kind: "next" });
+      expect(await route(host, TEST_LOGIN_PATH, config({ devAliases: false }))).toEqual({ kind: "next" });
+    }
+  });
+
+  it("only passes the exact path through on app.", async () => {
+    expect(await route("app.drivebook.localhost", `${TEST_LOGIN_PATH}/x`)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/dealer-admin${TEST_LOGIN_PATH}/x`,
+    });
+  });
+
+  it("does not pass it through on dealer or admin. hosts", async () => {
+    expect(await route("demo.drivebook.localhost", TEST_LOGIN_PATH)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/site/demo${TEST_LOGIN_PATH}`,
+    });
+    expect(await route("admin.drivebook.localhost", TEST_LOGIN_PATH)).toMatchObject({
+      kind: "rewrite",
+      pathname: `/backoffice${TEST_LOGIN_PATH}`,
+    });
+  });
+
+  it("redirects to the dealer admin home for the host, and refuses dealer and admin. hosts", () => {
+    const base = "drivebook.localhost";
+    expect(testLoginRedirect("app.drivebook.localhost:3000", base)).toBe("/");
+    expect(testLoginRedirect("localhost:3000", base)).toBe("/_dev/app");
+    expect(testLoginRedirect("drivebook.localhost", base)).toBe("/_dev/app");
+    expect(testLoginRedirect("demo.drivebook.localhost", base)).toBeNull();
+    expect(testLoginRedirect("admin.drivebook.localhost", base)).toBeNull();
+  });
+});
+
+describe("sessionCookieSecure", () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+
+  it("stays Secure on https, localhost and *.localhost", () => {
+    expect(sessionCookieSecure(h({ host: "localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "app.drivebook.localhost:3000" }), true)).toBe(true);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "https" }), true)).toBe(true);
+  });
+
+  it("drops Secure only on plain-http non-localhost hosts with dev aliases on", () => {
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000" }), true)).toBe(false);
+    expect(sessionCookieSecure(h({ host: "web:3000", "x-forwarded-proto": "http" }), false)).toBe(true);
+  });
+});
+
 describe("routeRequest: dev aliases", () => {
   it("routes /_dev/site/{slug} like a dealer host, with the alias base path", async () => {
     expect(await route("localhost:3000", "/_dev/site/demo?car=1")).toEqual({
@@ -195,13 +274,27 @@ describe("routeRequest: dev aliases", () => {
       kind: "rewrite",
       pathname: "/dealer-admin/login",
       search: "",
+      headers: { "x-drivebook-base-path": "/_dev/app" },
     });
-    expect(await route("localhost", "/_dev/admin/login")).toMatchObject({ pathname: "/backoffice/login" });
-    expect(await route("localhost", "/_dev/app")).toEqual({ kind: "redirect", status: 307, location: "/_dev/app/login" });
+    expect(await route("localhost", "/_dev/admin/login")).toMatchObject({
+      pathname: "/backoffice/login",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
+    });
+    expect(await route("localhost", "/_dev/app")).toEqual({
+      kind: "rewrite",
+      pathname: "/dealer-admin",
+      search: "",
+      headers: { "x-drivebook-base-path": "/_dev/app" },
+    });
+    expect(await route("localhost", "/_dev/admin")).toMatchObject({
+      pathname: "/backoffice",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
+    });
     expect(await route("localhost", "/_dev/admin/")).toEqual({
-      kind: "redirect",
-      status: 307,
-      location: "/_dev/admin/login",
+      kind: "rewrite",
+      pathname: "/backoffice/",
+      search: "",
+      headers: { "x-drivebook-base-path": "/_dev/admin" },
     });
     expect(await route("localhost", path("_dev", "other"))).toEqual({ kind: "redirect", status: 307, location: "/_dev" });
   });
@@ -209,6 +302,27 @@ describe("routeRequest: dev aliases", () => {
   it("serves dev aliases on non-dealer hosts such as preview proxies", async () => {
     expect(await route("web:3000", "/_dev/app/login")).toMatchObject({ pathname: "/dealer-admin/login" });
     expect(await route("preview.example.com", "/_dev/admin/login")).toMatchObject({ pathname: "/backoffice/login" });
+  });
+
+  it("serves the dev inbox at /_dev/inbox", async () => {
+    const inbox = { kind: "rewrite", pathname: "/dev/inbox", search: "" };
+    expect(await route("localhost", "/_dev/inbox")).toEqual(inbox);
+    expect(await route("web:3000", "/_dev/inbox/")).toEqual(inbox);
+    expect(await route("localhost", "/dev/inbox")).toEqual({ kind: "redirect", status: 307, location: "/_dev/inbox" });
+    expect(await route("demo.drivebook.localhost", "/_dev/inbox")).toEqual(notFound());
+  });
+
+  it("404s the dev inbox in production unless DEV_INBOX_ENABLED is set", async () => {
+    const off = config({ devAliases: false, devInbox: false });
+    expect(await route("localhost", "/_dev/inbox", off)).toEqual(notFound());
+    expect(await route("localhost", "/dev/inbox", off)).toEqual(notFound());
+
+    const on = config({ devAliases: false, devInbox: true });
+    expect(await route("preview.example.com", "/_dev/inbox", on)).toEqual({ kind: "rewrite", pathname: "/dev/inbox", search: "" });
+    expect(await route("localhost", "/_dev", on)).toEqual(notFound());
+    expect(await route("localhost", path("_dev", "inbox", "x"), on)).toEqual(notFound());
+    expect(await route("localhost", "/dev/inbox", on)).toEqual(notFound());
+    expect(await route("app.drivebook.localhost", "/_dev/inbox", on)).toEqual(notFound());
   });
 
   it("404s /_dev/* when dev aliases are off", async () => {

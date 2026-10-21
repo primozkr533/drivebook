@@ -2,7 +2,19 @@
 // (default postgres://drivebook:drivebook@localhost:5432/drivebook_test), never the dev database.
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { backofficeUsers, cars, dealerLicenceHistory, dealers, dealerUsers, plans, sessions } from "@/db/schema";
+import {
+  authTokens,
+  backofficeSessions,
+  backofficeUsers,
+  cars,
+  dealerLicenceHistory,
+  dealers,
+  dealerSessions,
+  dealerUsers,
+  messageLog,
+  passwordResetRequests,
+  plans,
+} from "@/db/schema";
 import { getTestDb, truncateAll } from "../setup/db";
 
 const db = getTestDb();
@@ -110,7 +122,43 @@ describe("phase-1 schema", () => {
     expect(ids.some((id) => /^\d+$/.test(id))).toBe(false);
   });
 
-  it("rejects sessions with both or neither user id set", async () => {
+  it("keeps dealer user emails lowercased and unique across dealers", async () => {
+    const { plan, dealer } = await insertDealer();
+    const [other] = await db
+      .insert(dealers)
+      .values({
+        slug: "avto-drugi",
+        name: "Avto Drugi",
+        legalName: "Avto Drugi d.o.o.",
+        addressLine: "Celovška cesta 1",
+        postalCode: "1000",
+        city: "Ljubljana",
+        phone: "+38611234568",
+        email: "info@avto-drugi.si",
+        primaryColor: "#E4572E",
+        planId: plan.id,
+      })
+      .returning();
+    const [user] = await db
+      .insert(dealerUsers)
+      .values({ dealerId: dealer.id, email: "sales@avto-test.si", name: "A", role: "salesperson" })
+      .returning();
+    expect(user).toMatchObject({ status: "invited", passwordHash: null, totpSecretEnc: null, lastLoginAt: null });
+    await expectPgError(
+      db.insert(dealerUsers).values({ dealerId: other.id, email: "sales@avto-test.si", name: "B", role: "salesperson" }),
+      "23505",
+    );
+    await expectPgError(
+      db.insert(dealerUsers).values({ dealerId: dealer.id, email: "Boss@avto-test.si", name: "C", role: "owner" }),
+      "23514",
+    );
+    await expectPgError(
+      db.insert(backofficeUsers).values({ email: "Admin@drivebook.si", name: "D", role: "support" }),
+      "23514",
+    );
+  });
+
+  it("keeps dealer and backoffice sessions in separate tables with unique token hashes", async () => {
     const { dealer } = await insertDealer();
     const [user] = await db
       .insert(dealerUsers)
@@ -122,35 +170,140 @@ describe("phase-1 schema", () => {
       .returning();
     const expiresAt = new Date("2026-12-31T00:00:00Z");
 
-    await db.insert(sessions).values({ id: "ok", userKind: "dealer", dealerUserId: user.id, expiresAt });
+    await db.insert(dealerSessions).values({ tokenHash: "a".repeat(64), userId: user.id, expiresAt });
     await expectPgError(
-      db.insert(sessions).values({ id: "neither", userKind: "dealer", expiresAt }),
-      "23514",
-    );
-    await expectPgError(
-      db.insert(sessions).values({ id: "wrong-kind", userKind: "backoffice", dealerUserId: user.id, expiresAt }),
-      "23514",
-    );
-    for (const userKind of ["dealer", "backoffice"] as const) {
-      await expectPgError(
-        db.insert(sessions).values({
-          id: `both-${userKind}`,
-          userKind,
-          dealerUserId: user.id,
-          backofficeUserId: admin.id,
-          expiresAt,
-        }),
-        "23514",
-      );
-    }
-  });
-
-  it("treats dealer user emails case-insensitively per dealer", async () => {
-    const { dealer } = await insertDealer();
-    await db.insert(dealerUsers).values({ dealerId: dealer.id, email: "Sales@avto-test.si", name: "A", role: "salesperson" });
-    await expectPgError(
-      db.insert(dealerUsers).values({ dealerId: dealer.id, email: "sales@AVTO-test.si", name: "B", role: "salesperson" }),
+      db.insert(dealerSessions).values({ tokenHash: "a".repeat(64), userId: user.id, expiresAt }),
       "23505",
     );
+    await db.insert(backofficeSessions).values({ tokenHash: "b".repeat(64), userId: admin.id, expiresAt });
+    await expectPgError(
+      db.insert(backofficeSessions).values({ tokenHash: "b".repeat(64), userId: admin.id, expiresAt }),
+      "23505",
+    );
+    // A dealer user id is not a valid backoffice session owner.
+    await expectPgError(
+      db.insert(backofficeSessions).values({ tokenHash: "c".repeat(64), userId: user.id, expiresAt }),
+      "23503",
+    );
+
+    await db.delete(dealerUsers);
+    expect(await db.select().from(dealerSessions)).toEqual([]);
+  });
+
+  it("rejects a reused auth token hash", async () => {
+    const values = {
+      surface: "dealer" as const,
+      userId: "00000000-0000-4000-8000-000000000001",
+      purpose: "invite" as const,
+      tokenHash: "d".repeat(64),
+      expiresAt: new Date("2026-12-31T00:00:00Z"),
+    };
+    await db.insert(authTokens).values(values);
+    await expectPgError(db.insert(authTokens).values({ ...values, purpose: "reset" }), "23505");
+  });
+
+  it("allows message_log rows without a dealer", async () => {
+    const [row] = await db
+      .insert(messageLog)
+      .values({ channel: "email", provider: "fake", recipient: "admin@drivebook.si", template: "reset" })
+      .returning();
+    expect(row).toMatchObject({ dealerId: null, status: "queued", smsSegments: null });
+  });
+
+  it("creates the auth and notification tables with their key columns", async () => {
+    const result = await db.execute<{ table_name: string; column_name: string; is_nullable: string }>(sql`
+      SELECT table_name, column_name, is_nullable FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name IN (
+        'dealer_users', 'backoffice_users', 'dealer_sessions', 'backoffice_sessions', 'auth_tokens',
+        'login_attempts', 'message_log', 'dev_outbox', 'audit_log', 'password_reset_requests')`);
+    const columns = new Map(result.rows.map((r) => [`${r.table_name}.${r.column_name}`, r.is_nullable]));
+    const expected: Record<string, "YES" | "NO"> = {
+      "dealer_users.password_hash": "YES",
+      "dealer_users.status": "NO",
+      "dealer_users.totp_secret_enc": "YES",
+      "dealer_users.totp_enabled_at": "YES",
+      "dealer_users.last_login_at": "YES",
+      "dealer_users.totp_last_step": "YES",
+      "backoffice_users.status": "NO",
+      "backoffice_users.totp_secret_enc": "YES",
+      "backoffice_users.totp_enabled_at": "YES",
+      "backoffice_users.last_login_at": "YES",
+      "backoffice_users.totp_last_step": "YES",
+      "dealer_sessions.token_hash": "NO",
+      "dealer_sessions.user_id": "NO",
+      "dealer_sessions.last_seen_at": "NO",
+      "dealer_sessions.expires_at": "NO",
+      "backoffice_sessions.token_hash": "NO",
+      "backoffice_sessions.user_id": "NO",
+      "auth_tokens.surface": "NO",
+      "auth_tokens.purpose": "NO",
+      "auth_tokens.used_at": "YES",
+      "login_attempts.surface": "NO",
+      "login_attempts.email": "NO",
+      "login_attempts.success": "NO",
+      "message_log.dealer_id": "YES",
+      "message_log.sms_segments": "YES",
+      "message_log.provider_message_id": "YES",
+      "message_log.error": "YES",
+      "dev_outbox.sender": "NO",
+      "dev_outbox.subject": "YES",
+      "dev_outbox.text_body": "NO",
+      "dev_outbox.html_body": "YES",
+      "audit_log.dealer_id": "YES",
+      "audit_log.actor_kind": "NO",
+      "audit_log.actor_id": "YES",
+      "audit_log.action": "NO",
+      "audit_log.data": "NO",
+      "password_reset_requests.id": "NO",
+      "password_reset_requests.surface": "NO",
+      "password_reset_requests.ip": "NO",
+      "password_reset_requests.created_at": "NO",
+    };
+    for (const [column, nullable] of Object.entries(expected)) {
+      expect(columns.get(column), column).toBe(nullable);
+    }
+    expect(columns.has("dealer_users.active")).toBe(false);
+
+    const indexes = await db.execute<{ indexname: string }>(sql`
+      SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN (
+        'dealer_sessions', 'backoffice_sessions', 'login_attempts', 'password_reset_requests')`);
+    expect(indexes.rows.map((r) => r.indexname)).toEqual(
+      expect.arrayContaining([
+        "dealer_sessions_user_id_idx",
+        "backoffice_sessions_user_id_idx",
+        "login_attempts_surface_email_created_at_idx",
+        "login_attempts_surface_ip_created_at_idx",
+        "password_reset_requests_surface_ip_created_at_idx",
+      ]),
+    );
+  });
+
+  it("stores totp_last_step as a nullable bigint on both user tables", async () => {
+    const result = await db.execute<{ table_name: string; data_type: string; column_default: string | null }>(sql`
+      SELECT table_name, data_type, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'totp_last_step' ORDER BY table_name`);
+    expect(result.rows).toEqual([
+      { table_name: "backoffice_users", data_type: "bigint", column_default: null },
+      { table_name: "dealer_users", data_type: "bigint", column_default: null },
+    ]);
+
+    const { dealer } = await insertDealer();
+    const [user] = await db
+      .insert(dealerUsers)
+      .values({ dealerId: dealer.id, email: "owner@avto-test.si", name: "Owner", role: "owner" })
+      .returning();
+    expect(user.totpLastStep).toBeNull();
+    const [admin] = await db
+      .insert(backofficeUsers)
+      .values({ email: "admin@drivebook.si", name: "Admin", role: "superadmin", totpLastStep: 59_000_000 })
+      .returning();
+    expect(admin.totpLastStep).toBe(59_000_000);
+  });
+
+  it("logs password reset requests per surface and ip without a dealer", async () => {
+    const [row] = await db.insert(passwordResetRequests).values({ surface: "backoffice", ip: "203.0.113.7" }).returning();
+    expect(row).toMatchObject({ surface: "backoffice", ip: "203.0.113.7" });
+    expect(row.createdAt).toBeInstanceOf(Date);
+    await expectPgError(db.execute(sql`INSERT INTO password_reset_requests (surface) VALUES ('dealer')`), "23502");
   });
 });

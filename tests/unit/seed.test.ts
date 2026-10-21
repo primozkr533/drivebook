@@ -1,5 +1,5 @@
 // Real-database tests: start Postgres with `docker compose up -d db` (uses TEST_DATABASE_URL).
-import { count, eq, type SQL } from "drizzle-orm";
+import { and, count, eq, type SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -13,7 +13,7 @@ import {
   openingHours,
   plans,
 } from "@/db/schema";
-import { DEMO_CAR_IDS, DEMO_DEALER_SLUG, DEMO_OLD_SLUG, runSeed } from "@/db/seed";
+import { DEMO_CAR_IDS, DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL, runSeed } from "@/db/seed";
 import { resetConfigForTests } from "@/lib/config";
 import { getTestDb, truncateAll } from "../setup/db";
 
@@ -60,7 +60,7 @@ describe("runSeed", () => {
 
     const users = await db.select().from(dealerUsers).where(eq(dealerUsers.dealerId, dealer.id));
     expect(users.map((u) => u.role).sort()).toEqual(["owner", "salesperson"]);
-    expect(users.every((u) => u.passwordHash === null)).toBe(true);
+    expect(users.every((u) => u.passwordHash === null && u.status === "active")).toBe(true);
 
     expect(await rowCount(bookingRules, eq(bookingRules.dealerId, dealer.id))).toBe(1);
     expect(await rowCount(dealerLicenceHistory, eq(dealerLicenceHistory.dealerId, dealer.id))).toBe(1);
@@ -108,7 +108,39 @@ describe("runSeed", () => {
     await runSeed(db);
     const admins = await db.select().from(backofficeUsers).where(eq(backofficeUsers.role, "superadmin"));
     expect(admins).toHaveLength(1);
-    expect(admins[0]).toMatchObject({ email: "admin@drivebook.localhost", name: "Super Admin", passwordHash: null });
+    expect(admins[0]).toMatchObject({
+      email: "admin@drivebook.localhost",
+      name: "Super Admin",
+      status: "active",
+      passwordHash: null,
+    });
+  });
+
+  it("creates exactly one active demo owner across re-seeds", async () => {
+    await runSeed(db);
+    await runSeed(db);
+    const dealer = await demoDealer();
+    const owners = await db
+      .select()
+      .from(dealerUsers)
+      .where(and(eq(dealerUsers.dealerId, dealer.id), eq(dealerUsers.role, "owner")));
+    expect(owners).toHaveLength(1);
+    expect(owners[0]).toMatchObject({ email: DEMO_OWNER_EMAIL, status: "active", passwordHash: null });
+  });
+
+  it("moves an owner seeded under the old email to the demo owner email", async () => {
+    await runSeed(db);
+    await db
+      .update(dealerUsers)
+      .set({ email: "lastnik@demo.drivebook.localhost" })
+      .where(eq(dealerUsers.email, DEMO_OWNER_EMAIL));
+    await runSeed(db);
+    const dealer = await demoDealer();
+    const owners = await db
+      .select({ email: dealerUsers.email })
+      .from(dealerUsers)
+      .where(and(eq(dealerUsers.dealerId, dealer.id), eq(dealerUsers.role, "owner")));
+    expect(owners).toEqual([{ email: DEMO_OWNER_EMAIL }]);
   });
 
   it("honours SEED_SUPERADMIN_EMAIL", async () => {

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getConfig, isReservedSlug, resetConfigForTests } from "@/lib/config";
+import { getConfig, isReservedSlug, resetConfigForTests, surfaceOrigin } from "@/lib/config";
 
 const originalEnv = process.env;
+const SECRET = "x".repeat(32);
 
 function setEnv(env: Record<string, string>) {
   process.env = { ...env } as NodeJS.ProcessEnv;
@@ -31,6 +32,12 @@ describe("getConfig", () => {
     expect(config.twilio).toBeNull();
     expect(config.brevo).toBeNull();
     expect(config.cloudflare).toBeNull();
+    expect(config.authSecret.length).toBeGreaterThanOrEqual(32);
+    expect(config.farmTestAuth).toBe(false);
+    expect(config.devInboxEnabled).toBe(true);
+    expect(config.notifyFake).toBe(false);
+    expect(config.publicUrlScheme).toBe("https");
+    expect(config.publicUrlPort).toBeNull();
   });
 
   it("is memoised until reset", () => {
@@ -42,7 +49,7 @@ describe("getConfig", () => {
   });
 
   it("defaults appEnv to production when NODE_ENV=production", () => {
-    setEnv({ NODE_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" });
+    setEnv({ NODE_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET });
     const config = getConfig();
     expect(config.appEnv).toBe("production");
     expect(config.devAliases).toBe(false);
@@ -58,6 +65,49 @@ describe("getConfig", () => {
     setEnv({ APP_ENV: "production" });
     expect(() => getConfig()).toThrow(/DATABASE_URL/);
     expect(() => getConfig()).toThrow(/BASE_DOMAIN/);
+  });
+
+  it("throws in production when AUTH_SECRET is missing", () => {
+    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" });
+    expect(() => getConfig()).toThrow(/AUTH_SECRET/);
+  });
+
+  it("throws in production when AUTH_SECRET is shorter than 32 chars", () => {
+    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: "x".repeat(31) });
+    expect(() => getConfig()).toThrow(/AUTH_SECRET/);
+  });
+
+  it("passes a valid AUTH_SECRET through in production", () => {
+    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET });
+    expect(getConfig().authSecret).toBe(SECRET);
+  });
+
+  it("treats auth/notify flags as true only for the literal 1", () => {
+    setEnv({ FARM_TEST_AUTH: "1", NOTIFY_FAKE: "1" });
+    expect(getConfig().farmTestAuth).toBe(true);
+    expect(getConfig().notifyFake).toBe(true);
+    setEnv({ FARM_TEST_AUTH: "true", NOTIFY_FAKE: "yes" });
+    expect(getConfig().farmTestAuth).toBe(false);
+    expect(getConfig().notifyFake).toBe(false);
+  });
+
+  it("serves the dev inbox in production only when DEV_INBOX_ENABLED=1", () => {
+    const prod = { APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET };
+    setEnv(prod);
+    expect(getConfig().devInboxEnabled).toBe(false);
+    setEnv({ ...prod, DEV_INBOX_ENABLED: "1" });
+    expect(getConfig().devInboxEnabled).toBe(true);
+  });
+
+  it("reads the public URL scheme and port", () => {
+    setEnv({ PUBLIC_URL_SCHEME: "http", PUBLIC_URL_PORT: "3000" });
+    expect(getConfig().publicUrlScheme).toBe("http");
+    expect(getConfig().publicUrlPort).toBe("3000");
+  });
+
+  it("rejects an invalid public URL scheme", () => {
+    setEnv({ PUBLIC_URL_SCHEME: "ftp" });
+    expect(() => getConfig()).toThrow(/PUBLIC_URL_SCHEME/);
   });
 
   it("treats whitespace-only values as missing", () => {
@@ -115,8 +165,22 @@ describe("getConfig", () => {
   });
 
   it("never throws for missing provider keys in production", () => {
-    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" });
+    setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET });
     expect(getConfig().providers).toEqual({ sms: "console", email: "console", cloudflare: false });
+  });
+});
+
+describe("surfaceOrigin", () => {
+  it("builds dev origins with scheme and port", () => {
+    setEnv({ PUBLIC_URL_SCHEME: "http", PUBLIC_URL_PORT: "3000", BASE_DOMAIN: "drivebook.localhost" });
+    expect(surfaceOrigin("dealer")).toBe("http://app.drivebook.localhost:3000");
+    expect(surfaceOrigin("backoffice")).toBe("http://admin.drivebook.localhost:3000");
+  });
+
+  it("omits an empty port in production", () => {
+    setEnv({ PUBLIC_URL_SCHEME: "https", PUBLIC_URL_PORT: "", BASE_DOMAIN: "drivebook.si" });
+    expect(surfaceOrigin("dealer")).toBe("https://app.drivebook.si");
+    expect(surfaceOrigin("backoffice")).toBe("https://admin.drivebook.si");
   });
 });
 

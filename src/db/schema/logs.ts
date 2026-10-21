@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { createdAt, updatedAt } from "./columns";
 import { dealers } from "./dealers";
 import { messageChannel, messageStatus } from "./enums";
@@ -15,6 +15,7 @@ export const messageLog = pgTable(
     template: text("template").notNull(),
     status: messageStatus("status").notNull().default("queued"),
     providerMessageId: text("provider_message_id"),
+    smsSegments: integer("sms_segments"),
     error: text("error"),
     payload: jsonb("payload").notNull().default({}),
     createdAt: createdAt(),
@@ -22,6 +23,18 @@ export const messageLog = pgTable(
   },
   (t) => [index("message_log_dealer_id_idx").on(t.dealerId)],
 );
+
+// Written by the fake notification adapter and read by the dev inbox.
+export const devOutbox = pgTable("dev_outbox", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  channel: messageChannel("channel").notNull(),
+  recipient: text("recipient").notNull(),
+  sender: text("sender").notNull(),
+  subject: text("subject"),
+  textBody: text("text_body").notNull(),
+  htmlBody: text("html_body"),
+  createdAt: createdAt(),
+});
 
 export const auditLog = pgTable(
   "audit_log",

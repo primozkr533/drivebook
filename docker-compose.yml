@@ -1,30 +1,53 @@
 # Dev stack. Phase 1 adds Postgres (+ worker) here; the web service must keep
 # starting on its own (no service_healthy gate) so /design is always reachable.
+
+# Shared app environment; the worker service reuses it via *app-env.
+x-app-env: &app-env
+  - PORT=3000
+  - DATABASE_URL=${DATABASE_URL:-postgres://drivebook:drivebook@db:5432/drivebook}
+  - APP_ENV=${APP_ENV:-development}
+  - BASE_DOMAIN=${BASE_DOMAIN:-drivebook.localhost}
+  - RUN_MIGRATIONS_ON_START=${RUN_MIGRATIONS_ON_START:-true}
+  - SEED_ON_START=${SEED_ON_START:-true}
+  - SEED_SUPERADMIN_EMAIL=${SEED_SUPERADMIN_EMAIL:-admin@drivebook.localhost}
+  - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+  - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+  - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+  - BREVO_API_KEY=${BREVO_API_KEY:-}
+  - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+  - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-DriveBook}
+  - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+  - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID:-}
+  - AUTH_SECRET=${AUTH_SECRET:-drivebook-dev-auth-secret-not-for-production}
+  - FARM_TEST_AUTH=${FARM_TEST_AUTH:-}
+  - DEV_INBOX_ENABLED=${DEV_INBOX_ENABLED:-}
+  - NOTIFY_FAKE=${NOTIFY_FAKE:-}
+  - PUBLIC_URL_SCHEME=${PUBLIC_URL_SCHEME:-http}
+  - PUBLIC_URL_PORT=${PUBLIC_URL_PORT:-3000}
+
 services:
   web:
     build: .
     ports:
       - "3000:3000"
-    environment:
-      - PORT=3000
-      - DATABASE_URL=${DATABASE_URL:-postgres://drivebook:drivebook@db:5432/drivebook}
-      - APP_ENV=${APP_ENV:-development}
-      - BASE_DOMAIN=${BASE_DOMAIN:-drivebook.localhost}
-      - RUN_MIGRATIONS_ON_START=${RUN_MIGRATIONS_ON_START:-true}
-      - SEED_ON_START=${SEED_ON_START:-true}
-      - SEED_SUPERADMIN_EMAIL=${SEED_SUPERADMIN_EMAIL:-admin@drivebook.localhost}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
-      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
-      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
-      - BREVO_API_KEY=${BREVO_API_KEY:-}
-      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
-      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-DriveBook}
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
-      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID:-}
+    environment: *app-env
     # service_started only: the app retries its DB connection itself.
     depends_on:
       db:
         condition: service_started
+    restart: unless-stopped
+
+  # Same Dockerfile, but the build stage: the standalone runner has no tsx or sources.
+  worker:
+    build:
+      context: .
+      target: build
+    command: ["npm", "run", "worker"]
+    user: node
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
