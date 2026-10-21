@@ -12,6 +12,7 @@ import {
   dealerSessions,
   dealerUsers,
   messageLog,
+  passwordResetRequests,
   plans,
 } from "@/db/schema";
 import { getTestDb, truncateAll } from "../setup/db";
@@ -214,7 +215,7 @@ describe("phase-1 schema", () => {
       SELECT table_name, column_name, is_nullable FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name IN (
         'dealer_users', 'backoffice_users', 'dealer_sessions', 'backoffice_sessions', 'auth_tokens',
-        'login_attempts', 'message_log', 'dev_outbox', 'audit_log')`);
+        'login_attempts', 'message_log', 'dev_outbox', 'audit_log', 'password_reset_requests')`);
     const columns = new Map(result.rows.map((r) => [`${r.table_name}.${r.column_name}`, r.is_nullable]));
     const expected: Record<string, "YES" | "NO"> = {
       "dealer_users.password_hash": "YES",
@@ -222,10 +223,12 @@ describe("phase-1 schema", () => {
       "dealer_users.totp_secret_enc": "YES",
       "dealer_users.totp_enabled_at": "YES",
       "dealer_users.last_login_at": "YES",
+      "dealer_users.totp_last_step": "YES",
       "backoffice_users.status": "NO",
       "backoffice_users.totp_secret_enc": "YES",
       "backoffice_users.totp_enabled_at": "YES",
       "backoffice_users.last_login_at": "YES",
+      "backoffice_users.totp_last_step": "YES",
       "dealer_sessions.token_hash": "NO",
       "dealer_sessions.user_id": "NO",
       "dealer_sessions.last_seen_at": "NO",
@@ -251,6 +254,10 @@ describe("phase-1 schema", () => {
       "audit_log.actor_id": "YES",
       "audit_log.action": "NO",
       "audit_log.data": "NO",
+      "password_reset_requests.id": "NO",
+      "password_reset_requests.surface": "NO",
+      "password_reset_requests.ip": "NO",
+      "password_reset_requests.created_at": "NO",
     };
     for (const [column, nullable] of Object.entries(expected)) {
       expect(columns.get(column), column).toBe(nullable);
@@ -259,14 +266,44 @@ describe("phase-1 schema", () => {
 
     const indexes = await db.execute<{ indexname: string }>(sql`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN (
-        'dealer_sessions', 'backoffice_sessions', 'login_attempts')`);
+        'dealer_sessions', 'backoffice_sessions', 'login_attempts', 'password_reset_requests')`);
     expect(indexes.rows.map((r) => r.indexname)).toEqual(
       expect.arrayContaining([
         "dealer_sessions_user_id_idx",
         "backoffice_sessions_user_id_idx",
         "login_attempts_surface_email_created_at_idx",
         "login_attempts_surface_ip_created_at_idx",
+        "password_reset_requests_surface_ip_created_at_idx",
       ]),
     );
+  });
+
+  it("stores totp_last_step as a nullable bigint on both user tables", async () => {
+    const result = await db.execute<{ table_name: string; data_type: string; column_default: string | null }>(sql`
+      SELECT table_name, data_type, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'totp_last_step' ORDER BY table_name`);
+    expect(result.rows).toEqual([
+      { table_name: "backoffice_users", data_type: "bigint", column_default: null },
+      { table_name: "dealer_users", data_type: "bigint", column_default: null },
+    ]);
+
+    const { dealer } = await insertDealer();
+    const [user] = await db
+      .insert(dealerUsers)
+      .values({ dealerId: dealer.id, email: "owner@avto-test.si", name: "Owner", role: "owner" })
+      .returning();
+    expect(user.totpLastStep).toBeNull();
+    const [admin] = await db
+      .insert(backofficeUsers)
+      .values({ email: "admin@drivebook.si", name: "Admin", role: "superadmin", totpLastStep: 59_000_000 })
+      .returning();
+    expect(admin.totpLastStep).toBe(59_000_000);
+  });
+
+  it("logs password reset requests per surface and ip without a dealer", async () => {
+    const [row] = await db.insert(passwordResetRequests).values({ surface: "backoffice", ip: "203.0.113.7" }).returning();
+    expect(row).toMatchObject({ surface: "backoffice", ip: "203.0.113.7" });
+    expect(row.createdAt).toBeInstanceOf(Date);
+    await expectPgError(db.execute(sql`INSERT INTO password_reset_requests (surface) VALUES ('dealer')`), "23502");
   });
 });

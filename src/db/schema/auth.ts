@@ -69,3 +69,14 @@ export const loginAttempts = pgTable(
     index("login_attempts_surface_ip_created_at_idx").on(t.surface, t.ip, t.createdAt),
   ],
 );
+
+export const passwordResetRequests = pgTable(
+  "password_reset_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    surface: authSurface("surface").notNull(),
+    ip: text("ip").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("password_reset_requests_surface_ip_created_at_idx").on(t.surface, t.ip, t.createdAt)],
+);
