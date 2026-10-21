@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { getConfig } from "@/lib/config";
-import { ljubljanaNow } from "@/lib/date";
+import { ljubljanaNow, slovenianWorkFreeDays } from "@/lib/date";
+import holidayNames from "../../messages/sl/holidays.json";
 import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL } from "./demo";
 import type { Db } from "./client";
 import {
@@ -10,7 +11,9 @@ import {
   dealerLicenceHistory,
   dealers,
   dealerSlugHistory,
+  dealerClosures,
   dealerUsers,
+  holidayOverrides,
   openingHours,
   plans,
 } from "./schema";
@@ -41,10 +44,25 @@ const OPENING_HOURS: { isoWeekday: number; opensAt: string; closesAt: string }[]
   { isoWeekday: 6, opensAt: "08:00", closesAt: "12:00" },
 ];
 
+export const DEMO_EMAIL = "info@demo.drivebook.localhost";
+export const DEMO_MAPS_URL = "https://maps.google.com/?q=Dunajska+cesta+100,+1000+Ljubljana";
+export const DEMO_SMS_SENDER_NAME = "AvtoDemo";
+export const DEMO_SALESPERSON_EMAIL = "prodaja@demo.drivebook.localhost";
+export const DEMO_CLOSURE_REASON = "Inventura";
+const DEMO_CLOSURE_OFFSET_DAYS = 30;
+const DEMO_CLOSURE_LENGTH_DAYS = 2;
+
+function addDays(dateISO: string, days: number): string {
+  const d = new Date(`${dateISO}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function runSeed(db: Db): Promise<void> {
   const { seedSuperadminEmail } = getConfig();
 
-  const validUntil = new Date(`${ljubljanaNow().dateISO}T00:00:00Z`);
+  const today = ljubljanaNow().dateISO;
+  const validUntil = new Date(`${today}T00:00:00Z`);
   validUntil.setUTCFullYear(validUntil.getUTCFullYear() + 1);
   const licenceValidUntil = validUntil.toISOString().slice(0, 10);
 
@@ -87,12 +105,37 @@ export async function runSeed(db: Db): Promise<void> {
 
     await tx.insert(bookingRules).values({ dealerId }).onConflictDoNothing({ target: bookingRules.dealerId });
 
+    // Only into an empty week: adding single ranges next to edited hours could overlap them.
+    const [hours] = await tx.select({ n: count() }).from(openingHours).where(eq(openingHours.dealerId, dealerId));
+    if (hours.n === 0) {
+      await tx.insert(openingHours).values(OPENING_HOURS.map((range) => ({ dealerId, ...range })));
+    }
+
+    const year = Number(today.slice(0, 4));
     await tx
-      .insert(openingHours)
-      .values(OPENING_HOURS.map((hours) => ({ dealerId, ...hours })))
-      .onConflictDoNothing({
-        target: [openingHours.dealerId, openingHours.isoWeekday, openingHours.opensAt],
+      .insert(holidayOverrides)
+      .values(
+        [...slovenianWorkFreeDays(year), ...slovenianWorkFreeDays(year + 1)].map((day) => ({
+          dealerId,
+          date: day.date,
+          key: day.key,
+          name: holidayNames[day.key as keyof typeof holidayNames],
+        })),
+      )
+      .onConflictDoNothing({ target: [holidayOverrides.dealerId, holidayOverrides.date] });
+
+    const [closures] = await tx
+      .select({ n: count() })
+      .from(dealerClosures)
+      .where(eq(dealerClosures.dealerId, dealerId));
+    if (closures.n === 0) {
+      await tx.insert(dealerClosures).values({
+        dealerId,
+        startDate: addDays(today, DEMO_CLOSURE_OFFSET_DAYS),
+        endDate: addDays(today, DEMO_CLOSURE_OFFSET_DAYS + DEMO_CLOSURE_LENGTH_DAYS - 1),
+        reason: DEMO_CLOSURE_REASON,
       });
+    }
 
     // No target: a car may collide on its fixed id or on (dealer_id, avto_net_url).
     await tx
@@ -182,7 +225,7 @@ export async function runSeed(db: Db): Promise<void> {
         },
         {
           dealerId,
-          email: "prodaja@demo.drivebook.localhost",
+          email: DEMO_SALESPERSON_EMAIL,
           name: "Luka Kovač",
           role: "salesperson",
           status: "active",
@@ -210,7 +253,7 @@ async function ensureDefaultPlan(tx: Tx): Promise<string> {
   return plan.id;
 }
 
-// Existing demo dealer rows are left as-is so edits made in the admin survive a re-seed.
+// Existing demo dealer values are kept so admin edits survive a re-seed; only empty settings are filled.
 async function upsertDemoDealer(tx: Tx, planId: string, licenceValidUntil: string): Promise<string> {
   await tx
     .insert(dealers)
@@ -222,16 +265,30 @@ async function upsertDemoDealer(tx: Tx, planId: string, licenceValidUntil: strin
       postalCode: "1000",
       city: "Ljubljana",
       phone: "+386 1 234 56 78",
-      email: "info@demo.drivebook.localhost",
+      email: DEMO_EMAIL,
       primaryColor: "#1F4FD8",
-      mapsUrl: null,
+      mapsUrl: DEMO_MAPS_URL,
       privacyUrl: null,
       logoKey: null,
+      smsSenderName: DEMO_SMS_SENDER_NAME,
       status: "active",
       planId,
       licenceValidUntil,
     })
     .onConflictDoNothing({ target: dealers.slug });
+  await tx
+    .update(dealers)
+    .set({
+      email: sql`coalesce(nullif(${dealers.email}, ''), ${DEMO_EMAIL})`,
+      mapsUrl: sql`coalesce(nullif(${dealers.mapsUrl}, ''), ${DEMO_MAPS_URL})`,
+      smsSenderName: sql`coalesce(nullif(${dealers.smsSenderName}, ''), ${DEMO_SMS_SENDER_NAME})`,
+    })
+    .where(
+      and(
+        eq(dealers.slug, DEMO_DEALER_SLUG),
+        sql`(${dealers.email} = '' OR coalesce(${dealers.mapsUrl}, '') = '' OR coalesce(${dealers.smsSenderName}, '') = '')`,
+      ),
+    );
   const [dealer] = await tx
     .select({ id: dealers.id })
     .from(dealers)

@@ -24,6 +24,8 @@ x-app-env: &app-env
   - NOTIFY_FAKE=${NOTIFY_FAKE:-}
   - PUBLIC_URL_SCHEME=${PUBLIC_URL_SCHEME:-http}
   - PUBLIC_URL_PORT=${PUBLIC_URL_PORT:-3000}
+  # Only web mounts the storage volume; the worker never touches uploads.
+  - STORAGE_DIR=${STORAGE_DIR:-/data/storage}
 
 services:
   web:
@@ -31,6 +33,8 @@ services:
     ports:
       - "3000:3000"
     environment: *app-env
+    volumes:
+      - storage:/data/storage
     # service_started only: the app retries its DB connection itself.
     depends_on:
       db:
@@ -72,3 +76,4 @@ services:
 
 volumes:
   db-data:
+  storage:

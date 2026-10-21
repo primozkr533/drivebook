@@ -19,6 +19,7 @@ export type Config = {
   notifyFake: boolean;
   publicUrlScheme: "http" | "https";
   publicUrlPort: string | null;
+  storageDir: string;
   providers: {
     sms: "twilio" | "console";
     email: "brevo" | "console";
@@ -67,6 +68,7 @@ const DEFAULT_BASE_DOMAIN = "drivebook.localhost";
 const DEFAULT_DATABASE_URL = "postgres://drivebook:drivebook@localhost:5432/drivebook";
 const DEFAULT_TEST_DATABASE_URL = "postgres://drivebook:drivebook@localhost:5432/drivebook_test";
 const DEFAULT_SUPERADMIN_EMAIL = "admin@drivebook.localhost";
+const DEFAULT_STORAGE_DIR = "./data/storage";
 const DEFAULT_BREVO_SENDER_NAME = "DriveBook";
 const DEV_AUTH_SECRET = "drivebook-dev-auth-secret-not-for-production";
 const MIN_AUTH_SECRET_LENGTH = 32;
@@ -178,6 +180,7 @@ function buildConfig(env: Env): Config {
     notifyFake: readFlag(env, "NOTIFY_FAKE"),
     publicUrlScheme: readScheme(env),
     publicUrlPort: readPort(env),
+    storageDir: read(env, "STORAGE_DIR") ?? DEFAULT_STORAGE_DIR,
     providers: {
       sms: twilio ? "twilio" : "console",
       email: brevo ? "brevo" : "console",

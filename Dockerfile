@@ -18,6 +18,8 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 RUN addgroup -S app && adduser -S app -G app
+# A new named volume copies this ownership; without it the mount is root-owned and uploads fail.
+RUN mkdir -p /data/storage && chown app:app /data/storage
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public

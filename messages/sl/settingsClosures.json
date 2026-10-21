@@ -1,0 +1,39 @@
+{
+  "holidays": {
+    "title": "Prazniki",
+    "description": "Ob praznikih je salon zaprt. Če boste na posamezen praznik vseeno odprti, to označite tukaj.",
+    "year": "Leto {year}",
+    "empty": "Za to leto ni praznikov.",
+    "unnamed": "Praznik",
+    "openAnyway": "Odprto kljub prazniku",
+    "openAnywayHint": "Ta dan veljajo običajne ure delovnega časa."
+  },
+  "closures": {
+    "title": "Zaprti dnevi",
+    "description": "Dopust, inventura ali drug dan, ko salon ni odprt. Za en sam dan pustite končni datum prazen.",
+    "fields": {
+      "startDate": "Od",
+      "endDate": "Do (neobvezno)",
+      "reason": "Razlog (neobvezno)"
+    },
+    "reasonPlaceholder": "npr. kolektivni dopust",
+    "submit": "Dodaj zaprti dan",
+    "added": "Zaprti dan je dodan.",
+    "upcoming": "Prihajajoča zaprtja",
+    "empty": "Ni prihajajočih zaprtij.",
+    "range": "{start} – {end}",
+    "noReason": "Brez razloga",
+    "delete": "Odstrani",
+    "deleteLabel": "Odstrani zaprtje {dates}"
+  },
+  "errors": {
+    "required": "Vnesite datum.",
+    "invalid_date": "Datum ni veljaven.",
+    "in_past": "Datum ne sme biti v preteklosti.",
+    "end_before_start": "Končni datum ne sme biti pred začetnim.",
+    "too_long": "Zaprtje je lahko dolgo največ {maxDays} dni.",
+    "reasonTooLong": "Razlog je lahko dolg največ {max} znakov.",
+    "forbidden": "Za to spremembo nimate pravic.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}

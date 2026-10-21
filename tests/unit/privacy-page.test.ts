@@ -41,8 +41,8 @@ const demo: PublicDealer = {
   phone: "+386 1 234 56 78",
   email: "info@demo.drivebook.localhost",
   websiteUrl: null,
-  mapsUrl: null,
-  privacyUrl: null,
+  googleMapsUrl: null,
+  privacyPolicyUrl: null,
   primaryColor: "#E4572E",
   logoUrl: null,
   status: "active",
@@ -130,7 +130,7 @@ describe("privacy page", () => {
   });
 
   it("redirects to the dealer's own privacy URL", async () => {
-    resolveDealerSlug.mockResolvedValue(current({ ...demo, privacyUrl: "https://avto.example/zasebnost" }));
+    resolveDealerSlug.mockResolvedValue(current({ ...demo, privacyPolicyUrl: "https://avto.example/zasebnost" }));
     await expect(render("demo")).rejects.toThrow("NEXT_REDIRECT https://avto.example/zasebnost");
   });
 

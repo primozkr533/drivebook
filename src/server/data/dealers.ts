@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { dealers, dealerSlugHistory } from "@/db/schema";
 import { isReservedSlug } from "@/lib/config";
+import { getStorage } from "@/server/storage";
 import { createDealerContext, type DealerContext, type DealerStatus } from "./context";
 import { db } from "./db";
 
@@ -13,8 +14,8 @@ export type PublicDealer = {
   phone: string;
   email: string;
   websiteUrl: string | null;
-  mapsUrl: string | null;
-  privacyUrl: string | null;
+  googleMapsUrl: string | null;
+  privacyPolicyUrl: string | null;
   primaryColor: string;
   logoUrl: string | null;
   status: DealerStatus;
@@ -43,11 +44,10 @@ export async function resolveDealerSlug(slug: string): Promise<ResolvedDealerSlu
         phone: dealer.phone,
         email: dealer.email,
         websiteUrl: dealer.websiteUrl,
-        mapsUrl: dealer.mapsUrl,
-        privacyUrl: dealer.privacyUrl,
+        googleMapsUrl: dealer.mapsUrl,
+        privacyPolicyUrl: dealer.privacyUrl,
         primaryColor: dealer.primaryColor,
-        // File storage is not wired yet, so a stored logo_key has no public URL.
-        logoUrl: null,
+        logoUrl: dealer.logoKey ? getStorage().url(dealer.logoKey) : null,
         status: dealer.status,
       },
     };

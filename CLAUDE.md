@@ -35,10 +35,14 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/db/` — schema (`src/db/schema/`), client, migrate, seed, `newPublicId` (`src/db/ids.ts`)
 - `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
 - `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
+- `src/server/data/settings-dealer.ts`, `src/server/data/settings-branding.ts`, `src/server/data/settings-booking.ts`, `src/server/data/settings-hours.ts`, `src/server/data/dealer-users.ts` — Owner-only settings services (every function calls `requireDealerRole(ctx, ['owner'])` first)
+- `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getClosedDatesBetween` (shared with the phase-2 slot engine)
+- `src/app/dealer-admin/(app)/settings/*` (`src/app/dealer-admin/(app)/settings/`) and `src/app/dealer-admin/(app)/users` — Owner settings and users pages, gated by `requireOwnerPage()` in `src/app/dealer-admin/(app)/owner-gate.tsx`
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
 - `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
+- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by the files route (`src/app/api/files/[...key]/route.ts`, see `## API Contract`)
 - `src/app/site/[slug]/` — public dealer site
 - `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
 - `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
@@ -62,6 +66,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `NOTIFY_FAKE` — `1` forces the fake SMS/e-mail adapters even when provider keys are present
 - `PUBLIC_URL_SCHEME` — `https` (default) or `http` (dev); scheme for absolute links in e-mails
 - `PUBLIC_URL_PORT` — optional port appended to absolute links (`3000` in dev, empty in production)
+- `STORAGE_DIR` — directory for uploaded files (dealer logos); a Docker volume at /data/storage in compose, `./data/storage` by default
 - `TWILIO_ACCOUNT_SID` — Twilio account SID for SMS
 - `TWILIO_AUTH_TOKEN` — Twilio auth token
 - `TWILIO_FROM_NUMBER` — Twilio sender number (E.164)
@@ -78,6 +83,11 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
   - Response 200 JSON: `{ "ok": true, "user": { "email": string, "role": "owner" }, "dealerSlug": string, "redirect": string }`. `redirect` is the dealer admin home for the request host (`/` on `app.` hosts, `/_dev/app` on non-dealer dev hosts).
   - Sets the normal dealer session cookie `db_app_session` (httpOnly, Secure, SameSite=Lax, host-only) via `createSession` + `setSessionCookie` from `src/server/auth/session.ts`. Exception: with dev aliases on (never in production), a plain-http request on a host other than `localhost`/`*.localhost` (e.g. `http://web:3000`) gets the cookie without `Secure`, since browsers drop Secure cookies set over http there (`sessionCookieSecure` in `src/server/routing.ts`; the login form follows the same rule).
   - Is not available on dealer subdomain hosts (404).
+- `GET /api/files/{key}` (key = slash-separated storage key, e.g. `logos/abc123.png`)
+  - 200: body = the file bytes; headers `Content-Type` (stored type), `Content-Length`, `Cache-Control: public, max-age=31536000, immutable` (keys are unique per upload and never reused), `ETag` and `X-Content-Type-Options: nosniff`. For `image/svg+xml` also send `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`.
+  - 304 when `If-None-Match` matches the ETag.
+  - 404 for an invalid key (traversal etc.) or a missing file.
+  - `HEAD` is supported with the same headers and no body; other methods are not defined.
 
 ## Tenant isolation
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
@@ -94,6 +104,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
 - `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the surface home in the `(app)` route group, whose layout redirects to `/login` without a session; login and password pages stay outside `(app)`; the proxy always sets `x-drivebook-base-path` there — empty on `app.`/`admin.`, `/_dev/app` / `/_dev/admin` under the dev aliases — read via `getSurfaceBasePath()`)
 - `/api/test/login` passes through untouched on `app.` and non-dealer hosts (dealer and `admin.` hosts 404 it)
+- `/api/files/*` passes through untouched on every host, including dealer subdomains
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
@@ -147,3 +158,9 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Holiday names are not hardcoded: `slovenianWorkFreeDays` (`src/lib/date.ts`) returns stable `key`s, and the Slovenian name comes from `messages/sl/holidays.json` by key.
 - Public pages never render empty dealer contact data: every public page that shows the address or phone (dealer page, privacy page, and any later one) builds the address with `dealerAddress()` and switches to a translation variant without the address/phone when it is empty.
 - A dealer's `legalName` starts equal to `name` (set by `createDealer`). The back-office rename (`updateDealer`) keeps `legalName` in step with `name` only while the two are still equal; once `legalName` differs it is never overwritten by a rename.
+- Settings and Users pages and their server actions are Owner-only: Salespeople don't see the nav items, the pages render access denied, and actions are refused on the server.
+- Dealer user invites, reactivations and plan limits: invited + active users count toward the plan's max users; deactivated users don't. The last active Owner can't be demoted or deactivated. Inviting the e-mail of a deactivated user of the same dealer re-invites that row.
+- By-id dealer operations (users, closures, holidays) return not-found (HTTP 404) for ids of another dealer, never forbidden.
+- Uploaded files use unique keys (`logos/<publicId>.<ext>`) and are served with `Cache-Control: public, max-age=31536000, immutable`; replacing a logo deletes the old file after commit. The logo type is detected from content; unsafe SVGs are rejected, and SVGs are served with a sandbox CSP.
+- `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
+- The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.

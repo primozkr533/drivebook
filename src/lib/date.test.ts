@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   TIME_ZONE,
+  addDays,
+  daysBetween,
+  isValidDateISO,
+  isoWeekday,
   WEEKDAY_SHORT_SL,
   easterSunday,
   formatDate,
@@ -161,5 +165,47 @@ describe("Slovenian work-free days", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("plain date helpers", () => {
+  it("addDays crosses month, year and leap-day boundaries", () => {
+    expect(addDays("2026-10-21", 1)).toBe("2026-10-22");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDays("2027-02-28", 1)).toBe("2027-03-01");
+    expect(addDays("2026-01-01", -1)).toBe("2025-12-31");
+    expect(addDays("2026-05-05", 0)).toBe("2026-05-05");
+  });
+
+  it("addDays keeps whole days across both DST changes", () => {
+    expect(addDays("2026-03-28", 1)).toBe("2026-03-29");
+    expect(addDays("2026-03-29", 1)).toBe("2026-03-30");
+    expect(addDays("2026-10-24", 1)).toBe("2026-10-25");
+    expect(addDays("2026-10-25", 1)).toBe("2026-10-26");
+    expect(addDays("2026-03-22", 14)).toBe("2026-04-05");
+  });
+
+  it("daysBetween counts calendar days, also across DST", () => {
+    expect(daysBetween("2026-03-28", "2026-03-30")).toBe(2);
+    expect(daysBetween("2026-10-24", "2026-10-26")).toBe(2);
+    expect(daysBetween("2026-01-01", "2026-12-31")).toBe(364);
+    expect(daysBetween("2026-01-02", "2026-01-01")).toBe(-1);
+  });
+
+  it("isoWeekday maps Monday to 1 and Sunday to 7", () => {
+    expect(isoWeekday("2026-10-19")).toBe(1);
+    expect(isoWeekday("2026-10-22")).toBe(4);
+    expect(isoWeekday("2026-10-25")).toBe(7);
+    expect(isoWeekday("2026-03-29")).toBe(7);
+  });
+
+  it("rejects malformed and impossible dates", () => {
+    expect(isValidDateISO("2026-02-28")).toBe(true);
+    expect(isValidDateISO("2026-02-30")).toBe(false);
+    expect(isValidDateISO("2026-13-01")).toBe(false);
+    expect(isValidDateISO("26-1-1")).toBe(false);
+    expect(() => addDays("2026-02-30", 1)).toThrow("Invalid date");
+    expect(() => isoWeekday("nope")).toThrow("Invalid date");
   });
 });

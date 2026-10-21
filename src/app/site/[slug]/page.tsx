@@ -5,7 +5,8 @@ import { getTranslations } from "next-intl/server";
 import { CarCard, HoursStrip } from "@/components/signature";
 import { ButtonLink, Card, CardHeader, Container, Grid, Heading, Shell, Stack, Text } from "@/components/ui";
 import { brandStyle } from "@/lib/color";
-import { ljubljanaNow } from "@/lib/date";
+import { addDays, ljubljanaNow } from "@/lib/date";
+import { getClosedDatesBetween, isDealerClosed } from "@/server/data/availability";
 import { listActiveCars } from "@/server/data/cars";
 import { resolveDealerSlug } from "@/server/data/dealers";
 import { listOpeningHours } from "@/server/data/hours";
@@ -30,18 +31,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function DealerPage({ params, searchParams }: Props) {
-  const [{ slug }, query, h, t] = await Promise.all([params, searchParams, headers(), getTranslations("dealerPage")]);
+  const [{ slug }, query, h, t, holidayT] = await Promise.all([
+    params,
+    searchParams,
+    headers(),
+    getTranslations("dealerPage"),
+    getTranslations("holidays"),
+  ]);
   const { ctx, dealer } = await loadDealer(slug);
   const suspended = dealer.status === "suspended";
-  const [hours, cars] = await Promise.all([listOpeningHours(ctx), suspended ? [] : listActiveCars(ctx)]);
+  const now = ljubljanaNow();
+  const [hours, cars, todayClosed, upcoming] = await Promise.all([
+    listOpeningHours(ctx),
+    suspended ? [] : listActiveCars(ctx),
+    isDealerClosed(ctx, now.dateISO),
+    getClosedDatesBetween(ctx, now.dateISO, addDays(now.dateISO, 14)),
+  ]);
 
   const model = buildDealerPageModel({
     dealer,
     cars,
     hours,
-    now: ljubljanaNow(),
+    now,
     carParam: query.car,
     basePath: h.get("x-drivebook-base-path") ?? "",
+    closures: { today: todayClosed, upcoming },
+    holidayName: (key) => holidayT(key),
   });
 
   const carLabels = { selected: t("carSelected"), listing: t("carListing"), inactive: t("carInactive") };
@@ -51,12 +66,16 @@ export default async function DealerPage({ params, searchParams }: Props) {
       <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
       <Container className="flex flex-col gap-6 pb-6 pt-8 md:flex-row md:items-end md:justify-between">
         <div className="flex items-center gap-4">
-          {dealer.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={dealer.logoUrl} alt="" className="size-16 shrink-0 object-contain" />
-          )}
           <div className="min-w-0">
-            <Heading size="d1">{dealer.name}</Heading>
+            <Heading size="d1">
+              {dealer.logoUrl ? (
+                // The stored-file URL is app-relative and served on every host, so no base-path prefix.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={dealer.logoUrl} alt={dealer.name} className="h-16 w-auto max-w-full object-contain" />
+              ) : (
+                dealer.name
+              )}
+            </Heading>
             {model.address && (
               <address className="mt-1 not-italic">
                 {model.address.line && <Text>{model.address.line}</Text>}
@@ -65,11 +84,16 @@ export default async function DealerPage({ params, searchParams }: Props) {
             )}
           </div>
         </div>
-        {(model.telHref || model.mapsHref) && (
+        {(model.telHref || model.emailHref || model.mapsHref) && (
           <div className="flex flex-wrap items-center gap-3">
             {model.telHref && (
               <ButtonLink href={model.telHref} variant="brand">
                 {t("call")} <span className="tabular">{model.phone}</span>
+              </ButtonLink>
+            )}
+            {model.emailHref && (
+              <ButtonLink href={model.emailHref} variant="quiet">
+                {model.email}
               </ButtonLink>
             )}
             {model.mapsHref && (
@@ -142,6 +166,21 @@ export default async function DealerPage({ params, searchParams }: Props) {
                 <CardHeader title={t("openingHours")} />
                 <HoursStrip days={model.days} today={model.today} nowMin={model.nowMin} closedLabel={t("closed")} compact />
               </Card>
+              {model.closedDates.length > 0 && (
+                <Card>
+                  <CardHeader title={t("closedDatesTitle")} />
+                  <ul className="flex flex-col" data-testid="closed-dates">
+                    {model.closedDates.map((c) => (
+                      <li key={c.date} className="flex justify-between gap-3 border-t border-line py-2">
+                        <span className="font-mono text-code tabular text-ink">{c.date}</span>
+                        <Text size="small" tone="muted" className="text-right">
+                          {c.label ?? t("closed")}
+                        </Text>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
             </aside>
           </Grid>
         </Container>

@@ -4,6 +4,7 @@ import { dealers, dealerSlugHistory, plans } from "@/db/schema";
 import { setDbForTests } from "@/server/data/db";
 import { resolveDealerSlug, type ResolvedDealerSlug } from "@/server/data/dealers";
 import {
+  FILES_PATH_PREFIX,
   NOT_FOUND_PATH,
   requestHost,
   routeRequest,
@@ -162,6 +163,41 @@ describe("routeRequest: 404s and isolation", () => {
       location: "/backoffice/login",
     });
     expect(cfg.resolveSlug).not.toHaveBeenCalled();
+  });
+});
+
+describe("routeRequest: stored files", () => {
+  const file = `${FILES_PATH_PREFIX}logos/abc123.png`;
+
+  it("passes /api/files/* through untouched on every host", async () => {
+    for (const host of [
+      "demo.drivebook.localhost",
+      "demo.drivebook.localhost:3000",
+      "app.drivebook.localhost",
+      "admin.drivebook.localhost",
+      "localhost:3000",
+      "web:3000",
+      "drivebook.localhost",
+    ]) {
+      for (const devAliases of [true, false]) {
+        const cfg = config({ devAliases });
+        expect(await route(host, file, cfg)).toEqual({ kind: "next" });
+        expect(await route(host, `${FILES_PATH_PREFIX}logos/abc123?v=1`, cfg)).toEqual({ kind: "next" });
+      }
+    }
+  });
+
+  it("does not resolve the dealer slug for a file request", async () => {
+    const cfg = config();
+    await route("demo.drivebook.localhost", file, cfg);
+    expect(cfg.resolveSlug).not.toHaveBeenCalled();
+  });
+
+  it("keeps routing other /api paths on dealer hosts to the site", async () => {
+    expect(await route("demo.drivebook.localhost", path("api", "filesx", "a.png"))).toMatchObject({
+      kind: "rewrite",
+      pathname: "/site/demo/api/filesx/a.png",
+    });
   });
 });
 

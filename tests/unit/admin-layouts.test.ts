@@ -1,8 +1,9 @@
 import { createElement, type ReactNode } from "react";
 import { prerender } from "react-dom/static";
-import { createTranslator } from "next-intl";
+import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "./i18n";
+import { addDays, formatIsoDate, ljubljanaNow } from "@/lib/date";
 import DealerAppLayout from "@/app/dealer-admin/(app)/layout";
 import DealerHomePage from "@/app/dealer-admin/(app)/page";
 import DealerAccountPage from "@/app/dealer-admin/(app)/account/page";
@@ -15,10 +16,31 @@ import BackofficePlansPage from "@/app/backoffice/(app)/plans/page";
 import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
+import { requireOwnerPage } from "@/app/dealer-admin/(app)/owner-gate";
+import { BOOKING_RULE_DEFAULTS } from "@/server/data/settings-booking";
+import SettingsLayout from "@/app/dealer-admin/(app)/settings/layout";
+import SettingsHomePage from "@/app/dealer-admin/(app)/settings/page";
+import SettingsDealerPage from "@/app/dealer-admin/(app)/settings/dealer/page";
+import SettingsBrandingPage from "@/app/dealer-admin/(app)/settings/branding/page";
+import SettingsBookingPage from "@/app/dealer-admin/(app)/settings/booking/page";
+import SettingsHoursPage from "@/app/dealer-admin/(app)/settings/hours/page";
+import SettingsClosuresPage from "@/app/dealer-admin/(app)/settings/closures/page";
+import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice") => {
+  getTranslations: async (
+    namespace:
+      | "auth"
+      | "account"
+      | "backoffice"
+      | "settings"
+      | "settingsBooking"
+      | "settingsDealer"
+      | "settingsClosures"
+      | "holidays"
+      | "dealerUsers",
+  ) => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -34,6 +56,13 @@ const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(),
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
+  getOpeningHours: vi.fn(),
+  getBranding: vi.fn(),
+  getBookingRules: vi.fn(),
+  getDealerSettings: vi.fn(),
+  listDealerUsers: vi.fn(),
+  listHolidays: vi.fn(),
+  listClosures: vi.fn(),
   pathname: "/",
 }));
 
@@ -56,7 +85,28 @@ vi.mock("@/server/auth/session", () => ({
 vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
+vi.mock("@/server/data/settings-dealer", () => ({
+  getDealerSettings: mocks.getDealerSettings,
+  updateDealerProfile: vi.fn(),
+  updateSmsSettings: vi.fn(),
+}));
+vi.mock("@/server/data/dealer-users", () => ({
+  listDealerUsers: mocks.listDealerUsers,
+  inviteDealerUser: vi.fn(),
+  changeDealerUserRole: vi.fn(),
+  deactivateDealerUser: vi.fn(),
+  reactivateDealerUser: vi.fn(),
+}));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
+vi.mock("@/server/data/settings-hours", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-hours")>()),
+  getOpeningHours: mocks.getOpeningHours,
+  listHolidays: mocks.listHolidays,
+  listClosures: mocks.listClosures,
+}));
+vi.mock("@/server/data/settings-branding", () => ({ getBranding: mocks.getBranding, MAX_LOGO_BYTES: 2 * 1024 * 1024 }));
+vi.mock("@/app/dealer-admin/(app)/settings/branding/actions", () => ({ saveLogoAction: vi.fn(), savePrimaryColorAction: vi.fn() }));
+vi.mock("@/app/dealer-admin/(app)/settings/hours/actions", () => ({ saveOpeningHoursAction: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
   getPlan: mocks.getPlan,
@@ -65,11 +115,17 @@ vi.mock("@/server/data/backoffice/plans", () => ({
   deletePlan: vi.fn(),
   DEFAULT_MONTHLY_SMS_QUOTA: 300,
 }));
+vi.mock("@/server/data/settings-booking", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-booking")>()),
+  getBookingRules: mocks.getBookingRules,
+}));
 vi.mock("@/server/data/backoffice/users", () => ({
   listBackofficeUsers: mocks.listBackofficeUsers,
   inviteBackofficeUser: vi.fn(),
   deactivateBackofficeUser: vi.fn(),
 }));
+
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 
 const ctx = { dealerId: "dealer-1", slug: "demo", status: "active" };
 
@@ -79,6 +135,8 @@ beforeEach(() => {
   mocks.backofficeSession = null;
   mocks.pathname = "/";
   vi.clearAllMocks();
+  mocks.listHolidays.mockResolvedValue([]);
+  mocks.listClosures.mockResolvedValue([]);
 });
 
 async function render(node: ReactNode) {
@@ -461,5 +519,274 @@ describe("backoffice users", () => {
     mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
     expect(await redirectOf(render(createElement(BackofficeUsersPage)))).toBe("/_dev/admin/login");
     expect(mocks.listBackofficeUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("dealer settings shell", () => {
+  const settingsT = messages.settings;
+  const owner = { id: "u1", email: "lastnik@demo.si", role: "owner" };
+  const salesperson = { id: "u3", email: "prodajalec@demo.si", role: "salesperson" };
+  const signInAs = (user: typeof owner, basePath = "/_dev/app") => {
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS });
+    mocks.dealerSession = { ctx, user, sessionId: "s1" };
+    mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
+    mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
+  };
+  const sections = ["dealer", "branding", "booking", "hours", "closures"] as const;
+  const stubSections = ["branding", "booking", "hours", "closures"] as const;
+  const stubPages = [SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
+  const navLink = (href: string, label: string) => new RegExp(`<a[^>]*href="${href}"[^>]*>${label}</a>`, "g");
+
+  it("requireOwnerPage returns the session for an Owner and denies a Salesperson of the same dealer", async () => {
+    signInAs(owner);
+    expect(await requireOwnerPage()).toEqual({ ok: true, ctx, user: owner });
+    signInAs(salesperson);
+    expect(await requireOwnerPage()).toEqual({ ok: false });
+  });
+
+  it("requireOwnerPage redirects to the login page without a session", async () => {
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/app" });
+    expect(await redirectOf(requireOwnerPage())).toBe("/_dev/app/login");
+  });
+
+  it.each(["", "/_dev/app"])("shows Settings and Users in the inline nav and the compact menu for an Owner (base path %j)", async (basePath) => {
+    signInAs(owner, basePath);
+    const html = await render(createElement(DealerAppLayout, { children: child }));
+    expect(html.match(navLink(`${basePath}/settings`, settingsT.nav))).toHaveLength(2);
+    expect(html.match(navLink(`${basePath}/users`, settingsT.usersNav))).toHaveLength(2);
+  });
+
+  it("hides Settings and Users from a Salesperson", async () => {
+    signInAs(salesperson);
+    const html = await render(createElement(DealerAppLayout, { children: child }));
+    expect(html).not.toContain(`>${settingsT.nav}</a>`);
+    expect(html).not.toContain(`>${settingsT.usersNav}</a>`);
+    expect(html.match(navLink("/_dev/app/account", messages.account.navAccount))).toHaveLength(2);
+  });
+
+  it.each([
+    ["settings", ["", "settings", "hours"].join("/")],
+    ["users", ["", "users"].join("/")],
+  ])("marks the %s nav item active", async (item, path) => {
+    signInAs(owner);
+    mocks.pathname = `/_dev/app${path}`;
+    const label = item === "users" ? settingsT.usersNav : settingsT.nav;
+    const links = (await render(createElement(DealerAppLayout, { children: child }))).match(navLink(`/_dev/app/${item}`, label)) ?? [];
+    expect(links).toHaveLength(2);
+    for (const a of links) expect(a).toContain('aria-current="page"');
+  });
+
+  it("renders the settings header and sub-nav with the current section active for an Owner", async () => {
+    signInAs(owner);
+    mocks.pathname = "/_dev/app/settings/booking";
+    const html = await render(createElement(SettingsLayout, { children: child }));
+    expect(html).toContain(`>${settingsT.title}</h1>`);
+    expect(html).toContain('data-testid="child"');
+    for (const section of sections) {
+      const links = html.match(new RegExp(`<a[^>]*href="/_dev/app/settings/${section}"[^>]*>`, "g")) ?? [];
+      expect(links).toHaveLength(1);
+      expect(html).toContain(settingsT.sections[section]);
+      if (section === "booking") expect(links[0]).toContain('aria-current="page"');
+      else expect(links[0]).not.toContain("aria-current");
+    }
+  });
+
+  it("denies a Salesperson in the settings layout without rendering the children", async () => {
+    signInAs(salesperson);
+    const html = await render(createElement(SettingsLayout, { children: child }));
+    expect(html).toContain('data-testid="access-denied"');
+    expect(html).toContain(settingsT.accessDenied.title);
+    expect(html).not.toContain('data-testid="child"');
+    expect(html).not.toContain('data-testid="settings-nav"');
+    expect(html).not.toContain(settingsT.title + "</h1>");
+  });
+
+  it.each(["", "/_dev/app"])("redirects the settings home to the dealer section (base path %j)", async (basePath) => {
+    signInAs(owner, basePath);
+    expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
+  });
+
+  it("renders every remaining settings page for an Owner and access denied for a Salesperson", async () => {
+    const testIds: Record<(typeof stubSections)[number], string> = {
+      branding: "settings-branding",
+      booking: "settings-booking",
+      hours: "hours-editor",
+      closures: "settings-closures",
+    };
+    mocks.getOpeningHours.mockResolvedValue({ 1: [{ opens: "08:00", closes: "12:00" }], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] });
+    mocks.getBranding.mockResolvedValue({ primaryColor: "#E4572E", logoUrl: "/api/files/logos/abc.png" });
+    const renderPage = async (Page: (typeof stubPages)[number]) =>
+      render(createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: await Page() }));
+    for (const [i, Page] of stubPages.entries()) {
+      signInAs(owner);
+      const html = await renderPage(Page);
+      expect(html).toContain(`data-testid="${testIds[stubSections[i]]}"`);
+      expect(html).not.toContain("access-denied");
+
+      signInAs(salesperson);
+      const calls = mocks.getOpeningHours.mock.calls.length;
+      const denied = await renderPage(Page);
+      expect(denied).toContain('data-testid="access-denied"');
+      expect(denied).not.toContain(testIds[stubSections[i]]);
+      expect(mocks.getOpeningHours.mock.calls.length).toBe(calls);
+    }
+    signInAs(salesperson);
+    expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
+  });
+
+  it("renders the dealer data and SMS forms for an Owner and access denied for a Salesperson", async () => {
+    const t = messages.settingsDealer;
+    mocks.getDealerSettings.mockResolvedValue({
+      name: "Avto Demo d.o.o.",
+      addressLine: "Dunajska 1",
+      postalCode: "1000",
+      city: "Ljubljana",
+      phone: "+38611234567",
+      email: "info@demo.si",
+      googleMapsUrl: null,
+      privacyPolicyUrl: null,
+      smsSenderName: null,
+      effectiveSmsSenderName: "Avto Demo d",
+      smsNotificationsEnabled: true,
+      notificationPhone: "+38641555218",
+    });
+    signInAs(owner);
+    const page = await SettingsDealerPage();
+    const html = await render(
+      createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: page }),
+    );
+    expect(mocks.getDealerSettings).toHaveBeenCalledWith(ctx);
+    expect(html).toContain('class="grid grid-cols-1 lg:grid-cols-2');
+    for (const text of [t.profile.title, t.sms.title, t.profile.fields.googleMapsUrl, t.sms.fields.smsSenderName, ">0/11<"]) {
+      expect(html).toContain(text);
+    }
+    for (const field of ["name", "addressLine", "postalCode", "city", "phone", "email", "googleMapsUrl", "privacyPolicyUrl",
+      "smsSenderName", "smsNotificationsEnabled", "notificationPhone"]) {
+      expect(html).toContain(`name="${field}"`);
+    }
+    expect(html).toContain('placeholder="Avto Demo d"');
+    expect(html).toContain('value="info@demo.si"');
+    expect(html).toMatch(/name="smsNotificationsEnabled"[^>]*checked/);
+
+    signInAs(salesperson);
+    mocks.getDealerSettings.mockClear();
+    const denied = await render(createElement(SettingsDealerPage));
+    expect(denied).toContain('data-testid="access-denied"');
+    expect(denied).not.toContain("settings-dealer-profile");
+    expect(mocks.getDealerSettings).not.toHaveBeenCalled();
+  });
+
+  it("renders holidays per year with translated names and upcoming closures with their reason", async () => {
+    signInAs(owner);
+    const year = Number(ljubljanaNow().dateISO.slice(0, 4));
+    const today = ljubljanaNow().dateISO;
+    mocks.listHolidays.mockResolvedValue([
+      { id: "h1", date: `${year}-12-25`, key: "christmas", year, openAnyway: false },
+      { id: "h2", date: `${year + 1}-12-25`, key: "christmas", year: year + 1, openAnyway: true },
+      { id: "h3", date: `${year + 1}-06-25`, key: "statehood", year: year + 1, openAnyway: false },
+    ]);
+    mocks.listClosures.mockResolvedValue([
+      { id: "old", startDate: addDays(today, -10), endDate: addDays(today, -9), reason: "Preteklo" },
+      { id: "c1", startDate: addDays(today, 3), endDate: addDays(today, 3), reason: null },
+      { id: "c2", startDate: addDays(today, 5), endDate: addDays(today, 9), reason: "Inventura" },
+    ]);
+    const html = await render(createElement(SettingsClosuresPage));
+    const t = messages.settingsClosures;
+
+    const thisYear = html.slice(html.indexOf(`data-testid="holidays-${year}"`), html.indexOf(`data-testid="holidays-${year + 1}"`));
+    const nextYear = html.slice(html.indexOf(`data-testid="holidays-${year + 1}"`));
+    expect(thisYear).toContain(`25. 12. ${year}`);
+    expect(thisYear).toContain(messages.holidays.christmas);
+    expect(thisYear).not.toContain(messages.holidays.statehood);
+    expect(nextYear).toContain(messages.holidays.statehood);
+    expect(html).toMatch(/data-testid="holiday-open-h2"[^>]*checked|checked=""[^>]*data-testid="holiday-open-h2"/);
+    expect(html).not.toMatch(/checked=""[^>]*data-testid="holiday-open-h1"/);
+    expect(html.match(new RegExp(t.holidays.openAnyway, "g"))).toHaveLength(3);
+    expect(html).toContain("md:grid-cols-2");
+
+    for (const field of ["startDate", "endDate", "reason"]) expect(html).toContain(`name="${field}"`);
+    expect(html).toContain(t.closures.noReason);
+    expect(html).toContain("Inventura");
+    expect(html).toContain(`${formatIsoDate(addDays(today, 5))} – ${formatIsoDate(addDays(today, 9))}`);
+    expect(html).toContain('data-testid="closure-delete-c1"');
+    expect(html).not.toContain("Preteklo");
+    expect(mocks.listHolidays).toHaveBeenCalledWith(ctx);
+  });
+
+  const usersT = messages.dealerUsers;
+  const userList = (maxUsers: number | null, used = 2) => ({
+    maxUsers,
+    used,
+    users: [
+      { id: "u1", name: "Ana Lastnik", email: "lastnik@demo.si", role: "owner", status: "active", lastLoginAt: new Date("2026-10-01T08:05:00Z") },
+      { id: "u4", name: "Bor Prodaja", email: "bor@demo.si", role: "salesperson", status: "deactivated", lastLoginAt: null },
+    ],
+  });
+
+  it("lists the dealer's users with usage, role, status, Ljubljana last login and per-user actions for an Owner", async () => {
+    signInAs(owner);
+    mocks.listDealerUsers.mockResolvedValue(userList(5));
+    const html = await render(createElement(DealerUsersPage, { searchParams: Promise.resolve({}) }));
+    expect(html).toContain(`>${usersT.title}</h1>`);
+    expect(html).toMatch(/data-testid="dealer-users-usage"[^>]*>2 \/ 5</);
+    expect(html).toContain('data-testid="dealer-users-table"');
+    expect(html).toContain('data-testid="dealer-users-cards"');
+    expect(html).toContain("Ana Lastnik");
+    expect(html).toContain(usersT.roles.owner);
+    expect(html).toContain(usersT.statuses.deactivated);
+    expect(html).toContain("1. 10. 2026 10:05");
+    expect(html).toContain(usersT.never);
+    expect(html).toContain('name="userId" value="u4"');
+    expect(html).toContain(usersT.actions.reactivate);
+    expect(html).toContain(usersT.actions.deactivate);
+    expect(html).not.toContain('data-testid="dealer-user-invite-limit"');
+    expect(html).not.toMatch(/<fieldset[^>]*disabled/);
+  });
+
+  it("shows unlimited usage when the plan has no user limit", async () => {
+    signInAs(owner);
+    mocks.listDealerUsers.mockResolvedValue(userList(null));
+    const html = await render(createElement(DealerUsersPage, { searchParams: Promise.resolve({}) }));
+    expect(html).toMatch(new RegExp(`data-testid="dealer-users-usage"[^>]*>2 / ${usersT.usage.unlimited}<`));
+  });
+
+  it("disables the invite form with an explanation at the plan limit", async () => {
+    signInAs(owner);
+    mocks.listDealerUsers.mockResolvedValue(userList(2));
+    const html = await render(createElement(DealerUsersPage, { searchParams: Promise.resolve({}) }));
+    expect(html).toMatch(/<fieldset[^>]*disabled/);
+    expect(html).toContain('data-testid="dealer-user-invite-limit"');
+    expect(html).toContain(usersT.invite.limitReached.replace("{max}", "2"));
+  });
+
+  it("renders access denied for a Salesperson without loading the users", async () => {
+    signInAs(salesperson);
+    const denied = await render(createElement(DealerUsersPage, { searchParams: Promise.resolve({}) }));
+    expect(denied).toContain('data-testid="access-denied"');
+    expect(denied).not.toContain("dealer-users");
+    expect(denied).not.toContain(usersT.title + "</h1>");
+    expect(mocks.listDealerUsers).not.toHaveBeenCalled();
+  });
+
+  it("shows the booking rules form with the current values, hours for notice and cut-off", async () => {
+    signInAs(owner);
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS, minNoticeMinutes: 180 });
+    const html = await render(createElement(SettingsBookingPage));
+    const bookingT = messages.settingsBooking;
+    const value = (name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0].match(/value="([^"]*)"/)?.[1];
+    expect(mocks.getBookingRules).toHaveBeenCalledWith(ctx);
+    expect(value("testDriveMinutes")).toBe("45");
+    expect(value("viewingMinutes")).toBe("30");
+    expect(value("otherMinutes")).toBe("30");
+    expect(value("capacity")).toBe("1");
+    expect(value("minNoticeHours")).toBe("3");
+    expect(value("horizonDays")).toBe("14");
+    expect(value("bufferMinutes")).toBe("15");
+    expect(value("cancelCutoffHours")).toBe("2");
+    expect(html).toMatch(/<option value="15" selected="">15 min<\/option>/);
+    expect(html).toContain(bookingT.fields.minNoticeHours);
+    expect(html).toContain("0–168 h");
+    expect(html).toContain("15–240 min");
+    expect(html).toContain(bookingT.reset);
   });
 });

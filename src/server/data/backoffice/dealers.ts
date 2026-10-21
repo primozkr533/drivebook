@@ -272,7 +272,6 @@ export async function createDealer(input: CreateDealerInput, opts: { now?: Date 
             date: day.date,
             key: day.key,
             name: holidayT(day.key as keyof typeof holidays),
-            isOpen: false,
           })),
         );
 

@@ -12,6 +12,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { newPublicId } from "../ids";
 import { createdAt, tstz, updatedAt } from "./columns";
 import { dealers } from "./dealers";
 
@@ -21,11 +22,18 @@ export const bookingRules = pgTable("booking_rules", {
     .notNull()
     .unique()
     .references(() => dealers.id, { onDelete: "cascade" }),
-  slotMinutes: integer("slot_minutes").notNull().default(30),
+  testDriveMinutes: integer("test_drive_minutes").notNull().default(45),
+  viewingMinutes: integer("viewing_minutes").notNull().default(30),
+  otherMinutes: integer("other_minutes").notNull().default(30),
+  capacity: integer("capacity").notNull().default(1),
+  // Slot interval: the step between bookable start times.
+  slotMinutes: integer("slot_minutes").notNull().default(15),
+  // Minimum notice.
   leadTimeMinutes: integer("lead_time_minutes").notNull().default(120),
-  maxDaysAhead: integer("max_days_ahead").notNull().default(30),
+  // Booking horizon.
+  maxDaysAhead: integer("max_days_ahead").notNull().default(14),
   cancelCutoffMinutes: integer("cancel_cutoff_minutes").notNull().default(120),
-  bufferMinutes: integer("buffer_minutes").notNull().default(0),
+  bufferMinutes: integer("buffer_minutes").notNull().default(15),
   requirePhoneVerification: boolean("require_phone_verification").notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -52,25 +60,6 @@ export const openingHours = pgTable(
   ],
 );
 
-export const closures = pgTable(
-  "closures",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    dealerId: uuid("dealer_id")
-      .notNull()
-      .references(() => dealers.id, { onDelete: "cascade" }),
-    startsAt: tstz("starts_at").notNull(),
-    endsAt: tstz("ends_at").notNull(),
-    reason: text("reason").notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    index("closures_dealer_id_idx").on(t.dealerId),
-    check("closures_valid_range", sql`${t.startsAt} < ${t.endsAt}`),
-  ],
-);
-
 export const holidayOverrides = pgTable(
   "holiday_overrides",
   {
@@ -82,7 +71,7 @@ export const holidayOverrides = pgTable(
     // slovenianWorkFreeDays key; null for dealer-defined days.
     key: text("key"),
     name: text("name").notNull(),
-    isOpen: boolean("is_open").notNull(),
+    openAnyway: boolean("open_anyway").notNull().default(false),
     opensAt: time("opens_at"),
     closesAt: time("closes_at"),
     createdAt: createdAt(),
@@ -91,9 +80,29 @@ export const holidayOverrides = pgTable(
   (t) => [
     index("holiday_overrides_dealer_id_idx").on(t.dealerId),
     unique("holiday_overrides_dealer_date_unique").on(t.dealerId, t.date),
+    // Optional own hours for the day; both or neither.
     check(
-      "holiday_overrides_open_hours",
-      sql`NOT ${t.isOpen} OR (${t.opensAt} IS NOT NULL AND ${t.closesAt} IS NOT NULL AND ${t.opensAt} < ${t.closesAt})`,
+      "holiday_overrides_hours_range",
+      sql`(${t.opensAt} IS NULL AND ${t.closesAt} IS NULL) OR (${t.opensAt} IS NOT NULL AND ${t.closesAt} IS NOT NULL AND ${t.opensAt} < ${t.closesAt})`,
     ),
+  ],
+);
+
+export const dealerClosures = pgTable(
+  "dealer_closures",
+  {
+    id: text("id").primaryKey().$defaultFn(newPublicId),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    // Inclusive Europe/Ljubljana calendar days; a single day has start = end.
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    reason: text("reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("dealer_closures_dealer_id_idx").on(t.dealerId),
+    check("dealer_closures_valid_range", sql`${t.endDate} >= ${t.startDate}`),
   ],
 );

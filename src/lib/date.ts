@@ -219,3 +219,33 @@ export function slovenianWorkFreeDays(year: number): WorkFreeDay[] {
   }
   return days.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
 }
+
+// Plain calendar-day arithmetic on YYYY-MM-DD: UTC has no DST, so a day is always 24 h here.
+function parseDateISO(dateISO: string): number {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO);
+  if (!dm) throw new Error(`Invalid date: ${dateISO}`);
+  const t = Date.UTC(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]));
+  if (utcDateISO(t) !== dateISO) throw new Error(`Invalid date: ${dateISO}`);
+  return t;
+}
+
+export function isValidDateISO(dateISO: string): boolean {
+  try {
+    parseDateISO(dateISO);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function addDays(dateISO: string, n: number): string {
+  return utcDateISO(parseDateISO(dateISO) + n * DAY_MS);
+}
+
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parseDateISO(to) - parseDateISO(from)) / DAY_MS);
+}
+
+export function isoWeekday(dateISO: string): IsoWeekday {
+  return (((new Date(parseDateISO(dateISO)).getUTCDay() + 6) % 7) + 1) as IsoWeekday;
+}
