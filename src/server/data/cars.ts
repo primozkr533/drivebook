@@ -1,6 +1,6 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import type { Car } from "@/components/signature";
-import { cars } from "@/db/schema";
+import { cars, dealers, plans } from "@/db/schema";
 import { ljubljanaNow } from "@/lib/date";
 import { requireDealerRole, type DealerActor } from "@/server/auth/permissions";
 import { isAvtonetUrl } from "@/server/cars/avtonet";
@@ -8,7 +8,7 @@ import { CarImageError, processCarImage, storeCarImageFromUrl, type CarImageErro
 import { getStorage } from "@/server/storage";
 import type { DealerContext } from "./context";
 import { db } from "./db";
-import { withDealerMutation, type AuditEntry } from "./mutate";
+import { withDealerMutation, type AuditEntry, type Tx } from "./mutate";
 
 type CarRow = typeof cars.$inferSelect;
 type CarBody = CarRow["body"];
@@ -31,6 +31,7 @@ export type CarInput = {
   avtonetUrl?: string;
   body?: CarBody;
   image?: CarImageInput;
+  active?: boolean;
 };
 
 export type CarField = "make" | "model" | "year" | "priceEur" | "avtonetUrl" | "image";
@@ -43,6 +44,13 @@ export class CarNotFoundError extends Error {
   constructor() {
     super("Car not found");
     this.name = "CarNotFoundError";
+  }
+}
+
+export class CarLimitError extends Error {
+  constructor() {
+    super("Plan car limit reached");
+    this.name = "CarLimitError";
   }
 }
 
@@ -183,6 +191,25 @@ const snapshot = (row: CarRow) => ({
   active: row.active,
 });
 
+// Only active cars count toward the plan's maxCars. The per-dealer lock keeps concurrent
+// creates/reactivations from both passing the check.
+async function assertCarSlotFree(tx: Tx, ctx: DealerContext): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`cars:${ctx.dealerId}`}, 0))`);
+  const [plan] = await tx
+    .select({ maxCars: plans.maxCars })
+    .from(dealers)
+    .innerJoin(plans, eq(plans.id, dealers.planId))
+    .where(eq(dealers.id, ctx.dealerId))
+    .limit(1);
+  const maxCars = plan?.maxCars ?? null;
+  if (maxCars === null) return;
+  const [{ used }] = await tx
+    .select({ used: count() })
+    .from(cars)
+    .where(and(eq(cars.dealerId, ctx.dealerId), eq(cars.active, true)));
+  if (used >= maxCars) throw new CarLimitError();
+}
+
 // Images are processed before the transaction; a failed write must not leave the new file behind.
 async function saveWithImage(
   input: CarInput,
@@ -219,9 +246,11 @@ export async function createCar(ctx: DealerContext, input: CarInput): Promise<Sa
     const row = await withDealerMutation(
       ctx,
       async (tx) => {
+        const active = input.active ?? true;
+        if (active) await assertCarSlotFree(tx, ctx);
         const [inserted] = await tx
           .insert(cars)
-          .values({ dealerId: ctx.dealerId, ...value, body: input.body ?? DEFAULT_BODY, imageKey })
+          .values({ dealerId: ctx.dealerId, ...value, body: input.body ?? DEFAULT_BODY, imageKey, active })
           .returning();
         return inserted;
       },
@@ -270,6 +299,15 @@ export async function setCarActive(ctx: DealerContext, publicId: string, active:
   const row = await withDealerMutation(
     ctx,
     async (tx) => {
+      if (active) {
+        const [current] = await tx
+          .select({ active: cars.active })
+          .from(cars)
+          .where(and(eq(cars.dealerId, ctx.dealerId), eq(cars.id, publicId)))
+          .for("update");
+        if (!current) throw new CarNotFoundError();
+        if (!current.active) await assertCarSlotFree(tx, ctx);
+      }
       const [updated] = await tx
         .update(cars)
         .set({ active, updatedAt: new Date() })

@@ -266,6 +266,38 @@ describe("setCarActiveAction", () => {
   });
 });
 
+describe("plan maxCars", () => {
+  const setMaxCars = async (maxCars: number) =>
+    db.update(plans).set({ maxCars }).where(eq(plans.id, a.dealer.planId));
+
+  it("saveCarAction returns the limit form error and keeps the values", async () => {
+    await setMaxCars(1);
+    await createdId();
+    expect(await saveCarAction(null, carForm({ model: "Second", avtonetUrl: "" }))).toEqual({
+      ok: false,
+      fieldErrors: {},
+      error: "limit",
+      values: expect.objectContaining({ model: "Second" }),
+    });
+    expect(await db.select().from(cars)).toHaveLength(1);
+  });
+
+  it("setCarActiveAction redirects to the list with the limit notice and changes nothing", async () => {
+    const first = await createdId();
+    const second = await createdId({ model: "Second", avtonetUrl: "" });
+    await setCarActiveAction(form({ id: second, active: "0" }));
+    await setMaxCars(1);
+    revalidatePath.mockClear();
+    expect(await redirectOf(setCarActiveAction(form({ id: second, active: "1", filter: "inactive" })))).toBe(
+      "/_dev/app/cars?status=inactive&notice=limit",
+    );
+    expect((await carRow(second)).active).toBe(false);
+    expect(revalidatePath).not.toHaveBeenCalled();
+    await setCarActiveAction(form({ id: first, active: "0" }));
+    expect((await carRow(first)).active).toBe(false);
+  });
+});
+
 describe("cross-dealer ids", () => {
   it.each([
     ["update", (id: string) => saveCarAction(null, carForm({ id, model: "Hijacked" }))],
