@@ -102,8 +102,8 @@ services:
       - "443:443/udp"
     environment:
       - BASE_DOMAIN=${BASE_DOMAIN:?set BASE_DOMAIN}
-      - ACME_EMAIL=${ACME_EMAIL:-}
-      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN:-}
+      - ACME_EMAIL=${ACME_EMAIL:?set ACME_EMAIL}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN:?set CLOUDFLARE_DNS_API_TOKEN}
     volumes:
       - caddy-data:/data
       - caddy-config:/config

@@ -133,7 +133,8 @@ describe("docker-compose.prod.yml", () => {
       expect(text).not.toMatch(/^\s*-\s*(TWILIO|BREVO|CLOUDFLARE)_[A-Z_]*=\s*$/m);
       for (const match of text.matchAll(/^\s*-\s*((?:TWILIO|BREVO|CLOUDFLARE)_[A-Z_]*)(=.*)?$/gm)) {
         const [, name, value] = match;
-        if (value !== undefined) expect(value).toMatch(new RegExp(`^=\\$\\{${name}:-[^}]*\\}$`));
+        if (value === undefined || name === "CLOUDFLARE_DNS_API_TOKEN") continue;
+        expect(value).toMatch(new RegExp(`^=\\$\\{${name}:-[^}]*\\}$`));
       }
     }
     for (const name of PROVIDER_KEYS.filter((key) => key !== "CLOUDFLARE_DNS_API_TOKEN")) {
@@ -142,10 +143,17 @@ describe("docker-compose.prod.yml", () => {
   });
 
   it("gives CLOUDFLARE_DNS_API_TOKEN and ACME_EMAIL to caddy only", () => {
-    expect(service("caddy")).toContain("- CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN:-}");
-    expect(service("caddy")).toContain("- ACME_EMAIL=${ACME_EMAIL:-}");
     for (const name of ["CLOUDFLARE_DNS_API_TOKEN", "ACME_EMAIL"]) {
+      expect(service("caddy")).toContain(`- ${name}=\${${name}:?set ${name}}`);
       expect(compose.match(new RegExp(`- ${name}=`, "g"))).toHaveLength(1);
+    }
+  });
+
+  it("refuses to start without ACME_EMAIL and CLOUDFLARE_DNS_API_TOKEN", () => {
+    for (const name of ["ACME_EMAIL", "CLOUDFLARE_DNS_API_TOKEN"]) {
+      expect(service("caddy")).toMatch(new RegExp(`^ {6}- ${name}=\\$\\{${name}:\\?[^}]+\\}$`, "m"));
+      expect(compose).not.toContain(`\${${name}:-`);
+      expect(local).not.toContain(`\${${name}:-`);
     }
   });
 });
@@ -155,6 +163,7 @@ describe("docker-compose.prod.local.yml", () => {
     expect(local).toContain("- ALLOW_FAKE_PROVIDERS=1");
     expect(local).toContain("- BASE_DOMAIN=drivebook.localhost");
     expect(local).toContain("./docker/caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro");
+    expect(local).toMatch(/^#\s+export .*\bACME_EMAIL=\S+.*\bCLOUDFLARE_DNS_API_TOKEN=\S+/m);
     const localEnv = local.match(/^x-local-app-env: &local-app-env\n((?: {2}.*\n)*)/m)?.[1] ?? "";
     const secret = localEnv.match(/^ {2}- AUTH_SECRET=(\S+)$/m)?.[1] ?? "";
     expect(secret.length).toBeGreaterThanOrEqual(32);

@@ -1,6 +1,6 @@
 # Local run of the production stack: fake providers, drivebook.localhost, Caddy internal TLS, demo seed.
 #   cp .env.example .env
-#   export AUTH_SECRET=local POSTGRES_PASSWORD=local
+#   export AUTH_SECRET=local POSTGRES_PASSWORD=local ACME_EMAIL=local CLOUDFLARE_DNS_API_TOKEN=local
 #   docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml up -d --build
 #   curl -k --resolve demo.drivebook.localhost:443:127.0.0.1 https://demo.drivebook.localhost/
 # Needs host ports 80/443 free.
