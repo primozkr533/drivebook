@@ -1,14 +1,16 @@
-# Rebuilds archivo-latin-ext.woff2 from Archivo[wdth,wght].ttf (google/fonts, ofl/archivo):
-#   python3 src/fonts/subset-archivo.py "Archivo[wdth,wght].ttf" src/fonts/archivo-latin-ext.woff2
-# Axes are limited to what the tokens use (weight 400–800, width 100–125 %) and glyphs to
-# Latin + Latin Extended-A, so the public page preloads one small file instead of two full subsets.
+# Rebuilds the self-hosted variable fonts from the google/fonts sources (pip install fonttools brotli):
+#   python3 src/fonts/subset-font.py "Archivo[wdth,wght].ttf" src/fonts/archivo-latin-ext.woff2 wght=400:800 wdth=100:125
+#   python3 src/fonts/subset-font.py "JetBrainsMono[wght].ttf" src/fonts/jetbrains-mono-latin-ext.woff2 wght=400:800
+# Axes are limited to what the tokens use and glyphs to Latin + Latin Extended-A, so each family is
+# one small file instead of several full Google subsets.
 import sys
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools import subset
 
-src, out = sys.argv[1], sys.argv[2]
-font = instantiateVariableFont(TTFont(src), {"wght": (400, 800), "wdth": (100, 125)})
+src, out, *axes = sys.argv[1:]
+limits = {tag: tuple(float(v) for v in rng.split(":")) for tag, rng in (a.split("=") for a in axes)}
+font = TTFont(src)
 
 unicodes = (
     list(range(0x20, 0x7F)) + list(range(0xA0, 0x180)) + list(range(0x218, 0x21C)) +
@@ -24,5 +26,6 @@ opts.notdef_outline = True
 sub = subset.Subsetter(opts)
 sub.populate(unicodes=unicodes)
 sub.subset(font)
+font = instantiateVariableFont(font, limits)
 font.flavor = "woff2"
 font.save(out)

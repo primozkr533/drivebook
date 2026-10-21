@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { NextIntlClientProvider } from "next-intl";
 import { archivo, jetbrainsMono } from "./fonts";
 import "./globals.css";
 
@@ -18,10 +17,8 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="sl" className={`${archivo.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
-      <body>
-        {/* Messages reach the client only under the admin (app) layouts; public pages ship none. */}
-        <NextIntlClientProvider messages={null}>{children}</NextIntlClientProvider>
-      </body>
+      {/* No NextIntlClientProvider here: the admin (app) layouts add it, so public pages ship no intl runtime. */}
+      <body>{children}</body>
     </html>
   );
 }

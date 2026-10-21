@@ -1,7 +1,6 @@
-import { JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 
-// Self-hosted subset (see src/fonts/subset-archivo.py); the wdth axis keeps the 125 % expanded display register.
+// Self-hosted Latin + Latin Extended-A subsets (src/fonts/subset-font.py); the wdth axis keeps the 125 % display register.
 export const archivo = localFont({
   src: "../fonts/archivo-latin-ext.woff2",
   weight: "400 800",
@@ -13,9 +12,12 @@ export const archivo = localFont({
 });
 
 // Mono only labels small utility text, so it is not preloaded for the first viewport.
-export const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin", "latin-ext"],
+export const jetbrainsMono = localFont({
+  src: "../fonts/jetbrains-mono-latin-ext.woff2",
+  weight: "400 800",
+  style: "normal",
   display: "swap",
   variable: "--font-jetbrains-mono",
   preload: false,
+  adjustFontFallback: false,
 });
