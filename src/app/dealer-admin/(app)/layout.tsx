@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { AdminHeader } from "@/components/auth/AdminHeader";
 import { Shell } from "@/components/ui";
+import { locale, messages, timeZone } from "@/i18n/request";
 import { getSurfaceBasePath, requireDealerUser } from "@/server/auth/permissions";
 import { getDealerName } from "@/server/data/dealers";
 
@@ -10,7 +11,9 @@ export default async function DealerAppLayout({ children }: { children: ReactNod
   const [basePath, dealerName] = await Promise.all([getSurfaceBasePath(), getDealerName(ctx)]);
   return (
     <Shell header={<AdminHeader surface="dealer" basePath={basePath} email={user.email} context={dealerName ?? ctx.slug} role={user.role} />}>
-      <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      <NextIntlClientProvider locale={locale} timeZone={timeZone} messages={messages}>
+        {children}
+      </NextIntlClientProvider>
     </Shell>
   );
 }

@@ -55,6 +55,8 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `docker/caddy` — Caddy image (xcaddy + Cloudflare DNS) and `docker/caddy/Caddyfile` (wildcard certificate via DNS-01, reverse proxy to `web:3000`)
 - `docker/backup` — backup image: nightly `pg_dump` + uploads archive, retention, `docker/backup/restore.sh`, round-trip check `docker/backup/test-restore.sh`
 - `docs/deploy.md` — production/staging deployment, backups and updates
+- `docs/performance.md` — how to measure the public dealer page with Lighthouse (mobile, 360 px) and the recorded score
+- `src/app/fonts.ts` + `src/fonts/` — self-hosted Archivo / JetBrains Mono subsets (`next/font/local`) behind `--font-archivo` / `--font-jetbrains-mono` in `src/styles/tokens.css`; rebuild them with `src/fonts/subset-font.py`
 
 ## Required environment variables
 All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
@@ -177,3 +179,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
 - Production refuses to start with fake SMS/e-mail providers unless ALLOW_FAKE_PROVIDERS=1 (staging only).
+- `NextIntlClientProvider` is mounted only in the admin `(app)` layouts (dealer admin and backoffice), not in the root layout, so public pages ship no intl runtime or messages. Client components elsewhere receive translated strings as props.
