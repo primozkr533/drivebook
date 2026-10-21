@@ -23,5 +23,6 @@ describe("sl messages", () => {
     expect(messages.common.appName).toBe("DriveBook");
     expect(messages.errors.notFoundTitle).toBe("Strani ni mogoče najti");
     expect(messages.backoffice.dealers.nav).toBe("Trgovci");
+    expect(messages.backoffice.plans.nav).toBe("Paketi");
   });
 });
