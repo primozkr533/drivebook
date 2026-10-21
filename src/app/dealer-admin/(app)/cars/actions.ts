@@ -10,6 +10,7 @@ import {
 } from "@/server/auth/permissions";
 import { fetchAvtonetListing, type AvtonetFailure } from "@/server/cars/avtonet";
 import {
+  CarLimitError,
   CarNotFoundError,
   createCar,
   setCarActive,
@@ -40,7 +41,7 @@ export type SaveCarState =
   | {
       ok: false;
       fieldErrors: Partial<Record<CarFormField, CarFieldError>>;
-      error?: "forbidden" | "readOnly";
+      error?: "forbidden" | "readOnly" | "limit";
       values?: CarFormValues;
     };
 
@@ -122,6 +123,7 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
     if (err instanceof CarNotFoundError) notFound();
     if (err instanceof ForbiddenError) return { ok: false, fieldErrors: {}, error: "forbidden", values };
     if (err instanceof DealerReadOnlyError) return { ok: false, fieldErrors: {}, error: "readOnly", values };
+    if (err instanceof CarLimitError) return { ok: false, fieldErrors: {}, error: "limit", values };
     throw err;
   }
 }
@@ -135,6 +137,7 @@ export async function setCarActiveAction(form: FormData): Promise<void> {
     if (err instanceof CarNotFoundError) notFound();
     if (err instanceof ForbiddenError) notice = "forbidden";
     else if (err instanceof DealerReadOnlyError) notice = "readOnly";
+    else if (err instanceof CarLimitError) notice = "limit";
     else throw err;
   }
   if (notice) {
