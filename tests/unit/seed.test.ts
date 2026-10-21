@@ -8,13 +8,27 @@ import {
   cars,
   dealerLicenceHistory,
   dealers,
+  dealerClosures,
   dealerSlugHistory,
   dealerUsers,
+  holidayOverrides,
   openingHours,
   plans,
 } from "@/db/schema";
-import { DEMO_CAR_IDS, DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL, runSeed } from "@/db/seed";
+import {
+  DEMO_CAR_IDS,
+  DEMO_CLOSURE_REASON,
+  DEMO_DEALER_SLUG,
+  DEMO_EMAIL,
+  DEMO_MAPS_URL,
+  DEMO_OLD_SLUG,
+  DEMO_OWNER_EMAIL,
+  DEMO_SALESPERSON_EMAIL,
+  DEMO_SMS_SENDER_NAME,
+  runSeed,
+} from "@/db/seed";
 import { resetConfigForTests } from "@/lib/config";
+import { ljubljanaNow, slovenianWorkFreeDays } from "@/lib/date";
 import { getTestDb, truncateAll } from "../setup/db";
 
 const db = getTestDb();
@@ -70,6 +84,80 @@ describe("runSeed", () => {
     expect(oldSlug.dealerId).toBe(dealer.id);
   });
 
+  it("gives the demo dealer settings, holidays for both years, a future closure and a Salesperson", async () => {
+    await runSeed(db);
+    const dealer = await demoDealer();
+    expect(dealer).toMatchObject({ email: DEMO_EMAIL, mapsUrl: DEMO_MAPS_URL, smsSenderName: DEMO_SMS_SENDER_NAME });
+
+    const [rules] = await db.select().from(bookingRules).where(eq(bookingRules.dealerId, dealer.id));
+    expect(rules).toMatchObject({ testDriveMinutes: 45, slotMinutes: 15, maxDaysAhead: 14 });
+
+    const monday = await db
+      .select({ opensAt: openingHours.opensAt, closesAt: openingHours.closesAt })
+      .from(openingHours)
+      .where(and(eq(openingHours.dealerId, dealer.id), eq(openingHours.isoWeekday, 1)));
+    expect(monday.length).toBeGreaterThanOrEqual(2);
+
+    const today = ljubljanaNow().dateISO;
+    const year = Number(today.slice(0, 4));
+    const holidays = await db.select().from(holidayOverrides).where(eq(holidayOverrides.dealerId, dealer.id));
+    for (const y of [year, year + 1]) {
+      const expected = slovenianWorkFreeDays(y);
+      expect(holidays.filter((h) => h.date.startsWith(String(y))).map((h) => h.key).sort()).toEqual(
+        expected.map((d) => d.key).sort(),
+      );
+    }
+    expect(holidays.find((h) => h.key === "christmas")?.name).toBe("božič");
+
+    const closures = await db.select().from(dealerClosures).where(eq(dealerClosures.dealerId, dealer.id));
+    expect(closures).toHaveLength(1);
+    expect(closures[0].reason).toBe(DEMO_CLOSURE_REASON);
+    expect(closures[0].startDate > today).toBe(true);
+    expect(closures[0].endDate >= closures[0].startDate).toBe(true);
+
+    const [salesperson] = await db.select().from(dealerUsers).where(eq(dealerUsers.email, DEMO_SALESPERSON_EMAIL));
+    expect(salesperson).toMatchObject({ dealerId: dealer.id, role: "salesperson", status: "active" });
+  });
+
+  it("fills empty demo settings but never overwrites an edited e-mail or hours", async () => {
+    await runSeed(db);
+    const dealer = await demoDealer();
+    await db
+      .update(dealers)
+      .set({ email: "prodaja@avtohisa.si", mapsUrl: null, smsSenderName: null })
+      .where(eq(dealers.id, dealer.id));
+    await db.delete(openingHours).where(eq(openingHours.dealerId, dealer.id));
+    await db.insert(openingHours).values({ dealerId: dealer.id, isoWeekday: 1, opensAt: "09:00", closesAt: "17:00" });
+
+    await runSeed(db);
+
+    expect(await demoDealer()).toMatchObject({
+      email: "prodaja@avtohisa.si",
+      mapsUrl: DEMO_MAPS_URL,
+      smsSenderName: DEMO_SMS_SENDER_NAME,
+    });
+    const hours = await db
+      .select({ isoWeekday: openingHours.isoWeekday, opensAt: openingHours.opensAt, closesAt: openingHours.closesAt })
+      .from(openingHours)
+      .where(eq(openingHours.dealerId, dealer.id));
+    expect(hours).toEqual([{ isoWeekday: 1, opensAt: "09:00:00", closesAt: "17:00:00" }]);
+  });
+
+  it("keeps edited holidays and closures", async () => {
+    await runSeed(db);
+    const dealer = await demoDealer();
+    const [holiday] = await db.select().from(holidayOverrides).where(eq(holidayOverrides.dealerId, dealer.id)).limit(1);
+    await db.update(holidayOverrides).set({ openAnyway: true }).where(eq(holidayOverrides.id, holiday.id));
+    await db.update(dealerClosures).set({ reason: "Dopust" }).where(eq(dealerClosures.dealerId, dealer.id));
+
+    await runSeed(db);
+
+    const [after] = await db.select().from(holidayOverrides).where(eq(holidayOverrides.id, holiday.id));
+    expect(after.openAnyway).toBe(true);
+    const closures = await db.select().from(dealerClosures).where(eq(dealerClosures.dealerId, dealer.id));
+    expect(closures.map((c) => c.reason)).toEqual(["Dopust"]);
+  });
+
   it("leaves image_key and logo_key null", async () => {
     await runSeed(db);
     const dealer = await demoDealer();
@@ -79,14 +167,27 @@ describe("runSeed", () => {
   });
 
   it("is idempotent", async () => {
-    const tables = [plans, dealers, cars, dealerUsers, backofficeUsers, openingHours, dealerLicenceHistory];
+    const tables = [
+      plans,
+      dealers,
+      cars,
+      dealerUsers,
+      backofficeUsers,
+      openingHours,
+      dealerLicenceHistory,
+      bookingRules,
+      holidayOverrides,
+      dealerClosures,
+    ];
     await runSeed(db);
     const first = await Promise.all(tables.map((table) => rowCount(table)));
     await runSeed(db);
     await runSeed(db);
     const again = await Promise.all(tables.map((table) => rowCount(table)));
     expect(again).toEqual(first);
-    expect(first).toEqual([1, 1, 4, 2, 1, 11, 1]);
+    const year = Number(ljubljanaNow().dateISO.slice(0, 4));
+    const holidayCount = slovenianWorkFreeDays(year).length + slovenianWorkFreeDays(year + 1).length;
+    expect(first).toEqual([1, 1, 4, 2, 1, 11, 1, 1, holidayCount, 1]);
   });
 
   it("creates the default plan as Standard with 300 SMS and 10 users on an empty database", async () => {

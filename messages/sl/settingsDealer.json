@@ -1,1 +1,78 @@
-{}
+{
+  "profile": {
+    "title": "Podatki o podjetju",
+    "description": "Prikazani so na javni strani trgovca in v sporočilih strankam.",
+    "fields": {
+      "name": "Ime trgovca",
+      "addressLine": "Naslov",
+      "postalCode": "Poštna številka",
+      "city": "Kraj",
+      "phone": "Telefon",
+      "email": "E-pošta",
+      "googleMapsUrl": "Povezava do Google Zemljevidov",
+      "privacyPolicyUrl": "Povezava do politike zasebnosti"
+    },
+    "hints": {
+      "phone": "Na primer 01 234 56 78 ali +386 1 234 56 78.",
+      "googleMapsUrl": "Povezava https://maps.app.goo.gl/… ali https://www.google.com/maps/…",
+      "privacyPolicyUrl": "Neobvezno. Povezava https:// do vaše politike zasebnosti."
+    },
+    "submit": "Shrani podatke",
+    "saved": "Podatki o podjetju so shranjeni."
+  },
+  "sms": {
+    "title": "SMS",
+    "description": "Ime pošiljatelja SMS sporočil strankam in obvestila o novih rezervacijah.",
+    "fields": {
+      "smsSenderName": "Ime pošiljatelja SMS",
+      "smsNotificationsEnabled": "SMS obvestila trgovcu",
+      "notificationPhone": "Telefon za obvestila"
+    },
+    "hints": {
+      "smsSenderName": "Do 11 črk, številk ali presledkov. Če ga pustite praznega, se uporabi »{name}«.",
+      "smsNotificationsEnabled": "Ob vsaki novi rezervaciji pošljemo SMS na telefon za obvestila.",
+      "notificationPhone": "Na primer 041 555 218."
+    },
+    "counter": "{count}/{max}",
+    "submit": "Shrani nastavitve SMS",
+    "saved": "Nastavitve SMS so shranjene."
+  },
+  "errors": {
+    "name": {
+      "required": "Vnesite ime trgovca.",
+      "too_short": "Ime mora imeti vsaj 2 znaka.",
+      "too_long": "Ime je predolgo (največ 100 znakov)."
+    },
+    "addressLine": {
+      "too_long": "Naslov je predolg (največ 200 znakov)."
+    },
+    "postalCode": {
+      "too_long": "Poštna številka je predolga (največ 200 znakov)."
+    },
+    "city": {
+      "too_long": "Kraj je predolg (največ 200 znakov)."
+    },
+    "phone": {
+      "invalid": "Vnesite veljavno telefonsko številko."
+    },
+    "email": {
+      "invalid": "Vnesite veljaven e-poštni naslov."
+    },
+    "googleMapsUrl": {
+      "invalid": "Vnesite povezavo https:// do Google Zemljevidov."
+    },
+    "privacyPolicyUrl": {
+      "invalid": "Vnesite veljavno povezavo, ki se začne s https://."
+    },
+    "smsSenderName": {
+      "too_long": "Ime pošiljatelja ima lahko največ 11 znakov.",
+      "invalid": "Uporabite le črke brez šumnikov, številke in presledke ter vsaj eno črko."
+    },
+    "notificationPhone": {
+      "required": "Za SMS obvestila vnesite telefon za obvestila.",
+      "invalid": "Vnesite veljavno telefonsko številko."
+    },
+    "forbidden": "Dostop zavrnjen. Teh nastavitev ne morete spreminjati.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}
