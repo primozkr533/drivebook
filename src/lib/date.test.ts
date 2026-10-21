@@ -15,6 +15,7 @@ import {
   weekdayShortSl,
   zonedToUtc,
 } from "@/lib/date";
+import holidays from "../../messages/sl/holidays.json";
 
 const thursday = new Date("2026-10-22T12:30:00Z");
 
@@ -95,22 +96,33 @@ describe("Slovenian work-free days", () => {
 
   it("lists all 15 days of 2026 in date order", () => {
     expect(slovenianWorkFreeDays(2026)).toEqual([
-      { date: "2026-01-01", key: "newYear1", name: "novo leto" },
-      { date: "2026-01-02", key: "newYear2", name: "novo leto" },
-      { date: "2026-02-08", key: "preseren", name: "Prešernov dan, slovenski kulturni praznik" },
-      { date: "2026-04-05", key: "easterSunday", name: "velikonočna nedelja" },
-      { date: "2026-04-06", key: "easterMonday", name: "velikonočni ponedeljek" },
-      { date: "2026-04-27", key: "uprising", name: "dan upora proti okupatorju" },
-      { date: "2026-05-01", key: "labour1", name: "praznik dela" },
-      { date: "2026-05-02", key: "labour2", name: "praznik dela" },
-      { date: "2026-05-24", key: "whitSunday", name: "binkoštna nedelja" },
-      { date: "2026-06-25", key: "statehood", name: "dan državnosti" },
-      { date: "2026-08-15", key: "assumption", name: "Marijino vnebovzetje" },
-      { date: "2026-10-31", key: "reformation", name: "dan reformacije" },
-      { date: "2026-11-01", key: "remembrance", name: "dan spomina na mrtve" },
-      { date: "2026-12-25", key: "christmas", name: "božič" },
-      { date: "2026-12-26", key: "independence", name: "dan samostojnosti in enotnosti" },
+      { date: "2026-01-01", key: "newYear1" },
+      { date: "2026-01-02", key: "newYear2" },
+      { date: "2026-02-08", key: "preseren" },
+      { date: "2026-04-05", key: "easterSunday" },
+      { date: "2026-04-06", key: "easterMonday" },
+      { date: "2026-04-27", key: "uprising" },
+      { date: "2026-05-01", key: "labour1" },
+      { date: "2026-05-02", key: "labour2" },
+      { date: "2026-05-24", key: "whitSunday" },
+      { date: "2026-06-25", key: "statehood" },
+      { date: "2026-08-15", key: "assumption" },
+      { date: "2026-10-31", key: "reformation" },
+      { date: "2026-11-01", key: "remembrance" },
+      { date: "2026-12-25", key: "christmas" },
+      { date: "2026-12-26", key: "independence" },
     ]);
+  });
+
+  it("has a non-empty holidays.json translation for every key", () => {
+    const names: Record<string, unknown> = holidays;
+    for (let year = 2000; year <= 2100; year++) {
+      for (const { key } of slovenianWorkFreeDays(year)) {
+        expect(names[key], key).toBeTypeOf("string");
+        expect((names[key] as string).trim(), key).not.toBe("");
+      }
+    }
+    expect(names.christmas).toBe("božič");
   });
 
   it("places Whit Sunday 49 days after Easter, also across the DST change", () => {

@@ -192,30 +192,30 @@ export function easterSunday(year: number): string {
   return utcDateISO(easterSundayUtc(year));
 }
 
-export type WorkFreeDay = { date: string; key: string; name: string };
+export type WorkFreeDay = { date: string; key: string };
 
 export function slovenianWorkFreeDays(year: number): WorkFreeDay[] {
   const easter = easterSundayUtc(year);
   const fixed = (month: number, day: number) => utcDateISO(Date.UTC(year, month - 1, day));
   const days: WorkFreeDay[] = [
-    { date: fixed(1, 1), key: "newYear1", name: "novo leto" },
-    { date: fixed(2, 8), key: "preseren", name: "Prešernov dan, slovenski kulturni praznik" },
-    { date: utcDateISO(easter), key: "easterSunday", name: "velikonočna nedelja" },
-    { date: utcDateISO(easter + DAY_MS), key: "easterMonday", name: "velikonočni ponedeljek" },
-    { date: fixed(4, 27), key: "uprising", name: "dan upora proti okupatorju" },
-    { date: fixed(5, 1), key: "labour1", name: "praznik dela" },
-    { date: fixed(5, 2), key: "labour2", name: "praznik dela" },
-    { date: utcDateISO(easter + 49 * DAY_MS), key: "whitSunday", name: "binkoštna nedelja" },
-    { date: fixed(6, 25), key: "statehood", name: "dan državnosti" },
-    { date: fixed(8, 15), key: "assumption", name: "Marijino vnebovzetje" },
-    { date: fixed(10, 31), key: "reformation", name: "dan reformacije" },
-    { date: fixed(11, 1), key: "remembrance", name: "dan spomina na mrtve" },
-    { date: fixed(12, 25), key: "christmas", name: "božič" },
-    { date: fixed(12, 26), key: "independence", name: "dan samostojnosti in enotnosti" },
+    { date: fixed(1, 1), key: "newYear1" },
+    { date: fixed(2, 8), key: "preseren" },
+    { date: utcDateISO(easter), key: "easterSunday" },
+    { date: utcDateISO(easter + DAY_MS), key: "easterMonday" },
+    { date: fixed(4, 27), key: "uprising" },
+    { date: fixed(5, 1), key: "labour1" },
+    { date: fixed(5, 2), key: "labour2" },
+    { date: utcDateISO(easter + 49 * DAY_MS), key: "whitSunday" },
+    { date: fixed(6, 25), key: "statehood" },
+    { date: fixed(8, 15), key: "assumption" },
+    { date: fixed(10, 31), key: "reformation" },
+    { date: fixed(11, 1), key: "remembrance" },
+    { date: fixed(12, 25), key: "christmas" },
+    { date: fixed(12, 26), key: "independence" },
   ];
   // 2 January was not a work-free day from 2013 to 2016 (restored by law in 2017).
   if (year < 2013 || year > 2016) {
-    days.push({ date: fixed(1, 2), key: "newYear2", name: "novo leto" });
+    days.push({ date: fixed(1, 2), key: "newYear2" });
   }
   return days.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
 }

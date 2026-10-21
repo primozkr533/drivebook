@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { resetConfigForTests } from "@/lib/config";
 import { slovenianWorkFreeDays } from "@/lib/date";
+import holidayNames from "../../messages/sl/holidays.json";
 import type { BackofficeSessionUser } from "@/server/auth/session";
 import { getTestDb, truncateAll } from "../setup/db";
 
@@ -147,10 +148,14 @@ describe("createDealer", () => {
     const expected = [...slovenianWorkFreeDays(2026), ...slovenianWorkFreeDays(2027)];
     expect(holidays).toHaveLength(expected.length);
     expect(holidays.every((h) => !h.isOpen)).toBe(true);
+    expect(holidays.every((h) => h.key !== null && h.name === holidayNames[h.key as keyof typeof holidayNames])).toBe(true);
     expect(holidays).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ date: "2026-05-24", key: "whitSunday", name: "binkoštna nedelja" }),
         expect.objectContaining({ date: "2027-05-16", key: "whitSunday", name: "binkoštna nedelja" }),
+        expect.objectContaining({ date: "2026-12-25", key: "christmas", name: "božič" }),
+        expect.objectContaining({ date: "2027-01-02", key: "newYear2", name: "novo leto" }),
+        expect.objectContaining({ date: "2027-02-08", key: "preseren", name: "Prešernov dan, slovenski kulturni praznik" }),
       ]),
     );
 
