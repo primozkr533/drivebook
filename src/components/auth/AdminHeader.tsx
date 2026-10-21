@@ -22,7 +22,6 @@ export async function AdminHeader({
           { label: tBackoffice("dealers.nav"), href: `${basePath}/dealers` },
           { label: tBackoffice("plans.nav"), href: `${basePath}/plans` },
           { label: tBackoffice("users.nav"), href: `${basePath}/users` },
-          { label: tBackoffice("users.nav"), href: `${basePath}/users` },
         ]
       : []),
     { label: t("navAccount"), href: `${basePath}/account` },
