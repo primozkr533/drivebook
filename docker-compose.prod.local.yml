@@ -1,0 +1,23 @@
+# Local run of the production stack: fake providers, drivebook.localhost, Caddy internal TLS, demo seed.
+#   cp .env.example .env
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml up -d --build
+#   curl -k --resolve demo.drivebook.localhost:443:127.0.0.1 https://demo.drivebook.localhost/
+# Needs host ports 80/443 free.
+
+x-local-app-env: &local-app-env
+  - BASE_DOMAIN=drivebook.localhost
+  - ALLOW_FAKE_PROVIDERS=1
+  - SEED_ON_START=1
+
+services:
+  migrate:
+    environment: *local-app-env
+  web:
+    environment: *local-app-env
+  worker:
+    environment: *local-app-env
+  caddy:
+    environment:
+      - BASE_DOMAIN=drivebook.localhost
+    volumes:
+      - ./docker/caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro
