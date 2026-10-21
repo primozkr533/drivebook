@@ -349,6 +349,7 @@ export default function DesignPage() {
             <div className="mt-6 grid gap-6 border-t border-line pt-6 md:grid-cols-2">
               <Switch label="SMS obvestila avtohiši" hint="Ob vsaki novi rezervaciji na 041 555 218" defaultChecked />
               <Switch label="Dvostopenjska prijava (TOTP)" hint="Koda iz aplikacije za preverjanje ob prijavi" />
+              <Switch label="Odprto kljub prazniku" hint="Med shranjevanjem onemogočeno" defaultChecked disabled />
             </div>
           </Card>
 
