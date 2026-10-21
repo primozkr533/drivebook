@@ -154,5 +154,98 @@
     "length": "Oznaka mora imeti od 3 do 40 znakov.",
     "reserved": "Ta oznaka je rezervirana.",
     "taken": "Ta oznaka je že zasedena."
+  },
+  "dealerDetail": {
+    "back": "Nazaj na trgovce",
+    "publicPage": "Javna stran",
+    "readOnly": "Pregled trgovca. Spremembe lahko izvaja le superadmin.",
+    "invited": "Trgovec je ustvarjen. Lastniku smo poslali povabilo za nastavitev gesla.",
+    "saved": {
+      "profile": "Podatki so shranjeni.",
+      "slug": "Oznaka je spremenjena.",
+      "status": "Stanje trgovca je spremenjeno.",
+      "licence": "Licenca je podaljšana.",
+      "dpa": "Podpis DPA je zabeležen.",
+      "invite": "Povabilo je ponovno poslano."
+    },
+    "profile": {
+      "title": "Podatki",
+      "fields": {
+        "name": "Ime trgovca",
+        "planId": "Paket",
+        "notes": "Opombe"
+      },
+      "notesHint": "Interne opombe, trgovec jih ne vidi.",
+      "noNotes": "—",
+      "submit": "Shrani podatke"
+    },
+    "slug": {
+      "title": "Oznaka",
+      "current": "Trenutna oznaka",
+      "field": "Nova oznaka",
+      "hint": "Male črke a–z, številke 0–9 in vezaj, od 3 do 40 znakov. Stara oznaka bo preusmerjala na novo.",
+      "submit": "Spremeni oznako",
+      "history": "Prejšnje oznake",
+      "historyEmpty": "Oznaka še ni bila spremenjena.",
+      "replacedAt": "Zamenjana {date}"
+    },
+    "licence": {
+      "title": "Licenca",
+      "validUntil": "Velja do",
+      "none": "Ni določeno",
+      "extendTitle": "Podaljšaj licenco",
+      "fields": {
+        "validUntil": "Nova veljavnost do",
+        "note": "Opomba"
+      },
+      "noteHint": "Obvezno, npr. številka računa ali razlog podaljšanja.",
+      "submit": "Podaljšaj licenco",
+      "history": "Zgodovina licence",
+      "historyEmpty": "Ni zapisov.",
+      "columns": {
+        "createdAt": "Vneseno",
+        "plan": "Paket",
+        "previousValidUntil": "Prej do",
+        "validUntil": "Novo do",
+        "note": "Opomba"
+      }
+    },
+    "status": {
+      "title": "Status",
+      "current": "Trenutno stanje",
+      "suspend": "Začasno ustavi",
+      "reactivate": "Ponovno aktiviraj",
+      "suspendHint": "Javna stran ne prikazuje vozil, trgovec pa ne more spreminjati podatkov, dokler ga ne aktivirate.",
+      "reactivateHint": "Trgovec bo spet aktiven."
+    },
+    "dpa": {
+      "title": "DPA",
+      "signed": "Podpisan",
+      "notSigned": "Ni podpisan",
+      "signedAt": "Datum podpisa",
+      "submit": "Zabeleži podpis"
+    },
+    "owner": {
+      "title": "Lastnik",
+      "email": "E-pošta",
+      "status": "Stanje",
+      "statuses": {
+        "invited": "Povabljen",
+        "active": "Aktiven",
+        "deactivated": "Deaktiviran"
+      },
+      "none": "Trgovec nima lastnika.",
+      "resend": "Ponovno pošlji povabilo"
+    },
+    "errors": {
+      "required": "Vnos je obvezen.",
+      "unknown": "Izberite obstoječ paket.",
+      "format": "Vnesite veljaven datum.",
+      "invalid": "Neveljavno stanje.",
+      "notFound": "Trgovec ne obstaja več.",
+      "notInvited": "Lastnik ni v stanju povabljen.",
+      "rateLimited": "Doseženo je največje število povabil v eni uri. Poskusite pozneje.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
   }
 }
