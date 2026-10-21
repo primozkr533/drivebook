@@ -115,10 +115,13 @@ describe("getStorage", () => {
   it("is a singleton rooted at getConfig().storageDir", async () => {
     vi.resetModules();
     vi.doMock("@/lib/config", () => ({ getConfig: () => ({ storageDir: root }) }));
-    const { getStorage } = await import("@/server/storage");
-    expect(getStorage()).toBe(getStorage());
-    await getStorage().put("logos/cfg.png", Buffer.from("x"), "image/png");
-    expect(await listRecursive(root)).toContain(path.join("logos", "cfg.png"));
-    vi.doUnmock("@/lib/config");
+    try {
+      const { getStorage } = await import("@/server/storage");
+      expect(getStorage()).toBe(getStorage());
+      await getStorage().put("logos/cfg.png", Buffer.from("x"), "image/png");
+      expect(await listRecursive(root)).toContain(path.join("logos", "cfg.png"));
+    } finally {
+      vi.doUnmock("@/lib/config");
+    }
   });
 });
