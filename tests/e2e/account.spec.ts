@@ -132,7 +132,8 @@ for (const { name, base, create } of surfaces) {
       await expect(page.getByTestId("totp-state")).toHaveAttribute("data-state", "on");
 
       await page.getByTestId("totp-disable-password").fill(user.password);
-      await page.getByTestId("totp-disable-code").fill(generateSync({ secret }));
+      // The enabling code's step is already used up.
+      await page.getByTestId("totp-disable-code").fill(generateSync({ secret, epoch: Math.floor(Date.now() / 1000) + 30 }));
       await submit(page, "totp-disable");
       await expect(page.getByTestId("totp-state")).toHaveAttribute("data-state", "off");
       await page.reload();

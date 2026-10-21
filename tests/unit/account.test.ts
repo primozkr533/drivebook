@@ -29,6 +29,9 @@ const db = getTestDb();
 const PASSWORD = "correct horse battery";
 const meta = { ip: "127.0.0.1", userAgent: "vitest" };
 
+// The step after the one consumed by confirmTotpSetup, still inside the verification tolerance.
+const nextCode = (secret: string) => generateSync({ secret, epoch: Math.floor(Date.now() / 1000) + 30 });
+
 function wrongCode(secret: string): string {
   const valid = generateSync({ secret });
   return String((Number(valid) + 500_000) % 1_000_000).padStart(6, "0");
@@ -233,7 +236,7 @@ describe("disabling 2FA", () => {
     expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
     expect(await auditRows("auth.totp.disabled")).toHaveLength(0);
 
-    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: generateSync({ secret }), ip: meta.ip })).toEqual({
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: nextCode(secret), ip: meta.ip })).toEqual({
       ok: true,
     });
     const [user] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, userId));
@@ -244,6 +247,51 @@ describe("disabling 2FA", () => {
       .from(auditLog)
       .where(and(eq(auditLog.action, "auth.totp.disabled"), eq(auditLog.actorId, userId)));
     expect(audits).toHaveLength(1);
+  });
+});
+
+describe("single-use codes", () => {
+  const stepOf = (epoch: number) => Math.floor(epoch / 30);
+
+  it("confirmTotpSetup stores the step and rejects a code at or before it", async () => {
+    const userId = seeded.dealerUser.id;
+    const setup = await startTotpSetup("dealer", userId);
+    const epoch = Math.floor(Date.now() / 1000);
+    await db.update(dealerUsers).set({ totpLastStep: stepOf(epoch) }).where(eq(dealerUsers.id, userId));
+    expect(await confirmTotpSetup("dealer", userId, generateSync({ secret: setup.secret, epoch }))).toEqual({
+      ok: false,
+      error: "invalid_code",
+    });
+    expect((await getAccountSummary("dealer", userId)).totpEnabled).toBe(false);
+
+    expect(await confirmTotpSetup("dealer", userId, generateSync({ secret: setup.secret, epoch: epoch + 30 }))).toEqual({
+      ok: true,
+    });
+    const [user] = await db.select().from(dealerUsers).where(eq(dealerUsers.id, userId));
+    expect(user.totpLastStep).toBe(stepOf(epoch) + 1);
+  });
+
+  it("disableTotp rejects the code used to enable 2FA as invalid and counts the failure", async () => {
+    const userId = seeded.backofficeUser.id;
+    const setup = await startTotpSetup("backoffice", userId);
+    const code = generateSync({ secret: setup.secret });
+    expect(await confirmTotpSetup("backoffice", userId, code)).toEqual({ ok: true });
+    const [enabled] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, userId));
+    expect(enabled.totpLastStep).toEqual(expect.any(Number));
+
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code, ip: meta.ip })).toEqual({
+      ok: false,
+      error: "invalid_code",
+    });
+    expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
+    expect(await db.select().from(loginAttempts)).toHaveLength(1);
+    expect(await auditRows("auth.totp.disable_failed")).toMatchObject([{ data: { reason: "invalid_code" } }]);
+
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: nextCode(setup.secret), ip: meta.ip })).toEqual({
+      ok: true,
+    });
+    const [disabled] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, userId));
+    expect(disabled.totpLastStep).toBeGreaterThan(enabled.totpLastStep!);
   });
 });
 
@@ -282,7 +330,7 @@ describe("users of a read_only dealer", () => {
     expect(await auditRows("auth.totp.enabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
 
     expect(
-      await disableTotp("dealer", userId, { password: PASSWORD, code: generateSync({ secret: setup.secret }), ip: meta.ip }),
+      await disableTotp("dealer", userId, { password: PASSWORD, code: nextCode(setup.secret), ip: meta.ip }),
     ).toEqual({ ok: true });
     expect((await getAccountSummary("dealer", userId)).totpEnabled).toBe(false);
     expect(await auditRows("auth.totp.disabled")).toMatchObject([{ dealerId: seeded.dealer.id, actorId: userId }]);
@@ -352,7 +400,7 @@ describe("failed credential checks", () => {
     for (let i = 1; i < LOGIN_MAX_ACCOUNT_FAILURES; i++) {
       expect(await disable(PASSWORD, wrongCode(secret))).toEqual({ ok: false, error: "invalid_code" });
     }
-    expect(await disable(PASSWORD, generateSync({ secret }))).toEqual({ ok: false, error: "rate_limited" });
+    expect(await disable(PASSWORD, nextCode(secret))).toEqual({ ok: false, error: "rate_limited" });
     expect((await getAccountSummary("backoffice", userId)).totpEnabled).toBe(true);
 
     const audits = await auditRows("auth.totp.disable_failed");
@@ -371,7 +419,7 @@ describe("failed credential checks", () => {
   it("lets a correct first attempt succeed without recording a failure", async () => {
     expect(await changeWith(seeded.dealerUser.id, PASSWORD)).toEqual({ ok: true });
     const { userId, secret } = await enableBackoffice();
-    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: generateSync({ secret }), ip: meta.ip })).toEqual({
+    expect(await disableTotp("backoffice", userId, { password: PASSWORD, code: nextCode(secret), ip: meta.ip })).toEqual({
       ok: true,
     });
     expect(await db.select().from(loginAttempts)).toHaveLength(0);

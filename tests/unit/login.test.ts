@@ -4,7 +4,7 @@ import { generateSync } from "otplib";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { auditLog, backofficeUsers, dealers, dealerUsers, loginAttempts, plans } from "@/db/schema";
 import { hashPassword } from "@/server/auth/password";
-import { encryptTotpSecret, generateTotpSecret } from "@/server/auth/totp";
+import { consumeTotpStep, encryptTotpSecret, generateTotpSecret } from "@/server/auth/totp";
 import { setDbForTests } from "@/server/data/db";
 import { getTestDb, truncateAll } from "../setup/db";
 
@@ -25,6 +25,7 @@ const { SESSION_COOKIE, validateSessionToken } = await import("@/server/auth/ses
 const db = getTestDb();
 const PASSWORD = "correct horse battery";
 const base = { ip: "10.0.0.1", userAgent: "vitest" };
+const currentStep = () => Math.floor(Date.now() / 1000 / 30);
 
 async function seed() {
   const [plan] = await db
@@ -253,6 +254,73 @@ describe("TOTP step", () => {
       ok: false,
       error: "invalid",
     });
+  });
+});
+
+describe("TOTP replay", () => {
+  async function pending() {
+    const r = await login({ ...base, surface: "dealer", email: "2fa@demo.si", password: PASSWORD });
+    return (r as { pendingToken: string }).pendingToken;
+  }
+  const lastStep = async () =>
+    (await db.select().from(dealerUsers).where(eq(dealerUsers.id, s.twoFactor.id)))[0].totpLastStep;
+
+  it("rejects the same code after signing out and in again, counting it as a failure", async () => {
+    const totpCode = generateSync({ secret: s.totpSecret });
+    const first = await login({ ...base, surface: "dealer", email: "", pendingToken: await pending(), totpCode });
+    expect(first.ok).toBe(true);
+    if (first.ok) jar.set(SESSION_COOKIE.dealer, { value: first.token });
+    await logout("dealer");
+
+    const pendingToken = await pending();
+    expect(await login({ ...base, surface: "dealer", email: "", pendingToken, totpCode })).toEqual({
+      ok: false,
+      error: "totp_invalid",
+      pendingToken,
+    });
+    expect(await db.select().from(loginAttempts).where(eq(loginAttempts.success, false))).toHaveLength(1);
+    const [last] = await db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(1);
+    expect(last).toMatchObject({ action: "auth.login.failure", data: { reason: "totp_invalid" } });
+  });
+
+  it("rejects a code at or before the stored step and accepts and stores a later one", async () => {
+    const step = currentStep();
+    await db.update(dealerUsers).set({ totpLastStep: step }).where(eq(dealerUsers.id, s.twoFactor.id));
+    const pendingToken = await pending();
+    for (const epoch of [step * 30, (step - 1) * 30]) {
+      const totpCode = generateSync({ secret: s.totpSecret, epoch });
+      expect(await login({ ...base, surface: "dealer", email: "", pendingToken, totpCode })).toMatchObject({
+        ok: false,
+        error: "totp_invalid",
+      });
+    }
+    expect(await lastStep()).toBe(step);
+
+    const next = generateSync({ secret: s.totpSecret, epoch: (step + 1) * 30 });
+    expect((await login({ ...base, surface: "dealer", email: "", pendingToken, totpCode: next })).ok).toBe(true);
+    expect(await lastStep()).toBe(step + 1);
+  });
+
+  it("consumes a step at most once per user on both surfaces, also under concurrency", async () => {
+    const step = currentStep();
+    for (const [surface, id] of [
+      ["dealer", s.twoFactor.id],
+      ["backoffice", s.admin.id],
+    ] as const) {
+      expect(await Promise.all([consumeTotpStep(surface, id, step), consumeTotpStep(surface, id, step)])).toEqual(
+        expect.arrayContaining([true, false]),
+      );
+      expect(await consumeTotpStep(surface, id, step)).toBe(false);
+      expect(await consumeTotpStep(surface, id, step - 1)).toBe(false);
+      expect(await consumeTotpStep(surface, id, step + 1)).toBe(true);
+    }
+    expect(await lastStep()).toBe(step + 1);
+    const [admin] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, s.admin.id));
+    expect(admin.totpLastStep).toBe(step + 1);
+    // Steps are per user: other users on either surface are untouched.
+    const [owner] = await db.select().from(dealerUsers).where(eq(dealerUsers.id, s.owner.id));
+    expect(owner.totpLastStep).toBeNull();
+    expect(await consumeTotpStep("dealer", s.owner.id, step)).toBe(true);
   });
 });
 

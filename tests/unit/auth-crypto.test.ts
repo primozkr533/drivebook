@@ -54,22 +54,26 @@ describe("tokens", () => {
 });
 
 describe("totp", () => {
-  it("accepts the current code, tolerates spacing and rejects a wrong code", () => {
+  it("returns the matched step for the current code, tolerates spacing and rejects a wrong code", () => {
     const secret = generateTotpSecret();
-    const code = generateSync({ secret });
-    expect(verifyTotpCode(secret, code)).toBe(true);
-    expect(verifyTotpCode(secret, `${code.slice(0, 3)} ${code.slice(3)}`)).toBe(true);
+    const now = Date.now();
+    const step = Math.floor(now / 1000 / 30);
+    const code = generateSync({ secret, epoch: Math.floor(now / 1000) });
+    expect(verifyTotpCode(secret, code, now)).toBe(step);
+    expect(verifyTotpCode(secret, `${code.slice(0, 3)} ${code.slice(3)}`, now)).toBe(step);
     const wrong = String((Number(code) + 1) % 1_000_000).padStart(6, "0");
-    expect(verifyTotpCode(secret, wrong)).toBe(false);
-    expect(verifyTotpCode(secret, "abc")).toBe(false);
+    expect(verifyTotpCode(secret, wrong, now)).toBeNull();
+    expect(verifyTotpCode(secret, "abc", now)).toBeNull();
   });
 
-  it("accepts codes one step away and rejects codes two steps away", () => {
+  it("returns the neighbouring step for codes one step away and rejects codes two steps away", () => {
     const secret = generateTotpSecret();
-    const now = Math.floor(Date.now() / 1000);
-    expect(verifyTotpCode(secret, generateSync({ secret, epoch: now - 30 }))).toBe(true);
-    expect(verifyTotpCode(secret, generateSync({ secret, epoch: now + 30 }))).toBe(true);
-    expect(verifyTotpCode(secret, generateSync({ secret, epoch: now - 90 }))).toBe(false);
+    const now = Date.now();
+    const seconds = Math.floor(now / 1000);
+    const step = Math.floor(seconds / 30);
+    expect(verifyTotpCode(secret, generateSync({ secret, epoch: seconds - 30 }), now)).toBe(step - 1);
+    expect(verifyTotpCode(secret, generateSync({ secret, epoch: seconds + 30 }), now)).toBe(step + 1);
+    expect(verifyTotpCode(secret, generateSync({ secret, epoch: seconds - 90 }), now)).toBeNull();
   });
 
   it("builds an otpauth URI and a PNG data URL", async () => {
