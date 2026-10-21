@@ -82,15 +82,15 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-`.env.example` holds the dev defaults; change these for production:
+`.env.example` holds the dev defaults. `AUTH_SECRET` and `POSTGRES_PASSWORD` are deliberately blank: `docker compose -f docker-compose.prod.yml` refuses to start until you set them, and with `APP_ENV=production` the app also refuses the sample development `AUTH_SECRET` (`AUTH_SECRET is the sample development secret` in the log). Change these for production:
 
 | Variable | Production value |
 | --- | --- |
 | `APP_ENV` | `production` (the prod compose file forces it anyway) |
 | `BASE_DOMAIN` | `drivebook.si` |
-| `AUTH_SECRET` | a strong random value, e.g. `openssl rand -hex 32` |
+| `AUTH_SECRET` | required; a strong random value, e.g. `openssl rand -base64 48` |
 | `POSTGRES_USER` / `POSTGRES_DB` | keep `drivebook` or choose your own |
-| `POSTGRES_PASSWORD` | a strong random value, e.g. `openssl rand -hex 32` (hex needs no URL-encoding) |
+| `POSTGRES_PASSWORD` | required; a strong random value, e.g. `openssl rand -hex 32` (hex needs no URL-encoding) |
 | `DATABASE_URL`, `TEST_DATABASE_URL` | delete both lines — compose builds `DATABASE_URL` from the `POSTGRES_*` values; a `DATABASE_URL` left in `.env` overrides that and must match them |
 | `SEED_ON_START` | `0` — otherwise the demo dealer is seeded into production |
 | `SEED_SUPERADMIN_EMAIL` | empty (the first Superadmin is created in step 5) |
@@ -208,10 +208,11 @@ Compose rebuilds the image, runs `migrate` first, and only starts the new `web` 
 
 ## Trying the production stack locally
 
-`docker-compose.prod.local.yml` overrides the prod stack for a local run (`drivebook.localhost`, Caddy internal TLS, fake providers, demo seed):
+`docker-compose.prod.local.yml` overrides the prod stack for a local run (`drivebook.localhost`, Caddy internal TLS, fake providers, demo seed, and its own fixed local `AUTH_SECRET` and Postgres password). Compose checks the `AUTH_SECRET` / `POSTGRES_PASSWORD` guards of `docker-compose.prod.yml` before applying the override, so export any non-empty value for them in the shell you run compose from:
 
 ```bash
 cp .env.example .env
+export AUTH_SECRET=local POSTGRES_PASSWORD=local
 docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml up -d --build
 curl -k --resolve demo.drivebook.localhost:443:127.0.0.1 https://demo.drivebook.localhost/
 ```

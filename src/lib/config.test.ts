@@ -83,6 +83,33 @@ describe("getConfig", () => {
     expect(getConfig().authSecret).toBe(SECRET);
   });
 
+  describe("sample AUTH_SECRET", () => {
+    const DEV_SECRET = "drivebook-dev-auth-secret-not-for-production";
+    const prod = { APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" };
+
+    it("throws in production when AUTH_SECRET is the dev secret", () => {
+      setEnv({ ...prod, AUTH_SECRET: DEV_SECRET });
+      expect(() => getConfig()).toThrow(/AUTH_SECRET is the sample development secret/);
+    });
+
+    it("allows the dev secret in production when ALLOW_FAKE_PROVIDERS=1", () => {
+      setEnv({ ...prod, AUTH_SECRET: DEV_SECRET, ALLOW_FAKE_PROVIDERS: "1" });
+      expect(getConfig().authSecret).toBe(DEV_SECRET);
+    });
+
+    it("accepts a real secret in production", () => {
+      setEnv({ ...prod, AUTH_SECRET: SECRET });
+      expect(getConfig().authSecret).toBe(SECRET);
+    });
+
+    it("leaves development and test unaffected", () => {
+      for (const appEnv of ["development", "test"]) {
+        setEnv({ APP_ENV: appEnv, AUTH_SECRET: DEV_SECRET });
+        expect(getConfig().authSecret).toBe(DEV_SECRET);
+      }
+    });
+  });
+
   it("treats auth/notify flags as true only for the literal 1", () => {
     setEnv({ FARM_TEST_AUTH: "1", NOTIFY_FAKE: "1" });
     expect(getConfig().farmTestAuth).toBe(true);

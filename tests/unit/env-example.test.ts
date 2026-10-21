@@ -62,6 +62,12 @@ describe(".env.example", () => {
     expect(lines[lineIndex(name)]).toBe(`${name}=`);
   });
 
+  it.each(["AUTH_SECRET", "POSTGRES_PASSWORD"])("leaves %s blank with a generation hint", (name) => {
+    const index = lineIndex(name);
+    expect(lines[index]).toBe(`${name}=`);
+    expect(lines[index - 1]).toMatch(/^# Generate one: openssl rand /);
+  });
+
   it("keeps 14 days of backups by default", () => {
     expect(lines[lineIndex("BACKUP_RETENTION_DAYS")]).toBe("BACKUP_RETENTION_DAYS=14");
   });

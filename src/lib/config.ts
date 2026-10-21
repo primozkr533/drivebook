@@ -150,6 +150,14 @@ function buildConfig(env: Env): Config {
     throw new Error(`AUTH_SECRET must be at least ${MIN_AUTH_SECRET_LENGTH} characters`);
   }
 
+  const allowFakeProviders = readFlag(env, "ALLOW_FAKE_PROVIDERS");
+  // Staging and the local prod rehearsal opt in via ALLOW_FAKE_PROVIDERS; real production must not.
+  if (isProduction && rawAuthSecret === DEV_AUTH_SECRET && !allowFakeProviders) {
+    throw new Error(
+      "AUTH_SECRET is the sample development secret; generate a production value (e.g. openssl rand -base64 48)",
+    );
+  }
+
   const twilioSid = read(env, "TWILIO_ACCOUNT_SID");
   const twilioToken = read(env, "TWILIO_AUTH_TOKEN");
   const twilioFrom = read(env, "TWILIO_FROM_NUMBER");
@@ -188,7 +196,7 @@ function buildConfig(env: Env): Config {
     farmTestAuth: readFlag(env, "FARM_TEST_AUTH"),
     devInboxEnabled: !isProduction || readFlag(env, "DEV_INBOX_ENABLED"),
     notifyFake: readFlag(env, "NOTIFY_FAKE"),
-    allowFakeProviders: readFlag(env, "ALLOW_FAKE_PROVIDERS"),
+    allowFakeProviders,
     missingProviderKeys: REQUIRED_PROVIDER_KEYS.filter((name) => read(env, name) === undefined),
     publicUrlScheme: readScheme(env),
     publicUrlPort: readPort(env),

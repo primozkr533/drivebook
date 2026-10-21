@@ -1,21 +1,34 @@
 # Local run of the production stack: fake providers, drivebook.localhost, Caddy internal TLS, demo seed.
 #   cp .env.example .env
+#   export AUTH_SECRET=local POSTGRES_PASSWORD=local
 #   docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml up -d --build
 #   curl -k --resolve demo.drivebook.localhost:443:127.0.0.1 https://demo.drivebook.localhost/
 # Needs host ports 80/443 free.
+# Compose checks the ${VAR:?} guards in docker-compose.prod.yml before applying this file, so they need
+# any non-empty value; the containers get the fixed local values below.
 
 x-local-app-env: &local-app-env
   - BASE_DOMAIN=drivebook.localhost
   - ALLOW_FAKE_PROVIDERS=1
   - SEED_ON_START=1
+  - AUTH_SECRET=drivebook-local-prod-auth-secret-not-for-production
+  - DATABASE_URL=postgres://drivebook:drivebook-local@db:5432/drivebook
 
 services:
+  db:
+    environment:
+      - POSTGRES_USER=drivebook
+      - POSTGRES_PASSWORD=drivebook-local
+      - POSTGRES_DB=drivebook
   migrate:
     environment: *local-app-env
   web:
     environment: *local-app-env
   worker:
     environment: *local-app-env
+  backup:
+    environment:
+      - DATABASE_URL=postgres://drivebook:drivebook-local@db:5432/drivebook
   caddy:
     environment:
       - BASE_DOMAIN=drivebook.localhost
