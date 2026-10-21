@@ -19,7 +19,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="sl" className={`${archivo.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        {/* Messages reach the client only under the admin (app) layouts; public pages ship none. */}
+        <NextIntlClientProvider messages={null}>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

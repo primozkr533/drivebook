@@ -1,11 +1,15 @@
-import { Archivo, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
-// Self-hosted at build time; wdth keeps the 125 % expanded display register.
-export const archivo = Archivo({
-  subsets: ["latin", "latin-ext"],
-  axes: ["wdth"],
+// Self-hosted subset (see src/fonts/subset-archivo.py); the wdth axis keeps the 125 % expanded display register.
+export const archivo = localFont({
+  src: "../fonts/archivo-latin-ext.woff2",
+  weight: "400 800",
+  style: "normal",
   display: "swap",
   variable: "--font-archivo",
+  declarations: [{ prop: "font-stretch", value: "100% 125%" }],
+  adjustFontFallback: "Arial",
 });
 
 // Mono only labels small utility text, so it is not preloaded for the first viewport.

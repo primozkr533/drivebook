@@ -1,3 +1,4 @@
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { AdminHeader } from "@/components/auth/AdminHeader";
@@ -9,7 +10,7 @@ export default async function BackofficeAppLayout({ children }: { children: Reac
   const [basePath, t] = await Promise.all([getSurfaceBasePath(), getTranslations("auth")]);
   return (
     <Shell header={<AdminHeader surface="backoffice" basePath={basePath} email={user.email} context={t("eyebrowBackoffice")} />}>
-      {children}
+      <NextIntlClientProvider>{children}</NextIntlClientProvider>
     </Shell>
   );
 }
