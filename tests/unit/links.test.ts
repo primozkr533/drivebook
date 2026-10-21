@@ -216,17 +216,55 @@ describe("invite lifecycle", () => {
 });
 
 describe("requestPasswordReset", () => {
-  it("resolves identically for an unknown email and sends nothing", async () => {
+  it("resolves identically for every case and sends nothing to unknown or deactivated users", async () => {
+    await db.update(dealerUsers).set({ status: "deactivated" }).where(eq(dealerUsers.id, seeded.active.id));
     const unknown = await requestPasswordReset("dealer", "nobody@demo.si");
-    const notActive = await requestPasswordReset("dealer", seeded.invited.email);
+    const deactivated = await requestPasswordReset("dealer", "owner@demo.si");
     expect(await drainNotificationsForTest()).toBe(0);
     expect(await db.select().from(devOutbox)).toHaveLength(0);
     expect(await db.select().from(messageLog)).toHaveLength(0);
     expect(await db.select().from(authTokens)).toHaveLength(0);
 
-    const known = await requestPasswordReset("dealer", "OWNER@demo.si ");
-    expect(unknown).toEqual(known);
-    expect(notActive).toEqual(known);
+    const invited = await requestPasswordReset("dealer", seeded.invited.email);
+    await db.update(dealerUsers).set({ status: "active" }).where(eq(dealerUsers.id, seeded.active.id));
+    const active = await requestPasswordReset("dealer", "OWNER@demo.si ");
+    expect(unknown).toEqual(active);
+    expect(deactivated).toEqual(active);
+    expect(invited).toEqual(active);
+  });
+
+  it("re-sends the invitation (7-day set-password link, no reset e-mail) to an invited user", async () => {
+    const now = new Date();
+    await requestPasswordReset("dealer", "Prodajalec@demo.si", { now });
+    expect(await drainNotificationsForTest()).toBe(1);
+    const outbox = await db.select().from(devOutbox);
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].recipient).toBe("prodajalec@demo.si");
+    expect(outbox[0].textBody).not.toContain("/reset-password/");
+    const link = outbox[0].textBody.match(/https?:\/\/\S+\/set-password\/[\w-]+/)![0];
+    const [log] = await db.select().from(messageLog);
+    expect(log).toMatchObject({ template: "invitation", status: "sent", dealerId: seeded.dealer.id });
+
+    const tokens = await db.select().from(authTokens);
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({ purpose: "invite", userId: seeded.invited.id });
+    const token = tokenOf(link);
+    const almost = new Date(now.getTime() + INVITE_TTL_MS - 1000);
+    expect(await inspectLinkToken("dealer", "invite", token, { now: almost })).toBe("valid");
+    expect(await consumeLinkToken("dealer", "invite", token, NEW_PASSWORD, meta)).toMatchObject({ ok: true });
+    expect(await consumeLinkToken("dealer", "invite", token, NEW_PASSWORD, meta)).toEqual({ ok: false, error: "used" });
+  });
+
+  it("re-sends at most 3 invitations per account per hour", async () => {
+    const now = new Date();
+    for (let i = 0; i < 5; i++) await requestPasswordReset("dealer", seeded.invited.email, { now });
+    expect(await db.select().from(authTokens)).toHaveLength(3);
+    expect(await drainNotificationsForTest()).toBe(3);
+    expect(await db.select().from(messageLog).where(eq(messageLog.template, "invitation"))).toHaveLength(3);
+
+    const nextHour = new Date(now.getTime() + 61 * 60 * 1000);
+    await requestPasswordReset("dealer", seeded.invited.email, { now: nextHour });
+    expect(await db.select().from(authTokens)).toHaveLength(4);
   });
 
   it("sends one e-mail with a /reset-password/ link to an active user", async () => {
