@@ -1,0 +1,18 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# One wildcard certificate via DNS-01, so the Cloudflare records stay DNS-only (grey cloud).
+{$BASE_DOMAIN}, *.{$BASE_DOMAIN} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_DNS_API_TOKEN}
+	}
+
+	encode zstd gzip
+
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Caddy keeps the original Host and, with no trusted_proxies, replaces X-Forwarded-For with the
+	# visitor's address, which is the last entry clientIp() (src/server/auth/client-ip.ts) trusts.
+	reverse_proxy web:3000
+}
