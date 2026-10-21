@@ -80,7 +80,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
 2. A `DealerContext` is created only by `resolveDealerSlug` (public host) or, later, by the authenticated session — never from IDs supplied in a request.
 3. Every dealer-scoped query filters by `ctx.dealerId`, including lookups by car ID (`getCar(ctx, id)`).
-4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction.
+4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction. Exception: self-service credential changes (see `## Decisions`).
 5. Admin actions and routes call `requireDealerRole(ctx, roles)` / `requireBackofficeRole(roles)` first; both are stubs that throw until auth exists.
 6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first.
 7. Public IDs (cars) are unguessable `newPublicId()` values, never sequential.
@@ -128,3 +128,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 
 ## Decisions
 - Until user-management UI exists, deactivation and invitation resend are operator actions via `npm run user-admin` (deactivate / resend-invite).
+- Self-service credential changes (own password change, TOTP setup/enable/disable in `src/server/auth/account.ts`) are exempt from `withDealerMutation`'s read_only/suspended block, so users of a restricted dealer can still secure their accounts; they must still write `audit_log` in the same transaction.
