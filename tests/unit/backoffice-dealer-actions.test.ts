@@ -1,5 +1,8 @@
 // Real-database tests: start Postgres with `docker compose up -d db` (uses TEST_DATABASE_URL).
+import { createElement, type ReactNode } from "react";
+import { prerender } from "react-dom/static";
 import { asc, count, eq } from "drizzle-orm";
+import { createTranslator } from "next-intl";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditLog,
@@ -25,6 +28,16 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({
   redirect: (location: string) => {
     throw new Error(`redirect ${location}`);
+  },
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+}));
+vi.mock("next-intl/server", () => ({
+  getRequestConfig: <T,>(fn: T) => fn,
+  getTranslations: async (namespace: "dealerPage" | "privacy") => {
+    const { messages } = await import("./i18n");
+    return createTranslator({ locale: "sl", messages, namespace });
   },
 }));
 
@@ -56,6 +69,13 @@ const {
   updateDealer,
 } = await import("@/server/data/backoffice/dealers");
 const { drainNotificationsForTest, stopBossForTests } = await import("@/server/notify/queue");
+const { default: DealerPage } = await import("@/app/site/[slug]/page");
+const { default: PrivacyPage } = await import("@/app/site/[slug]/zasebnost/page");
+
+async function renderHtml(element: ReactNode) {
+  const { prelude } = await prerender(createElement(() => element));
+  return new Response(prelude).text();
+}
 
 const db = getTestDb();
 const previousAppEnv = process.env.APP_ENV;
@@ -130,6 +150,41 @@ describe("updateDealer", () => {
     const [audit] = await audits();
     expect(audit).toMatchObject({ action: "dealer.update", entityId: id, dealerId: id, actorId: admin.id });
     expect(audit.data).toMatchObject({ before: { planId: plan.id, name: "Avto Novak" }, after: { planId: pro.id } });
+  });
+
+  it("keeps legalName in step with a rename while it still equals name, and audits it", async () => {
+    const { plan, id } = await seedNovak();
+    expect((await dealerRow(id)).legalName).toBe("Avto Novak");
+
+    expect(await updateDealer(id, { name: "Avto Novak Kranj", planId: plan.id })).toEqual({ ok: true });
+    expect(await dealerRow(id)).toMatchObject({ name: "Avto Novak Kranj", legalName: "Avto Novak Kranj" });
+
+    const [audit] = await audits();
+    expect(audit.data).toMatchObject({
+      before: { name: "Avto Novak", legalName: "Avto Novak" },
+      after: { name: "Avto Novak Kranj", legalName: "Avto Novak Kranj" },
+    });
+
+    const footer = await renderHtml(
+      await DealerPage({ params: Promise.resolve({ slug: "novak" }), searchParams: Promise.resolve({}) }),
+    );
+    expect(footer).toMatch(/<footer[\s\S]*<span>Avto Novak Kranj<\/span>/);
+    const privacy = await renderHtml(await PrivacyPage({ params: Promise.resolve({ slug: "novak" }) }));
+    expect(privacy).toContain("Avto Novak Kranj");
+    expect(privacy).not.toMatch(/Avto Novak(?! Kranj)/);
+  });
+
+  it("leaves a legalName that differs from name untouched and out of the audit", async () => {
+    const { plan, id } = await seedNovak();
+    await db.update(dealers).set({ legalName: "Novak Trgovina d.o.o." }).where(eq(dealers.id, id));
+
+    expect(await updateDealer(id, { name: "Avto Novak Kranj", planId: plan.id })).toEqual({ ok: true });
+    expect(await dealerRow(id)).toMatchObject({ name: "Avto Novak Kranj", legalName: "Novak Trgovina d.o.o." });
+
+    const [audit] = await audits();
+    const data = audit.data as { before: object; after: object };
+    expect(data.before).not.toHaveProperty("legalName");
+    expect(data.after).not.toHaveProperty("legalName");
   });
 
   it("rejects a blank name or unknown plan without writing", async () => {
