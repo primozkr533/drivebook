@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { prerender } from "react-dom/static";
-import { createTranslator } from "next-intl";
+import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "./i18n";
 import DealerAppLayout from "@/app/dealer-admin/(app)/layout";
@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(),
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
+  getOpeningHours: vi.fn(),
   pathname: "/",
 }));
 
@@ -66,6 +67,8 @@ vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
+vi.mock("@/server/data/settings-hours", () => ({ getOpeningHours: mocks.getOpeningHours }));
+vi.mock("@/app/dealer-admin/(app)/settings/hours/actions", () => ({ saveOpeningHoursAction: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
   getPlan: mocks.getPlan,
@@ -555,17 +558,29 @@ describe("dealer settings shell", () => {
     expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
   });
 
-  it("renders every settings stub for an Owner and access denied for a Salesperson", async () => {
+  it("renders every settings page for an Owner and access denied for a Salesperson", async () => {
+    const testIds: Record<(typeof sections)[number], string> = {
+      dealer: "settings-dealer",
+      branding: "settings-branding",
+      booking: "settings-booking",
+      hours: "hours-editor",
+      closures: "settings-closures",
+    };
+    mocks.getOpeningHours.mockResolvedValue({ 1: [{ opens: "08:00", closes: "12:00" }], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] });
+    const renderPage = async (Page: (typeof pages)[number]) =>
+      render(createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: await Page() }));
     for (const [i, Page] of pages.entries()) {
       signInAs(owner);
-      const html = await render(createElement(Page));
-      expect(html).toContain(`data-testid="settings-${sections[i]}"`);
+      const html = await renderPage(Page);
+      expect(html).toContain(`data-testid="${testIds[sections[i]]}"`);
       expect(html).not.toContain("access-denied");
 
       signInAs(salesperson);
-      const denied = await render(createElement(Page));
+      const calls = mocks.getOpeningHours.mock.calls.length;
+      const denied = await renderPage(Page);
       expect(denied).toContain('data-testid="access-denied"');
-      expect(denied).not.toContain(`settings-${sections[i]}`);
+      expect(denied).not.toContain(testIds[sections[i]]);
+      expect(mocks.getOpeningHours.mock.calls.length).toBe(calls);
     }
     signInAs(salesperson);
     expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
