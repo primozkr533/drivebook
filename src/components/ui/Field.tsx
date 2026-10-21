@@ -87,7 +87,13 @@ export function Select({
 }
 
 /** Binary toggle rendered as a geometric switch (checkbox semantics). */
-export function Switch({ label, hint, defaultChecked }: { label: string; hint?: string; defaultChecked?: boolean }) {
+export function Switch({
+  label,
+  hint,
+  name,
+  defaultChecked,
+  ...rest
+}: { label: string; hint?: string; name?: string; defaultChecked?: boolean; "data-testid"?: string }) {
   const id = useId();
   return (
     <label htmlFor={id} className="flex cursor-pointer items-start justify-between gap-4">
@@ -96,7 +102,7 @@ export function Switch({ label, hint, defaultChecked }: { label: string; hint?: 
         {hint && <span className="text-small text-muted">{hint}</span>}
       </span>
       <span className="relative mt-0.5 shrink-0">
-        <input id={id} type="checkbox" defaultChecked={defaultChecked} className="peer sr-only" />
+        <input id={id} type="checkbox" name={name} defaultChecked={defaultChecked} className="peer sr-only" {...rest} />
         <span className="block h-6 w-11 rounded-sharp bg-surface-2 shadow-[inset_0_0_0_1.5px_var(--line-strong)] transition-colors duration-[var(--dur-base)] peer-checked:bg-signal peer-focus-visible:shadow-[var(--focus-ring)]" />
         <span className="absolute left-1 top-1 block size-4 bg-ink transition-transform duration-[var(--dur-base)] ease-out peer-checked:translate-x-5" />
       </span>
