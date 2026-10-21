@@ -16,6 +16,7 @@ import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
 import { requireOwnerPage } from "@/app/dealer-admin/(app)/owner-gate";
+import { BOOKING_RULE_DEFAULTS } from "@/server/data/settings-booking";
 import SettingsLayout from "@/app/dealer-admin/(app)/settings/layout";
 import SettingsHomePage from "@/app/dealer-admin/(app)/settings/page";
 import SettingsDealerPage from "@/app/dealer-admin/(app)/settings/dealer/page";
@@ -27,7 +28,7 @@ import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings") => {
+  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings" | "settingsBooking") => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(),
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
+  getBookingRules: vi.fn(),
   pathname: "/",
 }));
 
@@ -73,6 +75,10 @@ vi.mock("@/server/data/backoffice/plans", () => ({
   updatePlan: vi.fn(),
   deletePlan: vi.fn(),
   DEFAULT_MONTHLY_SMS_QUOTA: 300,
+}));
+vi.mock("@/server/data/settings-booking", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/data/settings-booking")>()),
+  getBookingRules: mocks.getBookingRules,
 }));
 vi.mock("@/server/data/backoffice/users", () => ({
   listBackofficeUsers: mocks.listBackofficeUsers,
@@ -478,6 +484,7 @@ describe("dealer settings shell", () => {
   const owner = { id: "u1", email: "lastnik@demo.si", role: "owner" };
   const salesperson = { id: "u3", email: "prodajalec@demo.si", role: "salesperson" };
   const signInAs = (user: typeof owner, basePath = "/_dev/app") => {
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS });
     mocks.dealerSession = { ctx, user, sessionId: "s1" };
     mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
     mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
@@ -582,5 +589,27 @@ describe("dealer settings shell", () => {
     expect(denied).toContain('data-testid="access-denied"');
     expect(denied).not.toContain("dealer-users");
     expect(denied).not.toContain(settingsT.users.title + "</h1>");
+  });
+
+  it("shows the booking rules form with the current values, hours for notice and cut-off", async () => {
+    signInAs(owner);
+    mocks.getBookingRules.mockResolvedValue({ ...BOOKING_RULE_DEFAULTS, minNoticeMinutes: 180 });
+    const html = await render(createElement(SettingsBookingPage));
+    const bookingT = messages.settingsBooking;
+    const value = (name: string) => html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0].match(/value="([^"]*)"/)?.[1];
+    expect(mocks.getBookingRules).toHaveBeenCalledWith(ctx);
+    expect(value("testDriveMinutes")).toBe("45");
+    expect(value("viewingMinutes")).toBe("30");
+    expect(value("otherMinutes")).toBe("30");
+    expect(value("capacity")).toBe("1");
+    expect(value("minNoticeHours")).toBe("3");
+    expect(value("horizonDays")).toBe("14");
+    expect(value("bufferMinutes")).toBe("15");
+    expect(value("cancelCutoffHours")).toBe("2");
+    expect(html).toMatch(/<option value="15" selected="">15 min<\/option>/);
+    expect(html).toContain(bookingT.fields.minNoticeHours);
+    expect(html).toContain("0–168 h");
+    expect(html).toContain("15–240 min");
+    expect(html).toContain(bookingT.reset);
   });
 });
