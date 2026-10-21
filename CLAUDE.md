@@ -30,9 +30,10 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 
 ## Structure
 - `src/lib/config.ts` — the only env reader (`getConfig()`); also `RESERVED_SLUGS`
-- `src/lib/date.ts` — the only Europe/Ljubljana date utility
+- `src/lib/date.ts` — the only Europe/Ljubljana date utility; also `easterSunday` / `slovenianWorkFreeDays` (Slovenian work-free days)
 - `src/db/` — schema (`src/db/schema/`), client, migrate, seed, `newPublicId` (`src/db/ids.ts`)
 - `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
+- `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
@@ -41,7 +42,8 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
 - `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
 - `src/app/backoffice/` — `admin.` surface (backoffice); signed-in pages live in `(app)/`
-- `src/i18n/request.ts` + `messages/sl/` — translations
+- `src/app/backoffice/(app)/dealers`, `src/app/backoffice/(app)/plans`, `src/app/backoffice/(app)/users` — operator pages (Support: read-only UI, writes refused on the server)
+- `src/i18n/request.ts` + `messages/sl/` — translations (backoffice strings in `messages/sl/backoffice.json`)
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
 
 ## Required environment variables
@@ -80,9 +82,9 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
 2. A `DealerContext` is created only by `resolveDealerSlug` (public host) or, later, by the authenticated session — never from IDs supplied in a request.
 3. Every dealer-scoped query filters by `ctx.dealerId`, including lookups by car ID (`getCar(ctx, id)`).
-4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction. Exception: self-service credential changes (see `## Decisions`).
+4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction. Exceptions: self-service credential changes (see `## Decisions`); backoffice operator writes to dealer-scoped tables use `withBackofficeMutation` instead (`audit_log` in the same transaction, no `read_only`/`suspended` block, so operators can manage and reactivate restricted dealers).
 5. Admin pages, layouts and server actions first call `requireDealerUser()` / `requireBackofficeUser()` (`src/server/auth/permissions.ts`). These read the surface's own session cookie and redirect to that surface's `/login` when there is no valid session. Role checks use `requireDealerRole(ctx, roles)` (Owner / Salesperson) and `requireBackofficeRole(roles)` (Superadmin / Support). They throw `ForbiddenError` when the session user lacks the role or, for dealer users, when the session's dealer is not `ctx.dealerId`.
-6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first.
+6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first. Backoffice writes go through `withBackofficeMutation(fn, audit)` (`src/server/data/backoffice/mutate.ts`), which requires Superadmin and writes `audit_log` in the same transaction.
 7. Public IDs (cars) are unguessable `newPublicId()` values, never sequential.
 8. Reserved slugs (`RESERVED_SLUGS` in `src/lib/config.ts`) are never resolved as dealers.
 
@@ -127,7 +129,10 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Dealer admin is desktop-first but must be usable on tablet/phone: `AppHeader` nav hides below `lg`; pass `menu={{ label }}` to show the same items in the compact disclosure menu (`CompactMenu`) there.
 
 ## Decisions
-- Until user-management UI exists, deactivation and invitation resend are operator actions via `npm run user-admin` (deactivate / resend-invite).
+- Backoffice users are invited and deactivated by Superadmins on the backoffice users page (`admin.` surface, `src/app/backoffice/(app)/users`), and dealer Owner invitations are resent from the backoffice dealer detail page. `npm run user-admin` (deactivate / resend-invite) remains available for operators.
+- Creating a dealer seeds default booking rules, Slovenian work-free days for the current and next year, and empty opening hours, and invites the Owner (7-day link) after the transaction commits.
+- Support backoffice users can view everything; change controls are hidden and every write is refused server-side (Superadmin only).
+- Old slugs stay reserved in slug history and cannot be taken by another dealer.
 - Self-service credential changes (own password change, TOTP setup/enable/disable in `src/server/auth/account.ts`) are exempt from `withDealerMutation`'s read_only/suspended block, so users of a restricted dealer can still secure their accounts; they must still write `audit_log` in the same transaction.
 - Session cookie renewal: `src/proxy.ts` re-issues the surface session cookie on `app.`/`admin.` requests (and on `/_dev/app/*`, `/_dev/admin/*`) once the session has passed `SESSION_REFRESH_AFTER_MS` since its last refresh. Page navigation alone therefore keeps the 30-day sliding expiry alive. Server Components never set cookies.
 - TOTP codes are single-use. The last accepted time step is stored per user (`totp_last_step`). Codes at or before it are rejected at login, at 2FA setup confirmation and when 2FA is turned off.
