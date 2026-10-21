@@ -49,7 +49,7 @@ beforeEach(() => {
 
 it("invites with the form email and role and redirects to the list", async () => {
   mocks.inviteBackofficeUser.mockResolvedValue({ ok: true, userId: "u1", link: "x" });
-  expect(await redirectOf(inviteUserAction({}, form({ ...invite, role: "superadmin" })))).toBe("/_dev/admin/users");
+  expect(await redirectOf(inviteUserAction({}, form({ ...invite, role: "superadmin" })))).toMatch(/^\/_dev\/admin\/users\?saved=invite&t=[a-z0-9]+$/);
   expect(mocks.inviteBackofficeUser).toHaveBeenCalledWith({ email: "nova@drivebook.si", role: "superadmin" });
 });
 
@@ -65,7 +65,7 @@ it.each(["", "owner"])("rejects the role %j without calling the service", async 
 
 it("deactivates the bound user and redirects to the list", async () => {
   mocks.deactivateBackofficeUser.mockResolvedValue({ ok: true });
-  expect(await redirectOf(deactivateUserAction("u1", {}, form({ id: "other" })))).toBe("/_dev/admin/users");
+  expect(await redirectOf(deactivateUserAction("u1", {}, form({ id: "other" })))).toMatch(/^\/_dev\/admin\/users\?saved=deactivate&t=[a-z0-9]+$/);
   expect(mocks.deactivateBackofficeUser).toHaveBeenCalledWith("u1");
 });
 
