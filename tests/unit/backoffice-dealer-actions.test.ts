@@ -273,6 +273,43 @@ describe("extendLicence", () => {
     expect(await countOf(auditLog)).toBe(0);
     expect((await dealerRow(id)).licenceValidUntil).toBe("2027-10-31");
   });
+
+  it("rejects a date before today or before the current valid-until and writes nothing", async () => {
+    const { id } = await seedNovak();
+    await db.update(dealers).set({ licenceValidUntil: "2026-10-01" }).where(eq(dealers.id, id));
+    const before = await countOf(dealerLicenceHistory);
+
+    // 2026-10-21T23:30Z is already 2026-10-22 in Ljubljana.
+    expect(
+      await extendLicence(id, { validUntil: "2026-10-21", note: "x" }, { now: new Date("2026-10-21T23:30:00Z") }),
+    ).toEqual({ ok: false, field: "validUntil", error: "past" });
+    expect(await extendLicence(id, { validUntil: "2020-01-01", note: "x" }, { now: NOW })).toEqual({
+      ok: false,
+      field: "validUntil",
+      error: "past",
+    });
+
+    await db.update(dealers).set({ licenceValidUntil: "2030-12-31" }).where(eq(dealers.id, id));
+    expect(await extendLicence(id, { validUntil: "2028-10-31", note: "x" }, { now: NOW })).toEqual({
+      ok: false,
+      field: "validUntil",
+      error: "beforeCurrent",
+    });
+
+    expect(await countOf(dealerLicenceHistory)).toBe(before);
+    expect(await countOf(auditLog)).toBe(0);
+    expect((await dealerRow(id)).licenceValidUntil).toBe("2030-12-31");
+  });
+
+  it("accepts today when the licence has already lapsed, and the current valid-until itself", async () => {
+    const { id } = await seedNovak();
+    await db.update(dealers).set({ licenceValidUntil: "2026-10-01" }).where(eq(dealers.id, id));
+
+    expect(await extendLicence(id, { validUntil: "2026-10-21", note: "x" }, { now: NOW })).toEqual({ ok: true });
+    expect(await extendLicence(id, { validUntil: "2026-10-21", note: "y" }, { now: new Date("2026-10-21T12:00:00Z") })).toEqual({ ok: true });
+    expect((await dealerRow(id)).licenceValidUntil).toBe("2026-10-21");
+    expect(await countOf(dealerLicenceHistory)).toBe(3);
+  });
 });
 
 describe("recordDpaSigned", () => {

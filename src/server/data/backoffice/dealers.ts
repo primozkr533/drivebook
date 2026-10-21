@@ -349,8 +349,10 @@ const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Error &&
   ((error as { code?: string }).code === "23505" || (error.cause as { code?: string } | undefined)?.code === "23505");
 
-const uniqueConstraint = (error: Error): string | undefined =>
-  (error as { constraint?: string }).constraint ?? (error.cause as { constraint?: string } | undefined)?.constraint;
+const uniqueConstraint = (error: unknown): string | undefined =>
+  error instanceof Error
+    ? ((error as { constraint?: string }).constraint ?? (error.cause as { constraint?: string } | undefined)?.constraint)
+    : undefined;
 
 const done = <R extends { ok: boolean }>(result: R) => (result.ok ? { ok: true as const } : result);
 
