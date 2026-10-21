@@ -8,6 +8,6 @@ export function savedQuery(change: string): string {
 }
 
 // useActionState keeps a failed attempt's error across the success redirect's soft navigation; a new key remounts the form.
-export function savedFormKey(query: Query): string {
+export function savedFormKey(query: Query = {}): string {
   return `${first(query.saved) || "none"}:${first(query.t)}`;
 }
