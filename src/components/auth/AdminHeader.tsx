@@ -17,7 +17,12 @@ export async function AdminHeader({
 }) {
   const [t, tBackoffice] = await Promise.all([getTranslations("account"), getTranslations("backoffice")]);
   const nav = [
-    ...(surface === "backoffice" ? [{ label: tBackoffice("dealers.nav"), href: `${basePath}/dealers` }] : []),
+    ...(surface === "backoffice"
+      ? [
+          { label: tBackoffice("dealers.nav"), href: `${basePath}/dealers` },
+          { label: tBackoffice("plans.nav"), href: `${basePath}/plans` },
+        ]
+      : []),
     { label: t("navAccount"), href: `${basePath}/account` },
   ];
   return (

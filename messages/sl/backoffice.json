@@ -24,5 +24,53 @@
     "noLicence": "Ni določeno",
     "empty": "Ni trgovcev, ki ustrezajo iskanju.",
     "count": "{count, plural, one {# trgovec} two {# trgovca} few {# trgovci} other {# trgovcev}}"
+  },
+  "plans": {
+    "nav": "Paketi",
+    "title": "Paketi",
+    "description": "Paketi, ki jih dodelite trgovcem: SMS kvota in število uporabnikov.",
+    "newTitle": "Nov paket",
+    "newDescription": "Nov paket je takoj na voljo za dodelitev trgovcem.",
+    "editTitle": "Paket {name}",
+    "viewDescription": "Podatki paketa.",
+    "create": "Nov paket",
+    "save": "Shrani",
+    "add": "Ustvari paket",
+    "delete": "Izbriši paket",
+    "back": "Nazaj na pakete",
+    "edit": "Uredi",
+    "deleteTitle": "Brisanje paketa",
+    "deleteHint": "Izbrišete lahko le paket, ki ga ne uporablja noben trgovec in ni privzeti.",
+    "default": "Privzeti",
+    "fields": {
+      "name": "Ime",
+      "monthlySmsQuota": "Mesečna SMS kvota",
+      "maxUsers": "Največ uporabnikov",
+      "notes": "Opombe"
+    },
+    "hints": {
+      "monthlySmsQuota": "Število SMS sporočil na mesec.",
+      "maxUsers": "Najmanj 1.",
+      "notes": "Interne opombe, trgovci jih ne vidijo."
+    },
+    "columns": {
+      "name": "Ime",
+      "monthlySmsQuota": "SMS / mesec",
+      "maxUsers": "Uporabniki",
+      "dealerCount": "Trgovci",
+      "notes": "Opombe"
+    },
+    "empty": "Ni paketov.",
+    "noNotes": "—",
+    "count": "{count, plural, one {# paket} two {# paketa} few {# paketi} other {# paketov}}",
+    "errors": {
+      "required": "Vnos je obvezen.",
+      "invalid": "Vnesite celo število v dovoljenem obsegu.",
+      "taken": "Paket s tem imenom že obstaja.",
+      "inUse": "Paketa ni mogoče izbrisati, ker ga uporablja trgovec ali je v zgodovini licenc.",
+      "default": "Privzetega paketa ni mogoče izbrisati.",
+      "notFound": "Paket ne obstaja več.",
+      "forbidden": "Za to dejanje nimate pravic."
+    }
   }
 }
