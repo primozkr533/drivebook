@@ -39,6 +39,7 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
 - `src/server/startup.ts` + `src/instrumentation.ts` — migrate + seed on server start
 - `src/server/notify/queue.ts` — `sendEmail`/`sendSms` (log to `message_log` + enqueue; never throw), job handlers, `drainNotificationsForTest()` · `src/worker.ts` — worker entrypoint
+- `src/server/storage/` — `FileStorage` (put/get/delete/url) via `getStorage()`, local disk at `STORAGE_DIR`; files are served by `GET /api/files/{key}` (`src/app/api/files/[...key]/route.ts`)
 - `src/app/site/[slug]/` — public dealer site
 - `src/app/api/test/login/route.ts` — gate-only test login (`FARM_TEST_AUTH=1`); farm infrastructure, never remove or weaken it; the demo Owner is resolved by `src/server/auth/test-login.ts`
 - `src/app/dealer-admin/` — `app.` surface (dealer admin); signed-in pages live in `(app)/` (layout = `AdminHeader` from `src/components/auth/`)
@@ -79,6 +80,11 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
   - Response 200 JSON: `{ "ok": true, "user": { "email": string, "role": "owner" }, "dealerSlug": string, "redirect": string }`. `redirect` is the dealer admin home for the request host (`/` on `app.` hosts, `/_dev/app` on non-dealer dev hosts).
   - Sets the normal dealer session cookie `db_app_session` (httpOnly, Secure, SameSite=Lax, host-only) via `createSession` + `setSessionCookie` from `src/server/auth/session.ts`. Exception: with dev aliases on (never in production), a plain-http request on a host other than `localhost`/`*.localhost` (e.g. `http://web:3000`) gets the cookie without `Secure`, since browsers drop Secure cookies set over http there (`sessionCookieSecure` in `src/server/routing.ts`; the login form follows the same rule).
   - Is not available on dealer subdomain hosts (404).
+- `GET /api/files/{key}` (key = slash-separated storage key, e.g. `logos/abc123.png`)
+  - 200: body = the file bytes; headers `Content-Type` (stored type), `Content-Length`, `Cache-Control: public, max-age=31536000, immutable` (keys are unique per upload and never reused), `ETag` and `X-Content-Type-Options: nosniff`. For `image/svg+xml` also send `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`.
+  - 304 when `If-None-Match` matches the ETag.
+  - 404 for an invalid key (traversal etc.) or a missing file.
+  - `HEAD` is supported with the same headers and no body; other methods are not defined.
 
 ## Tenant isolation
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
@@ -95,6 +101,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - `{slug}.{BASE_DOMAIN}` → rewrites to `/site/{slug}`
 - `app.{BASE_DOMAIN}` → `/dealer-admin` · `admin.{BASE_DOMAIN}` → `/backoffice` (`/` is the surface home in the `(app)` route group, whose layout redirects to `/login` without a session; login and password pages stay outside `(app)`; the proxy always sets `x-drivebook-base-path` there — empty on `app.`/`admin.`, `/_dev/app` / `/_dev/admin` under the dev aliases — read via `getSurfaceBasePath()`)
 - `/api/test/login` passes through untouched on `app.` and non-dealer hosts (dealer and `admin.` hosts 404 it)
+- `/api/files/*` passes through untouched on every host, including dealer subdomains
 - Old (renamed) dealer slugs 301 to the current slug, keeping path and query
 - Internal prefixes (`/site`, `/dealer-admin`, `/backoffice`, `/_dev`, `/dev`) 404 when requested directly on any other host — except that with dev aliases on, a non-dealer host 307s them to their alias (`/backoffice/*` → `/_dev/admin/*`, `/dealer-admin/*` → `/_dev/app/*`, `/site/*` → `/_dev/site/*`, `/dev` → `/_dev`)
 - Dev aliases on non-dealer hosts (localhost, preview proxies; off in production): `/_dev/site/{slug}`, `/_dev/app`, `/_dev/admin` (plus `/_dev` → dev index page `src/app/dev/`, unknown `/_dev/*` redirect to it, and `/app`/`/admin` redirect to their aliases)
