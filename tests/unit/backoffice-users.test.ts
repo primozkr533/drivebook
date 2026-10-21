@@ -27,7 +27,8 @@ vi.mock("@/server/auth/session", async (importOriginal) => {
 
 const { ForbiddenError } = await import("@/server/auth/permissions");
 const { createSession, validateSessionToken } = await import("@/server/auth/session");
-const { inspectLinkToken } = await import("@/server/auth/links");
+const { consumeLinkToken, createInvitation, inspectLinkToken } = await import("@/server/auth/links");
+const { login } = await import("@/server/auth/login");
 const { setDbForTests } = await import("@/server/data/db");
 const { drainNotificationsForTest, stopBossForTests } = await import("@/server/notify/queue");
 const { deactivateBackofficeUser, inviteBackofficeUser, listBackofficeUsers } = await import(
@@ -125,6 +126,75 @@ describe("inviteBackofficeUser", () => {
     expect(await db.select().from(backofficeUsers)).toHaveLength(2);
     expect(await db.select().from(auditLog)).toHaveLength(0);
     expect(await db.select().from(authTokens)).toHaveLength(0);
+    expect(await db.select().from(messageLog)).toHaveLength(0);
+  });
+
+  it("returns 'taken' for an invited user's e-mail", async () => {
+    signInAs(s.admin);
+    const first = await inviteBackofficeUser({ email: "nova@drivebook.si", role: "support" });
+    expect(first.ok).toBe(true);
+    expect(await inviteBackofficeUser({ email: "nova@drivebook.si", role: "superadmin" })).toEqual({
+      ok: false,
+      error: "taken",
+    });
+    const [user] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.email, "nova@drivebook.si"));
+    expect(user).toMatchObject({ role: "support", status: "invited" });
+    expect(await db.select().from(auditLog)).toHaveLength(1);
+    expect(await db.select().from(messageLog)).toHaveLength(1);
+  });
+
+  it("re-invites a deactivated user with the new role; they can set a password and log in", async () => {
+    signInAs(s.admin);
+    const oldInvite = await createInvitation("backoffice", s.support.id);
+    expect(await deactivateBackofficeUser(s.support.id)).toEqual({ ok: true });
+    await db.delete(messageLog);
+
+    const result = await inviteBackofficeUser({ email: "Support@DriveBook.si", role: "superadmin" });
+    expect(result).toMatchObject({ ok: true, userId: s.support.id });
+    if (!result.ok) return;
+
+    const [user] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, s.support.id));
+    expect(user).toMatchObject({ role: "superadmin", status: "invited", passwordHash: null, totpEnabledAt: null });
+    expect(await db.select().from(backofficeUsers)).toHaveLength(2);
+
+    const audits = await db.select().from(auditLog).where(eq(auditLog.action, "backoffice_user.reinvite"));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      actorId: s.admin.id,
+      entity: "backoffice_user",
+      entityId: s.support.id,
+      data: {
+        email: "support@drivebook.si",
+        before: { role: "support", status: "deactivated" },
+        after: { role: "superadmin", status: "invited" },
+      },
+    });
+
+    const logs = await db.select().from(messageLog);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ channel: "email", template: "invitation", recipient: "support@drivebook.si" });
+    expect(await inspectLinkToken("backoffice", "invite", oldInvite.link.split("/").pop()!)).toBe("used");
+
+    const token = result.link.split("/").pop()!;
+    expect(await inspectLinkToken("backoffice", "invite", token)).toBe("valid");
+    const password = "a-new-long-password-123";
+    expect((await consumeLinkToken("backoffice", "invite", token, password, meta)).ok).toBe(true);
+    const [active] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, s.support.id));
+    expect(active.status).toBe("active");
+    expect(
+      (await login({ ...meta, surface: "backoffice", email: "support@drivebook.si", password })).ok,
+    ).toBe(true);
+  });
+
+  it("rolls back the re-invite when the actor is Support", async () => {
+    await db.update(backofficeUsers).set({ status: "deactivated" }).where(eq(backofficeUsers.id, s.admin.id));
+    signInAs(s.support);
+    await expect(inviteBackofficeUser({ email: "admin@drivebook.si", role: "support" })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const [user] = await db.select().from(backofficeUsers).where(eq(backofficeUsers.id, s.admin.id));
+    expect(user).toMatchObject({ role: "superadmin", status: "deactivated" });
+    expect(await db.select().from(auditLog)).toHaveLength(0);
     expect(await db.select().from(messageLog)).toHaveLength(0);
   });
 

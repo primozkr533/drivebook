@@ -1,5 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { backofficeUsers } from "@/db/schema";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { authTokens, backofficeUsers } from "@/db/schema";
 import { createInvitation } from "@/server/auth/links";
 import { requireBackofficeRole, type BackofficeRole } from "@/server/auth/permissions";
 import { normalizeEmail } from "@/server/auth/rate-limit";
@@ -59,22 +59,53 @@ export async function inviteBackofficeUser(input: {
 
   let userId: string;
   try {
-    userId = await withBackofficeMutation(
+    ({ userId } = await withBackofficeMutation(
       async (tx) => {
         const [existing] = await tx
-          .select({ id: backofficeUsers.id })
+          .select({ id: backofficeUsers.id, role: backofficeUsers.role, status: backofficeUsers.status })
           .from(backofficeUsers)
           .where(eq(backofficeUsers.email, email))
           .limit(1);
-        if (existing) throw new Rejected();
-        const [created] = await tx
-          .insert(backofficeUsers)
-          .values({ email, name: email.split("@")[0], role, status: "invited" })
-          .returning({ id: backofficeUsers.id });
-        return created.id;
+        if (existing && existing.status !== "deactivated") throw new Rejected();
+        if (!existing) {
+          const [created] = await tx
+            .insert(backofficeUsers)
+            .values({ email, name: email.split("@")[0], role, status: "invited" })
+            .returning({ id: backofficeUsers.id });
+          return { userId: created.id, previous: null };
+        }
+        // A returning member starts over like a fresh invite: no old password, 2FA device or open links.
+        const now = new Date();
+        await tx
+          .update(backofficeUsers)
+          .set({
+            role,
+            status: "invited",
+            passwordHash: null,
+            totpSecretEnc: null,
+            totpEnabledAt: null,
+            totpLastStep: null,
+            updatedAt: now,
+          })
+          .where(eq(backofficeUsers.id, existing.id));
+        await tx
+          .update(authTokens)
+          .set({ usedAt: now })
+          .where(
+            and(eq(authTokens.surface, "backoffice"), eq(authTokens.userId, existing.id), isNull(authTokens.usedAt)),
+          );
+        return { userId: existing.id, previous: { role: existing.role, status: existing.status } };
       },
-      (id) => ({ action: "backoffice_user.invite", entity: "backoffice_user", entityId: id, details: { email, role } }),
-    );
+      ({ userId: id, previous }) =>
+        previous
+          ? {
+              action: "backoffice_user.reinvite",
+              entity: "backoffice_user",
+              entityId: id,
+              details: { email, before: previous, after: { role, status: "invited" } },
+            }
+          : { action: "backoffice_user.invite", entity: "backoffice_user", entityId: id, details: { email, role } },
+    ));
   } catch (error) {
     if (error instanceof Rejected || isUniqueViolation(error)) return { ok: false, error: "taken" };
     throw error;
