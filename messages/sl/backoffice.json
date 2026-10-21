@@ -23,7 +23,45 @@
     },
     "noLicence": "Ni določeno",
     "empty": "Ni trgovcev, ki ustrezajo iskanju.",
-    "count": "{count, plural, one {# trgovec} two {# trgovca} few {# trgovci} other {# trgovcev}}"
+    "count": "{count, plural, one {# trgovec} two {# trgovca} few {# trgovci} other {# trgovcev}}",
+    "create": "Nov trgovec",
+    "new": {
+      "title": "Nov trgovec",
+      "description": "Ustvari trgovca, mu dodeli paket in licenco ter povabi lastnika.",
+      "back": "Nazaj na trgovce",
+      "submit": "Ustvari trgovca in pošlji povabilo",
+      "invited": "Trgovec je ustvarjen. Lastniku smo poslali povabilo za nastavitev gesla.",
+      "fields": {
+        "name": "Ime trgovca",
+        "slug": "Oznaka",
+        "ownerEmail": "E-pošta lastnika",
+        "planId": "Paket",
+        "licenceValidUntil": "Licenca velja do",
+        "notes": "Opombe"
+      },
+      "hints": {
+        "slug": "Male črke a–z, številke 0–9 in vezaj, od 3 do 40 znakov.",
+        "licenceValidUntil": "Datum ne sme biti v preteklosti.",
+        "notes": "Interne opombe, trgovec jih ne vidi."
+      },
+      "errors": {
+        "name": {
+          "required": "Vnesite ime trgovca."
+        },
+        "ownerEmail": {
+          "format": "Vnesite veljaven e-poštni naslov.",
+          "taken": "Uporabnik s tem e-poštnim naslovom že obstaja."
+        },
+        "planId": {
+          "unknown": "Izberite obstoječ paket."
+        },
+        "licenceValidUntil": {
+          "format": "Vnesite veljaven datum.",
+          "past": "Datum ne sme biti v preteklosti."
+        },
+        "forbidden": "Za to dejanje nimate pravic."
+      }
+    }
   },
   "plans": {
     "nav": "Paketi",
@@ -110,5 +148,11 @@
       "notFound": "Uporabnik ne obstaja več.",
       "forbidden": "Za to dejanje nimate pravic."
     }
+  },
+  "slugErrors": {
+    "format": "Oznaka sme vsebovati le male črke a–z, številke 0–9 in vezaj.",
+    "length": "Oznaka mora imeti od 3 do 40 znakov.",
+    "reserved": "Ta oznaka je rezervirana.",
+    "taken": "Ta oznaka je že zasedena."
   }
 }

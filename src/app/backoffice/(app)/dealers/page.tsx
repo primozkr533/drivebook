@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BackofficeDealersPage({ searchParams }: Props) {
-  await requireBackofficeUser();
+  const { user } = await requireBackofficeUser();
   const [query, basePath, t] = await Promise.all([searchParams, getSurfaceBasePath(), getTranslations("backoffice")]);
   const q = single(query.q).trim();
   const status = statusFilters.find((s) => s === single(query.status));
@@ -29,7 +29,17 @@ export default async function BackofficeDealersPage({ searchParams }: Props) {
   return (
     <Container className="py-10 md:py-16">
       <Stack gap={8}>
-        <PageHeader title={t("dealers.title")} description={t("dealers.description")} />
+        <PageHeader
+          title={t("dealers.title")}
+          description={t("dealers.description")}
+          actions={
+            user.role === "superadmin" ? (
+              <ButtonLink variant="primary" href={`${basePath}/dealers/new`} data-testid="dealer-create">
+                {t("dealers.create")}
+              </ButtonLink>
+            ) : undefined
+          }
+        />
         <Card pad="sm">
           <form method="get" className="flex flex-col gap-4 md:flex-row md:items-start" data-testid="dealers-filter">
             <div className="md:flex-1">

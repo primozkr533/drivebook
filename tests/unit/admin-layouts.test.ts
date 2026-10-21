@@ -10,6 +10,7 @@ import BackofficeAppLayout from "@/app/backoffice/(app)/layout";
 import BackofficeHomePage from "@/app/backoffice/(app)/page";
 import BackofficeAccountPage from "@/app/backoffice/(app)/account/page";
 import BackofficeDealersPage from "@/app/backoffice/(app)/dealers/page";
+import BackofficeNewDealerPage from "@/app/backoffice/(app)/dealers/new/page";
 import BackofficePlansPage from "@/app/backoffice/(app)/plans/page";
 import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
@@ -55,7 +56,7 @@ vi.mock("@/server/auth/session", () => ({
 vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
-vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers }));
+vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
   getPlan: mocks.getPlan,
@@ -274,6 +275,41 @@ describe("backoffice dealers", () => {
     expect(html).toMatch(/<input[^>]*name="q"[^>]*value="dem"/);
     expect(html).toMatch(/<option value="suspended" selected="">/);
     expect(html).toContain('data-testid="dealers-empty"');
+  });
+
+  it("shows the Nov trgovec signal link to a Superadmin only", async () => {
+    mocks.listDealers.mockResolvedValue([]);
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+    mocks.backofficeSession = { session: {}, user: { id: "u1", email: "root@drivebook.si", role: "superadmin" } };
+    const html = await renderDealers();
+    expect(html).toMatch(/<a[^>]*bg-signal[^>]*href="\/_dev\/admin\/dealers\/new"[^>]*data-testid="dealer-create"[^>]*>Nov trgovec<\/a>/);
+    signInBackoffice();
+    expect(await renderDealers()).not.toContain("dealer-create");
+  });
+
+  it("renders the create-dealer form for a Superadmin with plans and the slug help text", async () => {
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+    mocks.backofficeSession = { session: {}, user: { id: "u1", email: "root@drivebook.si", role: "superadmin" } };
+    mocks.listPlans.mockResolvedValue([
+      { id: "p2", code: "pro", name: "Pro", isDefault: false },
+      { id: "p1", code: "osnovni", name: "Osnovni", isDefault: true },
+    ]);
+    const html = await render(createElement(BackofficeNewDealerPage));
+    for (const name of ["name", "slug", "ownerEmail", "licenceValidUntil", "notes"]) {
+      expect(html).toMatch(new RegExp(`<input[^>]*name="${name}"`));
+    }
+    expect(html).toMatch(/<input[^>]*type="date"[^>]*name="licenceValidUntil"/);
+    expect(html).toMatch(/<select[^>]*name="planId"/);
+    expect(html).toMatch(/<option value="p1" selected="">Osnovni<\/option>/);
+    expect(html).toContain(dealersT.new.hints.slug);
+    expect(html.match(/bg-signal/g)).toHaveLength(1);
+  });
+
+  it("redirects Support from the create-dealer page to the list", async () => {
+    signInBackoffice();
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
+    expect(await redirectOf(render(createElement(BackofficeNewDealerPage)))).toBe("/_dev/admin/dealers");
+    expect(mocks.listPlans).not.toHaveBeenCalled();
   });
 
   it("ignores an unknown status filter", async () => {
