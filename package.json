@@ -19,8 +19,6 @@
     "build:cli": "esbuild src/worker.ts src/db/migrate-cli.ts src/db/seed-cli.ts src/server/auth/create-superadmin-cli.ts src/server/auth/user-admin-cli.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outdir=dist --entry-names=[name] --out-extension:.js=.cjs --log-level=warning"
   },
   "dependencies": {
-    "@fontsource-variable/archivo": "^5.2.0",
-    "@fontsource-variable/jetbrains-mono": "^5.2.0",
     "@node-rs/argon2": "^2.2.2",
     "drizzle-orm": "^0.45.4",
     "next": "^16.0.0",
