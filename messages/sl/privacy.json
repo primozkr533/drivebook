@@ -1,7 +1,9 @@
 {
   "title": "Obvestilo o varstvu osebnih podatkov",
   "controller": "Upravljavec osebnih podatkov je {legalName}, {address}.",
+  "controllerNoAddress": "Upravljavec osebnih podatkov je {legalName}.",
   "contact": "Kontakt upravljavca: {email}, {phone}.",
+  "contactNoPhone": "Kontakt upravljavca: {email}.",
   "processor": "Platforma DriveBook (drivebook.si) podatke obdeluje kot obdelovalec v imenu upravljavca.",
   "dataHeading": "Katere podatke zbiramo",
   "dataBody": "Ime in priimek, telefonsko številko, e-poštni naslov ter izbrano vozilo in termin.",
