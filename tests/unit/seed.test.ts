@@ -89,6 +89,43 @@ describe("runSeed", () => {
     expect(first).toEqual([1, 1, 4, 2, 1, 11, 1]);
   });
 
+  it("creates the default plan as Standard with 300 SMS and 10 users on an empty database", async () => {
+    await runSeed(db);
+    await runSeed(db);
+    const all = await db.select().from(plans);
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ code: "standard", name: "Standard", monthlySmsQuota: 300, maxUsers: 10 });
+  });
+
+  it("never overwrites operator edits to the default plan", async () => {
+    await runSeed(db);
+    await db
+      .update(plans)
+      .set({ name: "Osnovni", monthlySmsQuota: 500, maxUsers: 25 })
+      .where(eq(plans.code, "standard"));
+    await runSeed(db);
+    const [plan] = await db.select().from(plans).where(eq(plans.code, "standard"));
+    expect(plan).toMatchObject({ name: "Osnovni", monthlySmsQuota: 500, maxUsers: 25 });
+    expect((await demoDealer()).planId).toBe(plan.id);
+  });
+
+  it("succeeds when another plan has taken the name Standard", async () => {
+    await runSeed(db);
+    await db.update(plans).set({ name: "Osnovni" }).where(eq(plans.code, "standard"));
+    await db.insert(plans).values({ code: "novi", name: "Standard", maxCars: 20, maxUsers: 5, priceEurCents: 2900 });
+    await db.delete(dealers);
+    await db.delete(backofficeUsers);
+
+    await expect(runSeed(db)).resolves.toBeUndefined();
+
+    const [defaultPlan] = await db.select().from(plans).where(eq(plans.code, "standard"));
+    expect(defaultPlan.name).toBe("Osnovni");
+    const dealer = await demoDealer();
+    expect(dealer.planId).toBe(defaultPlan.id);
+    expect(await rowCount(dealerUsers, eq(dealerUsers.dealerId, dealer.id))).toBe(2);
+    expect(await rowCount(backofficeUsers, eq(backofficeUsers.role, "superadmin"))).toBe(1);
+  });
+
   it("keeps rows the user added", async () => {
     await runSeed(db);
     const dealer = await demoDealer();
