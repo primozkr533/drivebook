@@ -31,7 +31,7 @@ import {
 const statusTone = { active: "ok", suspended: "danger", read_only: "warn" } as const satisfies Record<DealerStatus, string>;
 const ownerTone = { invited: "warn", active: "ok", deactivated: "neutral" } as const;
 const changes: DealerChange[] = ["profile", "slug", "status", "licence", "dpa", "invite"];
-const errorKeys = ["required", "unknown", "format", "invalid", "notFound", "notInvited", "rateLimited", "forbidden"] as const;
+const errorKeys = ["required", "unknown", "format", "past", "beforeCurrent", "invalid", "notFound", "notInvited", "rateLimited", "forbidden"] as const;
 const licenceColumns = ["createdAt", "plan", "previousValidUntil", "validUntil", "note"] as const;
 
 type Props = {

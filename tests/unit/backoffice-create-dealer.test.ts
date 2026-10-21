@@ -1,5 +1,5 @@
 // Real-database tests: start Postgres with `docker compose up -d db` (uses TEST_DATABASE_URL).
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditLog,
@@ -39,6 +39,22 @@ vi.mock("@/server/auth/session", async (importOriginal) => {
       const token = surface === "backoffice" ? jar.get(actual.SESSION_COOKIE.backoffice) : undefined;
       const user = token ? sessions.get(token) : undefined;
       return user ? { session: { id: "s" }, user } : null;
+    },
+  };
+});
+
+// Runs once right after the next validateSlug call, to simulate another operator racing the creation.
+let afterSlugValidated: (() => Promise<void>) | undefined;
+vi.mock("@/server/data/backoffice/slug", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/data/backoffice/slug")>();
+  return {
+    ...actual,
+    validateSlug: async (...args: Parameters<typeof actual.validateSlug>) => {
+      const result = await actual.validateSlug(...args);
+      const hook = afterSlugValidated;
+      afterSlugValidated = undefined;
+      await hook?.();
+      return result;
     },
   };
 });
@@ -245,5 +261,94 @@ describe("createDealer", () => {
     expect(await countOf(dealers)).toBe(0);
     expect(await countOf(auditLog)).toBe(0);
     expect(await countOf(messageLog)).toBe(0);
+  });
+});
+
+describe("createDealer races", () => {
+  // Holds `work` in an open transaction until createDealer blocks on its row locks, then commits it.
+  async function raceWith(work: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<void>) {
+    let release!: () => void;
+    let committed!: Promise<void>;
+    afterSlugValidated = () =>
+      new Promise<void>((started, failed) => {
+        committed = db.transaction(async (tx) => {
+          await work(tx);
+          started();
+          await new Promise<void>((r) => (release = r));
+        });
+        committed.catch(failed);
+      });
+    return async () => {
+      for (;;) {
+        const [{ n }] = (await db.execute(sql`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`)).rows as {
+          n: number;
+        }[];
+        if (n > 0) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      release();
+      await committed;
+    };
+  }
+
+  const rivalDealer = (planId: string, slug: string) => ({
+    slug,
+    name: "Rival",
+    legalName: "Rival",
+    addressLine: "",
+    postalCode: "",
+    city: "",
+    phone: "",
+    email: "rival@rival.si",
+    primaryColor: "#000000",
+    planId,
+  });
+
+  it("maps a slug taken after validation to a slug 'taken' error", async () => {
+    const plan = await seedPlan();
+    await signInBackoffice("superadmin");
+    const commit = await raceWith(async (tx) => {
+      await tx.insert(dealers).values(rivalDealer(plan.id, "novak"));
+    });
+
+    const [result] = await Promise.all([createDealer(novakInput(plan.id), { now: NOW }), commit()]);
+    expect(result).toEqual({ ok: false, field: "slug", error: "taken" });
+    await drainNotificationsForTest();
+    expect(await countOf(dealers)).toBe(1);
+    expect(await countOf(dealerUsers)).toBe(0);
+    expect(await countOf(auditLog)).toBe(0);
+    expect(await countOf(messageLog)).toBe(0);
+  });
+
+  it("maps an owner e-mail taken after validation to an ownerEmail 'taken' error", async () => {
+    const plan = await seedPlan();
+    await signInBackoffice("superadmin");
+    const commit = await raceWith(async (tx) => {
+      const [rival] = await tx.insert(dealers).values(rivalDealer(plan.id, "rival")).returning({ id: dealers.id });
+      await tx
+        .insert(dealerUsers)
+        .values({ dealerId: rival.id, email: "owner@novak.si", name: "x", role: "owner", status: "invited" });
+    });
+
+    const [result] = await Promise.all([createDealer(novakInput(plan.id), { now: NOW }), commit()]);
+    expect(result).toEqual({ ok: false, field: "ownerEmail", error: "taken" });
+    await drainNotificationsForTest();
+    expect(await countOf(dealers)).toBe(1);
+    expect(await countOf(dealerUsers)).toBe(1);
+    expect(await countOf(auditLog)).toBe(0);
+    expect(await countOf(messageLog)).toBe(0);
+  });
+
+  it("rethrows database errors other than the slug and e-mail unique violations", async () => {
+    const plan = await seedPlan();
+    await signInBackoffice("superadmin");
+    const commit = await raceWith(async (tx) => {
+      await tx.delete(plans).where(eq(plans.id, plan.id));
+    });
+
+    const [result] = await Promise.allSettled([createDealer(novakInput(plan.id), { now: NOW }), commit()]);
+    expect(result.status).toBe("rejected");
+    expect(await countOf(dealers)).toBe(0);
+    expect(await countOf(auditLog)).toBe(0);
   });
 });

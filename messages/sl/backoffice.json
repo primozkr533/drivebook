@@ -241,6 +241,8 @@
       "required": "Vnos je obvezen.",
       "unknown": "Izberite obstoječ paket.",
       "format": "Vnesite veljaven datum.",
+      "past": "Datum ne sme biti v preteklosti.",
+      "beforeCurrent": "Novi datum ne sme biti pred trenutno veljavnostjo licence.",
       "invalid": "Neveljavno stanje.",
       "notFound": "Trgovec ne obstaja več.",
       "notInvited": "Lastnik ni v stanju povabljen.",
