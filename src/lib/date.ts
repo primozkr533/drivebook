@@ -124,6 +124,13 @@ export function formatDate(d: Date): string {
   return `${w.day}. ${w.month}. ${w.year}`;
 }
 
+// For Postgres `date` columns (YYYY-MM-DD): a calendar day, so no time-zone shift applies.
+export function formatIsoDate(dateISO: string): string {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO);
+  if (!dm) throw new Error(`Invalid date: ${dateISO}`);
+  return `${Number(dm[3])}. ${Number(dm[2])}. ${dm[1]}`;
+}
+
 export function formatDateShort(d: Date): string {
   const w = wallClock(d);
   return `${weekdayShortSl(w.isoWeekday).toLowerCase()} ${w.day}. ${w.month}.`;
