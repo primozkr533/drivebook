@@ -48,6 +48,7 @@
     "model": "Model",
     "year": "Letnik",
     "price": "Cena (EUR)",
+    "priceSuffix": "€",
     "imageFile": "Naloži sliko",
     "imageFileHint": "JPEG, PNG ali WebP. Sliko pomanjšamo in stisnemo.",
     "imageUrl": "ali povezava do slike",

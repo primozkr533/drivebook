@@ -182,7 +182,7 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
                   autoComplete="off"
                   value={draft.price}
                   onChange={set("price")}
-                  suffix="€"
+                  suffix={t("form.priceSuffix")}
                   required
                   className="tabular"
                   data-testid="car-price"
