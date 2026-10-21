@@ -146,3 +146,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - The public dealer page hides the call button, the address block and the maps link while the dealer's phone / address are empty; the suspended message then drops the 'call us' wording.
 - Holiday names are not hardcoded: `slovenianWorkFreeDays` (`src/lib/date.ts`) returns stable `key`s, and the Slovenian name comes from `messages/sl/holidays.json` by key.
 - Public pages never render empty dealer contact data: every public page that shows the address or phone (dealer page, privacy page, and any later one) builds the address with `dealerAddress()` and switches to a translation variant without the address/phone when it is empty.
+- A dealer's `legalName` starts equal to `name` (set by `createDealer`). The back-office rename (`updateDealer`) keeps `legalName` in step with `name` only while the two are still equal; once `legalName` differs it is never overwritten by a rename.
