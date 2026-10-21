@@ -87,6 +87,56 @@ describe("buildDealerPageModel", () => {
     );
   });
 
+  it("exposes the full contact data", () => {
+    const m = build();
+    expect(m.phone).toBe("+386 1 234 56 78");
+    expect(m.address).toEqual({ line: "Tržaška cesta 1", locality: "1000 Ljubljana" });
+  });
+
+  it("hides the phone, address and maps link when contact data is empty", () => {
+    for (const status of ["active", "suspended"] as const) {
+      const m = build({ dealer: { ...dealer, status, addressLine: "", postalCode: "", city: "", phone: "" } });
+      expect(m.phone).toBeNull();
+      expect(m.telHref).toBeNull();
+      expect(m.address).toBeNull();
+      expect(m.mapsHref).toBeNull();
+    }
+  });
+
+  it("treats whitespace-only contact fields as empty", () => {
+    const m = build({ dealer: { ...dealer, addressLine: " ", postalCode: " ", city: "", phone: "  " } });
+    expect(m.telHref).toBeNull();
+    expect(m.address).toBeNull();
+    expect(m.mapsHref).toBeNull();
+  });
+
+  it("hides the maps link without an address even when mapsUrl is set", () => {
+    const m = build({
+      dealer: { ...dealer, addressLine: "", postalCode: "", city: "", mapsUrl: "https://maps.app.goo.gl/x" },
+    });
+    expect(m.mapsHref).toBeNull();
+  });
+
+  it("builds the maps query from the non-empty parts of a partial address", () => {
+    const search = (q: string) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
+    const cityOnly = build({ dealer: { ...dealer, addressLine: "", postalCode: "" } });
+    expect(cityOnly.address).toEqual({ line: null, locality: "Ljubljana" });
+    expect(cityOnly.mapsHref).toBe(search("Avtohiša Demo, Ljubljana"));
+
+    const lineOnly = build({ dealer: { ...dealer, postalCode: "", city: "" } });
+    expect(lineOnly.address).toEqual({ line: "Tržaška cesta 1", locality: null });
+    expect(lineOnly.mapsHref).toBe(search("Avtohiša Demo, Tržaška cesta 1"));
+
+    const postalOnly = build({ dealer: { ...dealer, addressLine: "", city: "" } });
+    expect(postalOnly.mapsHref).toBe(search("Avtohiša Demo, 1000"));
+  });
+
+  it("keeps the phone with an empty address", () => {
+    const m = build({ dealer: { ...dealer, addressLine: "", postalCode: "", city: "" } });
+    expect(m.telHref).toBe("tel:+38612345678");
+    expect(m.address).toBeNull();
+  });
+
   it("links the dealer's own privacy policy when set", () => {
     expect(build({ dealer: { ...dealer, privacyUrl: "https://demo.si/zasebnost" } }).privacy).toEqual({
       href: "https://demo.si/zasebnost",

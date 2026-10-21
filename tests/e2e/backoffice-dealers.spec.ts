@@ -209,25 +209,30 @@ test("two licence extensions are listed newest first with the previous and new d
   await expect(cells(2).nth(3)).toHaveText(formatIsoDate("2030-12-31"));
 });
 
-test("suspending shows the call-us message on the public page and reactivating restores it", async ({ page }) => {
+// Backoffice-created dealers have no phone yet, so the suspended page uses the no-phone message.
+test("suspending shows the suspended message on the public page and reactivating restores it", async ({ page }) => {
   await signIn(page, track(await createBackofficeUser({ role: "superadmin" })));
   const dealer = await createDealer(page);
 
   await page.goto(site(dealer.slug));
   await expect(page.getByRole("heading", { level: 1, name: dealer.name })).toBeVisible();
-  await expect(page.getByText(dealerPage.suspendedBody)).toHaveCount(0);
+  await expect(page.getByText(dealerPage.suspendedBodyNoPhone)).toHaveCount(0);
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
 
   await page.goto(dealer.detailUrl);
   await page.getByTestId("dealer-suspend").click();
   await expect(page.getByTestId("dealer-status")).toHaveText(backoffice.dealers.statuses.suspended);
   await page.goto(site(dealer.slug));
   await expect(page.getByRole("heading", { name: dealerPage.suspendedTitle })).toBeVisible();
-  await expect(page.getByText(dealerPage.suspendedBody)).toBeVisible();
+  await expect(page.getByText(dealerPage.suspendedBodyNoPhone)).toBeVisible();
+  await expect(page.getByText(dealerPage.suspendedBody)).toHaveCount(0);
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
 
   await page.goto(dealer.detailUrl);
   await page.getByTestId("dealer-reactivate").click();
   await expect(page.getByTestId("dealer-status")).toHaveText(backoffice.dealers.statuses.active);
   await page.goto(site(dealer.slug));
   await expect(page.getByRole("heading", { level: 1, name: dealer.name })).toBeVisible();
-  await expect(page.getByText(dealerPage.suspendedBody)).toHaveCount(0);
+  await expect(page.getByText(dealerPage.suspendedBodyNoPhone)).toHaveCount(0);
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
 });
