@@ -72,9 +72,10 @@ export async function createBackofficeUser(
   return { surface: "backoffice", id: row!.id, email, password, totpSecret };
 }
 
-export function totpCode(user: Pick<E2eUser, "totpSecret">): string {
+// Codes are single-use per step, so a second sign-in in the same step needs `steps: 1`.
+export function totpCode(user: Pick<E2eUser, "totpSecret">, steps = 0): string {
   if (!user.totpSecret) throw new Error("User has no TOTP secret");
-  return generateSync({ secret: user.totpSecret });
+  return generateSync({ secret: user.totpSecret, epoch: Math.floor(Date.now() / 1000) + steps * 30 });
 }
 
 export async function clearLoginAttempts({ emails = [], ips = [] }: { emails?: string[]; ips?: string[] }): Promise<void> {

@@ -83,6 +83,28 @@ test("a backoffice superadmin with 2FA signs in through the code step", async ({
   expect(await cookie(page, "db_admin_session")).toMatchObject({ httpOnly: true, domain: `admin.${BASE_DOMAIN}` });
 });
 
+test("a TOTP code cannot be reused after signing out", async ({ page }) => {
+  const user = track(await createBackofficeUser({ role: "superadmin", totp: true }));
+  const code = totpCode(user);
+  await page.goto(`${host("admin")}/login`);
+  await signIn(page, user.email, user.password);
+  await page.getByTestId("login-totp").fill(code);
+  await page.getByTestId("login-submit").click();
+  await expect(page).toHaveURL(`${host("admin")}/account`);
+
+  await page.getByTestId("logout").first().click();
+  await expect(page).toHaveURL(`${host("admin")}/login`);
+  await signIn(page, user.email, user.password);
+  await page.getByTestId("login-totp").fill(code);
+  await submit(page);
+  await expect(page.getByTestId("login-error")).toHaveText(auth.errorTotpInvalid);
+  expect(await cookie(page, "db_admin_session")).toBeUndefined();
+
+  await page.getByTestId("login-totp").fill(totpCode(user, 1));
+  await page.getByTestId("login-submit").click();
+  await expect(page).toHaveURL(`${host("admin")}/account`);
+});
+
 test("wrong credentials show one generic message", async ({ page }) => {
   const user = track(await createDealerUser());
   await page.goto(`${host("app")}/login`);

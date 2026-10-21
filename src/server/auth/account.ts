@@ -5,12 +5,12 @@ import { hashPassword, validateNewPassword, verifyPassword } from "./password";
 import { isLoginRateLimited, recordLoginAttempt } from "./rate-limit";
 import { revokeUserSessions, type AuthSurface } from "./session";
 import {
+  acceptTotpCode,
   decryptTotpSecret,
   encryptTotpSecret,
   generateTotpSecret,
   totpKeyUri,
   totpQrDataUrl,
-  verifyTotpCode,
 } from "./totp";
 
 const usersTable = { dealer: dealerUsers, backoffice: backofficeUsers } as const;
@@ -148,7 +148,9 @@ export async function confirmTotpSetup(
 ): Promise<{ ok: true } | { ok: false; error: "invalid_code" | "no_pending_setup" }> {
   const user = await loadUser(surface, userId);
   if (user.totpEnabledAt || !user.totpSecretEnc) return { ok: false, error: "no_pending_setup" };
-  if (!verifyTotpCode(decryptTotpSecret(user.totpSecretEnc), code)) return { ok: false, error: "invalid_code" };
+  if (!(await acceptTotpCode(surface, user.id, decryptTotpSecret(user.totpSecretEnc), code))) {
+    return { ok: false, error: "invalid_code" };
+  }
 
   await updateWithAudit(surface, user, { totpEnabledAt: new Date() }, "auth.totp.enabled");
   return { ok: true };
@@ -166,7 +168,7 @@ export async function disableTotp(
     await recordCheckFailure(surface, user, input.ip, "auth.totp.disable_failed", "wrong_password");
     return { ok: false, error: "wrong_password" };
   }
-  if (!verifyTotpCode(decryptTotpSecret(user.totpSecretEnc), input.code)) {
+  if (!(await acceptTotpCode(surface, user.id, decryptTotpSecret(user.totpSecretEnc), input.code))) {
     await recordCheckFailure(surface, user, input.ip, "auth.totp.disable_failed", "invalid_code");
     return { ok: false, error: "invalid_code" };
   }
