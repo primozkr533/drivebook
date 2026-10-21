@@ -47,6 +47,7 @@ const mocks = vi.hoisted(() => ({
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
   getOpeningHours: vi.fn(),
+  getBranding: vi.fn(),
   getBookingRules: vi.fn(),
   getDealerSettings: vi.fn(),
   pathname: "/",
@@ -78,6 +79,8 @@ vi.mock("@/server/data/settings-dealer", () => ({
 }));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
 vi.mock("@/server/data/settings-hours", () => ({ getOpeningHours: mocks.getOpeningHours }));
+vi.mock("@/server/data/settings-branding", () => ({ getBranding: mocks.getBranding, MAX_LOGO_BYTES: 2 * 1024 * 1024 }));
+vi.mock("@/app/dealer-admin/(app)/settings/branding/actions", () => ({ saveLogoAction: vi.fn(), savePrimaryColorAction: vi.fn() }));
 vi.mock("@/app/dealer-admin/(app)/settings/hours/actions", () => ({ saveOpeningHoursAction: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
@@ -582,6 +585,7 @@ describe("dealer settings shell", () => {
       closures: "settings-closures",
     };
     mocks.getOpeningHours.mockResolvedValue({ 1: [{ opens: "08:00", closes: "12:00" }], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] });
+    mocks.getBranding.mockResolvedValue({ primaryColor: "#E4572E", logoUrl: "/api/files/logos/abc.png" });
     const renderPage = async (Page: (typeof stubPages)[number]) =>
       render(createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: await Page() }));
     for (const [i, Page] of stubPages.entries()) {
