@@ -12,7 +12,11 @@ const roleKeys = ["owner", "salesperson", "superadmin", "support"] as const;
 
 export async function AccountPanel({ surface }: { surface: AuthSurface }) {
   const { user } = surface === "dealer" ? await requireDealerUser() : await requireBackofficeUser();
-  const [summary, t] = await Promise.all([getAccountSummary(surface, user.id), getTranslations("account")]);
+  const [summary, t, tAuth] = await Promise.all([
+    getAccountSummary(surface, user.id),
+    getTranslations("account"),
+    getTranslations("auth"),
+  ]);
   const min = PASSWORD_MIN_LENGTH;
   const role = roleKeys.find((r) => r === summary.role);
 
@@ -48,6 +52,7 @@ export async function AccountPanel({ surface }: { surface: AuthSurface }) {
                     wrong_password: t("errorWrongPassword"),
                     too_short: t("errorTooShort", { min }),
                     mismatch: t("errorMismatch"),
+                    rate_limited: tAuth("errorRateLimited"),
                   },
                 }}
               />
@@ -76,6 +81,7 @@ export async function AccountPanel({ surface }: { surface: AuthSurface }) {
                   wrong_password: t("errorTotpWrongPassword"),
                   no_pending_setup: t("errorNoPendingSetup"),
                   not_enabled: t("errorNotEnabled"),
+                  rate_limited: tAuth("errorRateLimited"),
                 },
               }}
             />
