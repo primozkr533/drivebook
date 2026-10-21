@@ -141,7 +141,7 @@ describe("phase-1 schema", () => {
       year: ["integer", "NO"],
       price_eur: ["integer", "NO"],
       image_key: ["text", "YES"],
-      avto_net_url: ["text", "NO"],
+      avto_net_url: ["text", "YES"],
       active: ["boolean", "NO"],
       created_at: ["timestamp with time zone", "NO"],
       updated_at: ["timestamp with time zone", "NO"],
