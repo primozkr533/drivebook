@@ -58,7 +58,7 @@ export async function main(argv: string[], io: Io = console): Promise<number> {
   }
 }
 
-if (process.argv[1]?.endsWith("create-superadmin-cli.ts")) {
+if (/create-superadmin-cli\.(ts|cjs)$/.test(process.argv[1] ?? "")) {
   main(process.argv.slice(2))
     .catch((error: unknown) => {
       console.error(error);

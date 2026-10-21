@@ -17,11 +17,12 @@ import settingsBooking from "../../messages/sl/settingsBooking.json";
 import settingsHours from "../../messages/sl/settingsHours.json";
 import settingsClosures from "../../messages/sl/settingsClosures.json";
 import dealerUsers from "../../messages/sl/dealerUsers.json";
+import cars from "../../messages/sl/cars.json";
 
 export const locale = "sl";
 export const timeZone = "Europe/Ljubljana";
 
 export const messages = { common, dealerPage, auth, privacy, errors, dev, email, account, inbox, backoffice, holidays,
-  settings, settingsDealer, settingsBranding, settingsBooking, settingsHours, settingsClosures, dealerUsers };
+  settings, settingsDealer, settingsBranding, settingsBooking, settingsHours, settingsClosures, dealerUsers, cars };
 
 export default getRequestConfig(async () => ({ locale, timeZone, messages }));

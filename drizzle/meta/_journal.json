@@ -36,6 +36,20 @@
       "when": 1792603514882,
       "tag": "0004_dealer_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792610400535,
+      "tag": "0005_car_admin_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792612661449,
+      "tag": "0006_car_avto_net_url_optional",
+      "breakpoints": true
     }
   ]
 }

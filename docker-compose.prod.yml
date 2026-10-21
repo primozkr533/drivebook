@@ -1,0 +1,120 @@
+# Production stack: docker compose -f docker-compose.prod.yml up -d --build (reads .env, see .env.example).
+# Only caddy publishes ports; web, worker, db and backup stay on the compose network.
+# Local run with Caddy internal TLS: add -f docker-compose.prod.local.yml (see that file).
+
+x-app-build: &app-build
+  build: .
+  image: drivebook-app:prod
+
+x-app-env: &app-env
+  # Next binds to HOSTNAME; the container id would leave it off loopback (healthcheck).
+  - HOSTNAME=0.0.0.0
+  - APP_ENV=production
+  - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-drivebook}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-drivebook}}
+  - BASE_DOMAIN=${BASE_DOMAIN:?set BASE_DOMAIN}
+  - PUBLIC_URL_SCHEME=https
+  - AUTH_SECRET=${AUTH_SECRET:?set AUTH_SECRET}
+  - RUN_MIGRATIONS_ON_START=0
+  - SEED_ON_START=${SEED_ON_START:-0}
+  - SEED_SUPERADMIN_EMAIL=${SEED_SUPERADMIN_EMAIL:-}
+  - STORAGE_DIR=/data/storage
+  - ALLOW_FAKE_PROVIDERS=${ALLOW_FAKE_PROVIDERS:-}
+  - NOTIFY_FAKE=${NOTIFY_FAKE:-}
+  - DEV_INBOX_ENABLED=${DEV_INBOX_ENABLED:-}
+  - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+  - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+  - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+  - BREVO_API_KEY=${BREVO_API_KEY:-}
+  - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+  - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-DriveBook}
+  - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+  - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID:-}
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-drivebook}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-drivebook}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    <<: *app-build
+    command: ["npm", "run", "db:migrate"]
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    <<: *app-build
+    command: ["node", "server.js"]
+    environment: *app-env
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/design"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    <<: *app-build
+    command: ["npm", "run", "worker"]
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  backup:
+    build: docker/backup
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-drivebook}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-drivebook}}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - storage:/data/storage:ro
+      - backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    build: docker/caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - BASE_DOMAIN=${BASE_DOMAIN:?set BASE_DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL:?set ACME_EMAIL}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN:?set CLOUDFLARE_DNS_API_TOKEN}
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  storage:
+  backups:
+  caddy-data:
+  caddy-config:

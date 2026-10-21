@@ -1,7 +1,12 @@
-import { getConfig } from "@/lib/config";
+import { assertProductionProviders, getConfig } from "@/lib/config";
 import { createBoss, startNotificationWorker } from "@/server/notify/queue";
 
 async function main(): Promise<void> {
+  if (process.argv.includes("--help")) {
+    console.log("Usage: npm run worker (pg-boss notify.email / notify.sms worker; needs DATABASE_URL)");
+    process.exit(0);
+  }
+  assertProductionProviders(getConfig());
   const boss = createBoss(getConfig().databaseUrl, { worker: true });
   await boss.start();
   await startNotificationWorker(boss);
