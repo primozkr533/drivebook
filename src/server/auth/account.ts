@@ -104,11 +104,12 @@ export async function startTotpSetup(
   const secret = generateTotpSecret();
   const keyUri = totpKeyUri(secret, user.email);
   const qrDataUrl = await totpQrDataUrl(keyUri);
-  const users = usersTable[surface];
-  await db()
-    .update(users)
-    .set({ totpSecretEnc: encryptTotpSecret(secret), totpEnabledAt: null, updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  await updateWithAudit(
+    surface,
+    user,
+    { totpSecretEnc: encryptTotpSecret(secret), totpEnabledAt: null },
+    "auth.totp.setup_started",
+  );
   return { secret, qrDataUrl, keyUri };
 }
 
