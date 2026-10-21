@@ -6,7 +6,8 @@ export const plans = pgTable("plans", {
   code: text("code").notNull().unique(),
   name: text("name").notNull().unique(),
   maxCars: integer("max_cars").notNull(),
-  maxUsers: integer("max_users").notNull(),
+  // Null = unlimited.
+  maxUsers: integer("max_users"),
   monthlySmsQuota: integer("monthly_sms_quota").notNull().default(300),
   priceEurCents: integer("price_eur_cents").notNull(),
   notes: text("notes"),

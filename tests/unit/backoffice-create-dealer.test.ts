@@ -142,12 +142,23 @@ describe("createDealer", () => {
     });
 
     const [rules] = await db.select().from(bookingRules).where(eq(bookingRules.dealerId, result.id));
-    expect(rules).toMatchObject({ slotMinutes: 30, leadTimeMinutes: 120, maxDaysAhead: 30, requirePhoneVerification: true });
+    expect(rules).toMatchObject({
+      testDriveMinutes: 45,
+      viewingMinutes: 30,
+      otherMinutes: 30,
+      capacity: 1,
+      leadTimeMinutes: 120,
+      maxDaysAhead: 14,
+      bufferMinutes: 15,
+      cancelCutoffMinutes: 120,
+      slotMinutes: 15,
+      requirePhoneVerification: true,
+    });
 
     const holidays = await db.select().from(holidayOverrides).where(eq(holidayOverrides.dealerId, result.id));
     const expected = [...slovenianWorkFreeDays(2026), ...slovenianWorkFreeDays(2027)];
     expect(holidays).toHaveLength(expected.length);
-    expect(holidays.every((h) => !h.isOpen)).toBe(true);
+    expect(holidays.every((h) => !h.openAnyway)).toBe(true);
     expect(holidays.every((h) => h.key !== null && h.name === holidayNames[h.key as keyof typeof holidayNames])).toBe(true);
     expect(holidays).toEqual(
       expect.arrayContaining([

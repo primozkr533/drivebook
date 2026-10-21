@@ -17,7 +17,7 @@ export type Plan = {
   code: string;
   name: string;
   monthlySmsQuota: number;
-  maxUsers: number;
+  maxUsers: number | null;
   notes: string | null;
   isDefault: boolean;
 };

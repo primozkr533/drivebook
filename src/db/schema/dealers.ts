@@ -22,6 +22,10 @@ export const dealers = pgTable(
     privacyUrl: text("privacy_url"),
     primaryColor: text("primary_color").notNull(),
     logoKey: text("logo_key"),
+    // Null = derive the SMS sender from the dealer name.
+    smsSenderName: text("sms_sender_name"),
+    smsNotificationsEnabled: boolean("sms_notifications_enabled").notNull().default(false),
+    notificationPhone: text("notification_phone"),
     planId: uuid("plan_id")
       .notNull()
       .references(() => plans.id),
