@@ -82,6 +82,10 @@ async function cookieOptions(override: SessionCookieOverride = {}) {
       secure = true;
     }
   }
+  return sessionCookieOptions(secure);
+}
+
+export function sessionCookieOptions(secure: boolean) {
   return secure ? SESSION_COOKIE_OPTIONS : { ...SESSION_COOKIE_OPTIONS, secure: false };
 }
 
@@ -171,15 +175,13 @@ export async function getCurrentSession<S extends AuthSurface>(surface: S): Prom
   const store = await cookies();
   const token = store.get(SESSION_COOKIE[surface])?.value;
   if (!token) return null;
+  return validateSessionToken(surface, token);
+}
+
+// Server Components cannot set cookies, so the proxy re-issues the cookie whenever this slides the expiry.
+export async function refreshSessionCookie(surface: AuthSurface, token: string): Promise<Date | null> {
   const result = await validateSessionToken(surface, token);
-  if (result?.session.refreshed) {
-    try {
-      store.set(SESSION_COOKIE[surface], token, await cookieOptions());
-    } catch {
-      // Server Components cannot set cookies; the next action or route handler will.
-    }
-  }
-  return result;
+  return result?.session.refreshed ? result.session.expiresAt : null;
 }
 
 export async function destroyCurrentSession(surface: AuthSurface): Promise<void> {
