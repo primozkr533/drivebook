@@ -18,12 +18,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Routing already 404s this in production without DEV_INBOX_ENABLED; this guards direct renders.
 export default async function DevInboxPage() {
-  const { isProduction, devInboxEnabled } = getConfig();
+  const { isProduction, devInboxEnabled, devAliases } = getConfig();
   if (isProduction && !devInboxEnabled) notFound();
 
   const t = await getTranslations("inbox");
   const messages = await listDevOutbox();
-  const origins = { dealer: surfaceOrigin("dealer"), backoffice: surfaceOrigin("backoffice") };
+  // The /_dev/app and /_dev/admin aliases don't exist in production, even with DEV_INBOX_ENABLED.
+  const origins = devAliases ? { dealer: surfaceOrigin("dealer"), backoffice: surfaceOrigin("backoffice") } : null;
 
   return (
     <Shell header={<AppHeader />}>
@@ -63,7 +64,7 @@ export default async function DevInboxPage() {
                       </div>
                       {m.htmlBody && (
                         <HtmlPreview
-                          html={rewriteHtmlLinks(m.htmlBody, origins)}
+                          html={origins ? rewriteHtmlLinks(m.htmlBody, origins) : m.htmlBody}
                           showLabel={t("showHtml")}
                           hideLabel={t("hideHtml")}
                           title={t("htmlPreview")}

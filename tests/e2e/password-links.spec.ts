@@ -139,12 +139,12 @@ test("a reset link opened from the dev inbox on localhost stays on the localhost
   await expect(link).toContainText(url("app", "reset-password"));
   expect(await link.getAttribute("href")).toMatch(/^\/_dev\/app\/reset-password\/[^/?#]+$/);
   await link.click();
-  await expect(page).toHaveURL(new RegExp(`^${ROOT}/_dev/app/reset-password/`));
+  await expect(page).toHaveURL((u) => u.origin === ROOT && /^\/_dev\/app\/reset-password\//.test(u.pathname));
 
   await page.getByTestId("new-password").fill(NEW_PASSWORD);
   await page.getByTestId("confirm-password").fill(NEW_PASSWORD);
   await page.getByTestId("set-password-submit").click();
-  await expect(page).toHaveURL(new RegExp(`^${ROOT}/_dev/app(/account)?/?$`));
+  await expect(page).toHaveURL((u) => u.origin === ROOT && /^\/_dev\/app(\/account)?\/?$/.test(u.pathname));
   await expect(page.getByTestId("signed-in-as")).toContainText(user.email);
   expect(await cookie(page, "db_app_session")).toMatchObject({ httpOnly: true, domain: "localhost" });
 });

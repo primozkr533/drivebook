@@ -84,6 +84,31 @@ describe("dev inbox page", () => {
     expect(html).not.toContain("<iframe");
   });
 
+  it("keeps the real surface links in production with DEV_INBOX_ENABLED, where the dev aliases don't exist", async () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("DEV_INBOX_ENABLED", "1");
+    vi.stubEnv("DATABASE_URL", "postgres://u:p@localhost:5432/drivebook");
+    vi.stubEnv("AUTH_SECRET", "x".repeat(32));
+    vi.stubEnv("PUBLIC_URL_SCHEME", "https");
+    vi.stubEnv("PUBLIC_URL_PORT", "");
+    resetConfigForTests();
+    rows.push({
+      id: "p",
+      channel: "email",
+      recipient: "kupec@example.si",
+      sender: "DriveBook",
+      subject: "Ponastavitev gesla",
+      textBody: "Ponastavite geslo: https://admin.drivebook.localhost/reset-password/abc",
+      htmlBody: null,
+      createdAt: new Date("2026-10-20T08:05:00Z"),
+    });
+    const html = await render();
+
+    expect(html).toContain('href="https://admin.drivebook.localhost/reset-password/abc"');
+    expect(html).not.toContain("/_dev/app");
+    expect(html).not.toContain("/_dev/admin");
+  });
+
   it("shows the empty state", async () => {
     const html = await render();
     expect(html).toContain(inbox.empty);
