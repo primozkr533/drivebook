@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getConfig, isReservedSlug, resetConfigForTests, surfaceOrigin } from "@/lib/config";
+import { dealerSiteOrigin, getConfig, isReservedSlug, resetConfigForTests, surfaceOrigin } from "@/lib/config";
 
 const originalEnv = process.env;
 const SECRET = "x".repeat(32);
@@ -181,6 +181,15 @@ describe("surfaceOrigin", () => {
     setEnv({ PUBLIC_URL_SCHEME: "https", PUBLIC_URL_PORT: "", BASE_DOMAIN: "drivebook.si" });
     expect(surfaceOrigin("dealer")).toBe("https://app.drivebook.si");
     expect(surfaceOrigin("backoffice")).toBe("https://admin.drivebook.si");
+  });
+});
+
+describe("dealerSiteOrigin", () => {
+  it("builds the dealer subdomain origin", () => {
+    setEnv({ PUBLIC_URL_SCHEME: "http", PUBLIC_URL_PORT: "3000", BASE_DOMAIN: "drivebook.localhost" });
+    expect(dealerSiteOrigin("novak")).toBe("http://novak.drivebook.localhost:3000");
+    setEnv({ PUBLIC_URL_SCHEME: "https", PUBLIC_URL_PORT: "", BASE_DOMAIN: "drivebook.si" });
+    expect(dealerSiteOrigin("novak")).toBe("https://novak.drivebook.si");
   });
 });
 

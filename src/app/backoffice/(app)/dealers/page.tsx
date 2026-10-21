@@ -97,7 +97,15 @@ export default async function BackofficeDealersPage({ searchParams }: Props) {
                 <tbody>
                   {dealers.map((d) => (
                     <tr key={d.id} className="border-b border-line last:border-b-0" data-testid="dealer-row">
-                      <td className="px-4 py-3 font-[650] text-ink">{d.name}</td>
+                      <td className="px-4 py-3 font-[650] text-ink">
+                        <a
+                          href={`${basePath}/dealers/${d.id}`}
+                          className="underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
+                          data-testid="dealer-row-link"
+                        >
+                          {d.name}
+                        </a>
+                      </td>
                       <td className="px-4 py-3">
                         <Plate size="sm">{d.slug}</Plate>
                       </td>
