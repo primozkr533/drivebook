@@ -139,3 +139,8 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Account-page credential checks (the current password when changing the password; the password + code when turning 2FA off) count toward the same per-account failure limit and lockout as login. Every failed check is written to audit_log.
 - Forgot password for an `invited` user (no password set yet) re-sends the invitation, under the same 3-per-hour per-account link cap. Deactivated users get nothing. The response is always the same generic message.
 - Password-reset requests are also capped per client IP (via `clientIp`) per surface: 10 per hour, counted in `password_reset_requests`. Over the cap, no e-mail is sent and the usual generic message is shown.
+- The startup seed only inserts the default plan (matched by `code`) when it is missing (`onConflictDoNothing`); operator edits to it in the backoffice are never overwritten on restart.
+- Licence extension (`extendLicence`) refuses a valid-until date in the past (Europe/Ljubljana) or earlier than the dealer's current licence valid-until; extensions can never shorten a licence.
+- Inviting the e-mail of a `deactivated` backoffice user re-invites that row (status back to `invited`, new 7-day set-password link, invitation e-mail, audit_log entry); active or invited users still get `taken`.
+- The public dealer page hides the call button, the address block and the maps link while the dealer's phone / address are empty; the suspended message then drops the 'call us' wording.
+- Holiday names are not hardcoded: `slovenianWorkFreeDays` (`src/lib/date.ts`) returns stable `key`s, and the Slovenian name comes from `messages/sl/holidays.json` by key.

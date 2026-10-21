@@ -49,7 +49,7 @@ export async function runSeed(db: Db): Promise<void> {
   const licenceValidUntil = validUntil.toISOString().slice(0, 10);
 
   await db.transaction(async (tx) => {
-    const planId = await upsertPlan(tx);
+    const planId = await ensureDefaultPlan(tx);
 
     await tx
       .insert(backofficeUsers)
@@ -193,8 +193,9 @@ export async function runSeed(db: Db): Promise<void> {
   });
 }
 
-async function upsertPlan(tx: Tx): Promise<string> {
-  const [plan] = await tx
+// Insert only: operators edit the default plan in the backoffice and a restart must not undo that.
+async function ensureDefaultPlan(tx: Tx): Promise<string> {
+  await tx
     .insert(plans)
     .values({
       code: DEFAULT_PLAN_CODE,
@@ -204,17 +205,8 @@ async function upsertPlan(tx: Tx): Promise<string> {
       monthlySmsQuota: PLAN_MONTHLY_SMS_QUOTA,
       priceEurCents: 4900,
     })
-    .onConflictDoUpdate({
-      target: plans.code,
-      set: {
-        name: "Standard",
-        maxCars: 50,
-        maxUsers: PLAN_MAX_USERS,
-        monthlySmsQuota: PLAN_MONTHLY_SMS_QUOTA,
-        priceEurCents: 4900,
-      },
-    })
-    .returning({ id: plans.id });
+    .onConflictDoNothing({ target: plans.code });
+  const [plan] = await tx.select({ id: plans.id }).from(plans).where(eq(plans.code, DEFAULT_PLAN_CODE));
   return plan.id;
 }
 
