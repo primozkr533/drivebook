@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import { createTranslator } from "next-intl";
 import {
   bookingRules,
   dealerLicenceHistory,
@@ -17,6 +18,9 @@ import { db } from "../db";
 import type { Tx } from "../mutate";
 import { withBackofficeMutation, type BackofficeAuditEntry } from "./mutate";
 import { validateSlug, type SlugError } from "./slug";
+import holidays from "../../../../messages/sl/holidays.json";
+
+const holidayT = createTranslator({ locale: "sl", messages: { holidays }, namespace: "holidays" });
 
 export type DealerListItem = {
   id: string;
@@ -267,7 +271,7 @@ export async function createDealer(input: CreateDealerInput, opts: { now?: Date 
             dealerId: dealer.id,
             date: day.date,
             key: day.key,
-            name: day.name,
+            name: holidayT(day.key as keyof typeof holidays),
             isOpen: false,
           })),
         );
