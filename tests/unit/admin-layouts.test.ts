@@ -15,10 +15,19 @@ import BackofficePlansPage from "@/app/backoffice/(app)/plans/page";
 import BackofficePlanPage from "@/app/backoffice/(app)/plans/[id]/page";
 import BackofficeNewPlanPage from "@/app/backoffice/(app)/plans/new/page";
 import BackofficeUsersPage from "@/app/backoffice/(app)/users/page";
+import { requireOwnerPage } from "@/app/dealer-admin/(app)/owner-gate";
+import SettingsLayout from "@/app/dealer-admin/(app)/settings/layout";
+import SettingsHomePage from "@/app/dealer-admin/(app)/settings/page";
+import SettingsDealerPage from "@/app/dealer-admin/(app)/settings/dealer/page";
+import SettingsBrandingPage from "@/app/dealer-admin/(app)/settings/branding/page";
+import SettingsBookingPage from "@/app/dealer-admin/(app)/settings/booking/page";
+import SettingsHoursPage from "@/app/dealer-admin/(app)/settings/hours/page";
+import SettingsClosuresPage from "@/app/dealer-admin/(app)/settings/closures/page";
+import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice") => {
+  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings") => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -461,5 +470,117 @@ describe("backoffice users", () => {
     mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/admin" });
     expect(await redirectOf(render(createElement(BackofficeUsersPage)))).toBe("/_dev/admin/login");
     expect(mocks.listBackofficeUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("dealer settings shell", () => {
+  const settingsT = messages.settings;
+  const owner = { id: "u1", email: "lastnik@demo.si", role: "owner" };
+  const salesperson = { id: "u3", email: "prodajalec@demo.si", role: "salesperson" };
+  const signInAs = (user: typeof owner, basePath = "/_dev/app") => {
+    mocks.dealerSession = { ctx, user, sessionId: "s1" };
+    mocks.getDealerName.mockResolvedValue("Avto Demo d.o.o.");
+    mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
+  };
+  const sections = ["dealer", "branding", "booking", "hours", "closures"] as const;
+  const pages = [SettingsDealerPage, SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
+  const navLink = (href: string, label: string) => new RegExp(`<a[^>]*href="${href}"[^>]*>${label}</a>`, "g");
+
+  it("requireOwnerPage returns the session for an Owner and denies a Salesperson of the same dealer", async () => {
+    signInAs(owner);
+    expect(await requireOwnerPage()).toEqual({ ok: true, ctx, user: owner });
+    signInAs(salesperson);
+    expect(await requireOwnerPage()).toEqual({ ok: false });
+  });
+
+  it("requireOwnerPage redirects to the login page without a session", async () => {
+    mocks.headers = new Headers({ "x-drivebook-base-path": "/_dev/app" });
+    expect(await redirectOf(requireOwnerPage())).toBe("/_dev/app/login");
+  });
+
+  it.each(["", "/_dev/app"])("shows Settings and Users in the inline nav and the compact menu for an Owner (base path %j)", async (basePath) => {
+    signInAs(owner, basePath);
+    const html = await render(createElement(DealerAppLayout, { children: child }));
+    expect(html.match(navLink(`${basePath}/settings`, settingsT.nav))).toHaveLength(2);
+    expect(html.match(navLink(`${basePath}/users`, settingsT.usersNav))).toHaveLength(2);
+  });
+
+  it("hides Settings and Users from a Salesperson", async () => {
+    signInAs(salesperson);
+    const html = await render(createElement(DealerAppLayout, { children: child }));
+    expect(html).not.toContain(`>${settingsT.nav}</a>`);
+    expect(html).not.toContain(`>${settingsT.usersNav}</a>`);
+    expect(html.match(navLink("/_dev/app/account", messages.account.navAccount))).toHaveLength(2);
+  });
+
+  it.each([
+    ["settings", ["", "settings", "hours"].join("/")],
+    ["users", ["", "users"].join("/")],
+  ])("marks the %s nav item active", async (item, path) => {
+    signInAs(owner);
+    mocks.pathname = `/_dev/app${path}`;
+    const label = item === "users" ? settingsT.usersNav : settingsT.nav;
+    const links = (await render(createElement(DealerAppLayout, { children: child }))).match(navLink(`/_dev/app/${item}`, label)) ?? [];
+    expect(links).toHaveLength(2);
+    for (const a of links) expect(a).toContain('aria-current="page"');
+  });
+
+  it("renders the settings header and sub-nav with the current section active for an Owner", async () => {
+    signInAs(owner);
+    mocks.pathname = "/_dev/app/settings/booking";
+    const html = await render(createElement(SettingsLayout, { children: child }));
+    expect(html).toContain(`>${settingsT.title}</h1>`);
+    expect(html).toContain('data-testid="child"');
+    for (const section of sections) {
+      const links = html.match(new RegExp(`<a[^>]*href="/_dev/app/settings/${section}"[^>]*>`, "g")) ?? [];
+      expect(links).toHaveLength(1);
+      expect(html).toContain(settingsT.sections[section]);
+      if (section === "booking") expect(links[0]).toContain('aria-current="page"');
+      else expect(links[0]).not.toContain("aria-current");
+    }
+  });
+
+  it("denies a Salesperson in the settings layout without rendering the children", async () => {
+    signInAs(salesperson);
+    const html = await render(createElement(SettingsLayout, { children: child }));
+    expect(html).toContain('data-testid="access-denied"');
+    expect(html).toContain(settingsT.accessDenied.title);
+    expect(html).not.toContain('data-testid="child"');
+    expect(html).not.toContain('data-testid="settings-nav"');
+    expect(html).not.toContain(settingsT.title + "</h1>");
+  });
+
+  it.each(["", "/_dev/app"])("redirects the settings home to the dealer section (base path %j)", async (basePath) => {
+    signInAs(owner, basePath);
+    expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
+  });
+
+  it("renders every settings stub for an Owner and access denied for a Salesperson", async () => {
+    for (const [i, Page] of pages.entries()) {
+      signInAs(owner);
+      const html = await render(createElement(Page));
+      expect(html).toContain(`data-testid="settings-${sections[i]}"`);
+      expect(html).not.toContain("access-denied");
+
+      signInAs(salesperson);
+      const denied = await render(createElement(Page));
+      expect(denied).toContain('data-testid="access-denied"');
+      expect(denied).not.toContain(`settings-${sections[i]}`);
+    }
+    signInAs(salesperson);
+    expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
+  });
+
+  it("renders the users stub for an Owner and access denied for a Salesperson", async () => {
+    signInAs(owner);
+    const html = await render(createElement(DealerUsersPage));
+    expect(html).toContain(`>${settingsT.users.title}</h1>`);
+    expect(html).toContain('data-testid="dealer-users"');
+
+    signInAs(salesperson);
+    const denied = await render(createElement(DealerUsersPage));
+    expect(denied).toContain('data-testid="access-denied"');
+    expect(denied).not.toContain("dealer-users");
+    expect(denied).not.toContain(settingsT.users.title + "</h1>");
   });
 });
