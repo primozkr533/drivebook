@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { getConfig } from "@/lib/config";
+import { ljubljanaNow } from "@/lib/date";
 import { DEMO_DEALER_SLUG, DEMO_OLD_SLUG, DEMO_OWNER_EMAIL } from "./demo";
 import type { Db } from "./client";
 import {
@@ -28,6 +29,8 @@ export const DEMO_CAR_IDS = {
 const LEGACY_DEMO_OWNER_EMAIL = "lastnik@demo.drivebook.localhost";
 
 const PLAN_CODE = "standard";
+const PLAN_MAX_USERS = 10;
+const PLAN_MONTHLY_SMS_QUOTA = 300;
 const AVTO_NET_DETAILS = "https://www.avto.net/Ads/details.asp?id=";
 
 const OPENING_HOURS: { isoWeekday: number; opensAt: string; closesAt: string }[] = [
@@ -40,6 +43,10 @@ const OPENING_HOURS: { isoWeekday: number; opensAt: string; closesAt: string }[]
 
 export async function runSeed(db: Db): Promise<void> {
   const { seedSuperadminEmail } = getConfig();
+
+  const validUntil = new Date(`${ljubljanaNow().dateISO}T00:00:00Z`);
+  validUntil.setUTCFullYear(validUntil.getUTCFullYear() + 1);
+  const licenceValidUntil = validUntil.toISOString().slice(0, 10);
 
   await db.transaction(async (tx) => {
     const planId = await upsertPlan(tx);
@@ -55,7 +62,7 @@ export async function runSeed(db: Db): Promise<void> {
       })
       .onConflictDoNothing({ target: backofficeUsers.email });
 
-    const dealerId = await upsertDemoDealer(tx, planId);
+    const dealerId = await upsertDemoDealer(tx, planId, licenceValidUntil);
 
     const [licence] = await tx
       .select({ id: dealerLicenceHistory.id })
@@ -68,6 +75,7 @@ export async function runSeed(db: Db): Promise<void> {
         planId,
         validFrom: new Date(),
         validTo: null,
+        validUntil: licenceValidUntil,
         note: "Seed",
       });
     }
@@ -192,20 +200,26 @@ async function upsertPlan(tx: Tx): Promise<string> {
       code: PLAN_CODE,
       name: "Standard",
       maxCars: 50,
-      maxUsers: 10,
-      smsIncluded: 300,
+      maxUsers: PLAN_MAX_USERS,
+      monthlySmsQuota: PLAN_MONTHLY_SMS_QUOTA,
       priceEurCents: 4900,
     })
     .onConflictDoUpdate({
       target: plans.code,
-      set: { name: "Standard", maxCars: 50, maxUsers: 10, smsIncluded: 300, priceEurCents: 4900 },
+      set: {
+        name: "Standard",
+        maxCars: 50,
+        maxUsers: PLAN_MAX_USERS,
+        monthlySmsQuota: PLAN_MONTHLY_SMS_QUOTA,
+        priceEurCents: 4900,
+      },
     })
     .returning({ id: plans.id });
   return plan.id;
 }
 
 // Existing demo dealer rows are left as-is so edits made in the admin survive a re-seed.
-async function upsertDemoDealer(tx: Tx, planId: string): Promise<string> {
+async function upsertDemoDealer(tx: Tx, planId: string, licenceValidUntil: string): Promise<string> {
   await tx
     .insert(dealers)
     .values({
@@ -223,6 +237,7 @@ async function upsertDemoDealer(tx: Tx, planId: string): Promise<string> {
       logoKey: null,
       status: "active",
       planId,
+      licenceValidUntil,
     })
     .onConflictDoNothing({ target: dealers.slug });
   const [dealer] = await tx

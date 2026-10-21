@@ -22,6 +22,13 @@
       "when": 1792541664144,
       "tag": "0002_totp_last_step_and_password_reset_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792557433316,
+      "tag": "0003_backoffice_operator_columns",
+      "breakpoints": true
     }
   ]
 }

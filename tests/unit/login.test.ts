@@ -30,7 +30,7 @@ const currentStep = () => Math.floor(Date.now() / 1000 / 30);
 async function seed() {
   const [plan] = await db
     .insert(plans)
-    .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, smsIncluded: 100, priceEurCents: 4900 })
+    .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, monthlySmsQuota: 100, priceEurCents: 4900 })
     .returning();
   const [dealer] = await db
     .insert(dealers)
