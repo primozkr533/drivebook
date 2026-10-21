@@ -28,6 +28,7 @@ export default async function EditCarPage({ params }: Props) {
         />
         <CarForm
           listHref={`${basePath}/cars`}
+          listStatus={car.active ? "active" : "inactive"}
           initial={{
             id: car.id,
             make: car.make,

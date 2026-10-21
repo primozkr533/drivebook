@@ -190,3 +190,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - avto.net auto-fill only fetches URLs on avto.net or its subdomains (10 s timeout, realistic User-Agent) and never blocks saving: any failure or block shows a notice and manual entry always works.
 - A car's deep link is {scheme}://{slug}.{BASE_DOMAIN}{port}/?car={publicId}, shown with CopyLink in the cars list.
 - Car actions on a read_only/suspended dealer (save, deactivate, reactivate) never crash: the list toggles redirect back to the cars list with a status query param, and the list shows the restricted-account notice (`errors.readOnly`).
+- A car image URL (auto-filled or pasted) that can't be downloaded at save time never blocks saving: the car is saved without the image (on edit the current image is kept) and a non-blocking notice says the photo wasn't fetched. Upload validation errors (too large, unsupported/unsafe type) still block.

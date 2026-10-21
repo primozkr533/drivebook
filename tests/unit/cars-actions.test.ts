@@ -220,20 +220,33 @@ describe("saveCarAction validation and images", () => {
     expect((await carRow(id)).imageKey).toBeNull();
   });
 
-  it("reports an unsupported upload on imageFile and a failed download on imageUrl", async () => {
+  it("reports an unsupported upload on imageFile and saves nothing", async () => {
     const bad = new File([new Uint8Array([1, 2, 3, 4])], "x.png", { type: "image/png" });
     expect(await saveCarAction(null, carForm({ imageFile: bad }))).toMatchObject({
       ok: false,
       fieldErrors: { imageFile: "unsupported_type" },
       values: { make: "Škoda", price: "15900" },
     });
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
-    expect(await saveCarAction(null, carForm({ imageUrl: "http://93.184.216.34/car.jpg" }))).toMatchObject({
-      ok: false,
-      fieldErrors: { imageUrl: "download_failed" },
-      values: { imageUrl: "http://93.184.216.34/car.jpg", model: "Octavia" },
-    });
     expect(await db.select().from(cars)).toHaveLength(0);
+  });
+
+  it("creates the car without an image and returns the notice when the image URL can't be downloaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    const result = await saveCarAction(null, carForm({ imageUrl: "http://93.184.216.34/car.jpg" }));
+    expect(result).toEqual({ ok: true, id: expect.any(String), notice: "imageNotFetched" });
+    if (!result.ok) throw new Error("not saved");
+    expect(await carRow(result.id)).toMatchObject({ model: "Octavia", imageKey: null });
+    expect(revalidatePath).toHaveBeenCalled();
+  });
+
+  it("keeps the current image on edit when the new image URL can't be downloaded", async () => {
+    const id = await createdId({ imageFile: await png() });
+    const key = (await carRow(id)).imageKey!;
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("fetch failed"))));
+    const edit = carForm({ id, model: "Superb", imageUrl: "http://93.184.216.34/car.jpg" });
+    expect(await saveCarAction(null, edit)).toEqual({ ok: true, id, notice: "imageNotFetched" });
+    expect(await carRow(id)).toMatchObject({ model: "Superb", imageKey: key });
+    expect(await storage.get(key)).not.toBeNull();
   });
 });
 

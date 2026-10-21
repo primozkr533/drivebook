@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { CarSilhouette } from "@/components/signature";
 import { Button, ButtonLink, Card, CardHeader, Grid, Input, Stack, Text } from "@/components/ui";
 import { isCarImageTooLarge } from "@/lib/car-image-limits";
+import type { CarStatusFilter } from "@/server/data/cars";
 import { autofillFromAvtonetAction, saveCarAction, type CarFormField, type SaveCarState } from "./actions";
 import { mergeAutofill, type CarDraft } from "./form-model";
+import { carsListHref } from "./notice";
 
 export type CarFormInitial = CarDraft & { id: string; avtonetUrl: string; currentImageUrl: string | null };
 
@@ -26,7 +28,15 @@ async function saveCar(_prev: CarFormState | null, form: FormData): Promise<CarF
 
 const isHttpUrl = (value: string) => /^https?:\/\/\S+$/i.test(value.trim());
 
-export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHref: string }) {
+export function CarForm({
+  initial,
+  listHref,
+  listStatus = "active",
+}: {
+  initial: CarFormInitial;
+  listHref: string;
+  listStatus?: CarStatusFilter;
+}) {
   const t = useTranslations("cars");
   const router = useRouter();
   const [state, formAction, saving] = useActionState<CarFormState | null, FormData>(saveCar, null);
@@ -47,8 +57,8 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
   const [fileTooLarge, setFileTooLarge] = useState(false);
 
   useEffect(() => {
-    if (state?.ok) router.push(listHref);
-  }, [state, router, listHref]);
+    if (state?.ok) router.push(state.notice ? carsListHref(listHref, listStatus, state.notice) : listHref);
+  }, [state, router, listHref, listStatus]);
 
   useEffect(() => () => {
     if (filePreview) URL.revokeObjectURL(filePreview);

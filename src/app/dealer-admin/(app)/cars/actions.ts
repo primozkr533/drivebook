@@ -17,6 +17,7 @@ import {
   updateCar,
   type CarFieldError,
   type CarImageInput,
+  type CarSaveNotice,
 } from "@/server/data/cars";
 import { parseCarStatusFilter } from "./form-model";
 import { carsListHref, type CarListNotice } from "./notice";
@@ -37,7 +38,7 @@ export type CarFormValues = {
 };
 
 export type SaveCarState =
-  | { ok: true; id: string }
+  | { ok: true; id: string; notice?: CarSaveNotice }
   | {
       ok: false;
       fieldErrors: Partial<Record<CarFormField, CarFieldError>>;
@@ -118,7 +119,7 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
       };
     }
     revalidateCars(ctx.slug);
-    return { ok: true, id: result.car.id };
+    return { ok: true, id: result.car.id, ...(result.notice && { notice: result.notice }) };
   } catch (err) {
     if (err instanceof CarNotFoundError) notFound();
     if (err instanceof ForbiddenError) return { ok: false, fieldErrors: {}, error: "forbidden", values };

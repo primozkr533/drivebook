@@ -125,6 +125,7 @@ beforeEach(async () => {
   signIn(a.ctx);
 });
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await rm(tempDir, { recursive: true, force: true });
 });
 afterAll(async () => {
@@ -279,10 +280,6 @@ describe("validation", () => {
       ok: false,
       errors: { image: "unsupported_type" },
     });
-    expect(await createCar(a.ctx, input({ image: { kind: "url", url: "http://localhost/car.jpg" } }))).toEqual({
-      ok: false,
-      errors: { image: "blocked_host" },
-    });
     expect(await db.select().from(cars)).toHaveLength(0);
   });
 });
@@ -375,6 +372,41 @@ describe("images", () => {
     const newKey = (await carRow(car.id)).imageKey!;
     expect(newKey).not.toBe(oldKey);
     expect(await storedFiles()).toEqual([newKey]);
+  });
+
+  it.each([
+    ["a blocked host", "http://localhost/car.jpg", () => new Response("")],
+    ["a refused download", "http://93.184.216.34/car.jpg", () => new Response("nope", { status: 403 })],
+    ["a non-image response", "http://93.184.216.34/car.jpg", () => new Response("<html></html>")],
+  ])("creates the car without an image and with a notice for %s", async (_name, url, respond) => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond()));
+    const result = await createCar(a.ctx, input({ image: { kind: "url", url } }));
+    expect(result).toMatchObject({ ok: true, notice: "imageNotFetched" });
+    expect(result).not.toHaveProperty("errors");
+    if (!result.ok) throw new Error("not saved");
+    expect(await carRow(result.car.id)).toMatchObject({ model: "Octavia", imageKey: null });
+    expect(await storedFiles()).toEqual([]);
+  });
+
+  it("keeps the current image and saves other changes when a new image URL can't be downloaded", async () => {
+    const car = await created(a.ctx, { image: { kind: "upload", bytes: await png() } });
+    const oldKey = (await carRow(car.id)).imageKey!;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+
+    const url = "http://93.184.216.34/car.jpg";
+    const result = await updateCar(a.ctx, car.id, input({ model: "Superb", priceEur: 21000, image: { kind: "url", url } }));
+    expect(result).toMatchObject({ ok: true, notice: "imageNotFetched" });
+    expect(await carRow(car.id)).toMatchObject({ model: "Superb", priceEur: 21000, imageKey: oldKey });
+    expect(await storedFiles()).toEqual([oldKey]);
+  });
+
+  it("stores a downloadable image URL without a notice", async () => {
+    const bytes = await png();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(bytes, { headers: { "content-type": "image/png" } })));
+    const result = await createCar(a.ctx, input({ image: { kind: "url", url: "http://93.184.216.34/car.png" } }));
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty("notice");
+    expect(await storedFiles()).toHaveLength(1);
   });
 
   it("deletes the file when the image is removed", async () => {
