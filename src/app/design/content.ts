@@ -145,3 +145,12 @@ export const brandDemos = [
   { name: "Car Center Koper", slug: "cc-koper", hex: "#F2C200" },
   { name: "Mobil Ptuj", slug: "mobil-ptuj", hex: "#1F3FBF" },
 ];
+
+export const adminCarLabels = {
+  listing: "Oglas na avto.net",
+  active: "Aktivno",
+  inactive: "Neaktivno",
+  deepLink: "Povezava za oglas",
+  copy: "Kopiraj",
+  copied: "Kopirano",
+};

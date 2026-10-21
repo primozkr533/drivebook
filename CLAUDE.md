@@ -38,6 +38,10 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
 - `src/server/data/settings-dealer.ts`, `src/server/data/settings-branding.ts`, `src/server/data/settings-booking.ts`, `src/server/data/settings-hours.ts`, `src/server/data/dealer-users.ts` — Owner-only settings services (every function calls `requireDealerRole(ctx, ['owner'])` first)
 - `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getClosedDatesBetween` (shared with the phase-2 slot engine)
+- `src/server/data/cars.ts` — cars data service: public reads (`listActiveCars`, `getCar`) plus admin list/create/update/setActive (`listCarsForAdmin`, `createCar`, `updateCar`, `setCarActive`) for Owner + Salesperson
+- `src/server/cars/images.ts` — car image service: resize to ≤1200 px wide WebP, URL download with SSRF guard, stored under `cars/<publicId>.webp` keys
+- `src/server/cars/avtonet.ts` — avto.net auto-fill: listing fetch (avto.net hosts only, 10 s timeout) + Open Graph/meta parser
+- `src/app/dealer-admin/(app)/cars` — cars pages (list, new, edit) and server actions (`actions.ts`), for both roles (Owner + Salesperson)
 - `src/app/dealer-admin/(app)/settings/*` (`src/app/dealer-admin/(app)/settings/`) and `src/app/dealer-admin/(app)/users` — Owner settings and users pages, gated by `requireOwnerPage()` in `src/app/dealer-admin/(app)/owner-gate.tsx`
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
@@ -102,6 +106,7 @@ Production stack only (`docker-compose.prod.yml`, Caddy, backup; not read by the
   - 304 when `If-None-Match` matches the ETag.
   - 404 for an invalid key (traversal etc.) or a missing file.
   - `HEAD` is supported with the same headers and no body; other methods are not defined.
+  - Car images use the same route (keys `cars/<publicId>.webp`, `Content-Type: image/webp`).
 
 ## Tenant isolation
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
@@ -180,3 +185,7 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
 - Production refuses to start with fake SMS/e-mail providers unless ALLOW_FAKE_PROVIDERS=1 (staging only).
 - `NextIntlClientProvider` is mounted only in the admin `(app)` layouts (dealer admin and backoffice), not in the root layout, so public pages ship no intl runtime or messages. Client components elsewhere receive translated strings as props.
+- Cars are managed by Owners and Salespeople. Deactivated cars are hidden from every public read (list and ?car= deep link); by-id car operations for another dealer return not-found (404).
+- Car images are never hot-linked: uploads and image URLs are downloaded, resized to max 1200 px wide, re-encoded as WebP and stored under cars/<publicId>.webp; replacing an image deletes the old file after commit.
+- avto.net auto-fill only fetches URLs on avto.net or its subdomains (10 s timeout, realistic User-Agent) and never blocks saving: any failure or block shows a notice and manual entry always works.
+- A car's deep link is {scheme}://{slug}.{BASE_DOMAIN}{port}/?car={publicId}, shown with CopyLink in the cars list.
