@@ -11,10 +11,14 @@ export type DealerPageModel = {
   days: DayHours[];
   today: number;
   nowMin: number;
-  telHref: string;
-  mapsHref: string;
+  phone: string | null;
+  telHref: string | null;
+  address: DealerAddress | null;
+  mapsHref: string | null;
   privacy: { href: string; external: boolean };
 };
+
+export type DealerAddress = { line: string | null; locality: string | null };
 
 const ISO_WEEKDAYS: IsoWeekday[] = [1, 2, 3, 4, 5, 6, 7];
 
@@ -22,9 +26,19 @@ export function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
 }
 
-export function mapsHref(dealer: Pick<PublicDealer, "name" | "addressLine" | "postalCode" | "city" | "mapsUrl">): string {
+export function dealerAddress(dealer: Pick<PublicDealer, "addressLine" | "postalCode" | "city">): DealerAddress | null {
+  const line = dealer.addressLine.trim() || null;
+  const locality = [dealer.postalCode.trim(), dealer.city.trim()].filter(Boolean).join(" ") || null;
+  return line || locality ? { line, locality } : null;
+}
+
+export function mapsHref(
+  dealer: Pick<PublicDealer, "name" | "addressLine" | "postalCode" | "city" | "mapsUrl">,
+): string | null {
+  const address = dealerAddress(dealer);
+  if (!address) return null;
   if (dealer.mapsUrl) return dealer.mapsUrl;
-  const query = `${dealer.name}, ${dealer.addressLine}, ${dealer.postalCode} ${dealer.city}`;
+  const query = [dealer.name.trim(), address.line, address.locality].filter(Boolean).join(", ");
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
@@ -67,6 +81,7 @@ export function buildDealerPageModel({
   basePath: string;
 }): DealerPageModel {
   const suspended = dealer.status === "suspended";
+  const phone = dealer.phone.trim();
   return {
     suspended,
     cars: suspended ? [] : orderCars(cars, carParam),
@@ -74,7 +89,9 @@ export function buildDealerPageModel({
     // HoursStrip's `today` is an index into `days`, which starts on Monday.
     today: now.isoWeekday - 1,
     nowMin: now.minutes,
-    telHref: telHref(dealer.phone),
+    phone: phone || null,
+    telHref: phone ? telHref(phone) : null,
+    address: dealerAddress(dealer),
     mapsHref: mapsHref(dealer),
     privacy: privacyLink(dealer.privacyUrl, basePath),
   };
