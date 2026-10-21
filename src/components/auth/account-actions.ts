@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import {
   changePassword,
   confirmTotpSetup,
@@ -7,19 +8,20 @@ import {
   getAccountSummary,
   startTotpSetup,
 } from "@/server/auth/account";
+import { clientIp } from "@/server/auth/client-ip";
 import { requireBackofficeUser, requireDealerUser } from "@/server/auth/permissions";
 import type { AuthSurface } from "@/server/auth/session";
 
 export type ChangePasswordState = {
   status?: "changed";
-  error?: "wrong_password" | "too_short" | "mismatch";
+  error?: "wrong_password" | "too_short" | "mismatch" | "rate_limited";
 };
 
 export type TotpState = {
   enabled: boolean;
   setup?: { qrDataUrl: string; secret: string };
   status?: "enabled" | "disabled";
-  error?: "invalid_code" | "wrong_password" | "no_pending_setup" | "not_enabled";
+  error?: "invalid_code" | "wrong_password" | "no_pending_setup" | "not_enabled" | "rate_limited";
 };
 
 const field = (form: FormData, name: string) => {
@@ -44,6 +46,7 @@ export async function changePasswordAction(
     currentPassword: field(form, "currentPassword"),
     newPassword,
     currentSessionId: sessionId,
+    ip: clientIp(await headers()),
   });
   return result.ok ? { status: "changed" } : { error: result.error };
 }
@@ -65,7 +68,11 @@ export async function totpAction(surface: AuthSurface, prev: TotpState, form: Fo
         : { ...prev, status: undefined, error: result.error };
     }
     case "disable": {
-      const result = await disableTotp(surface, userId, { password: field(form, "password"), code: field(form, "code") });
+      const result = await disableTotp(surface, userId, {
+        password: field(form, "password"),
+        code: field(form, "code"),
+        ip: clientIp(await headers()),
+      });
       if (result.ok) return { enabled: false, status: "disabled" };
       return result.error === "not_enabled" ? { enabled: false, error: result.error } : { enabled: true, error: result.error };
     }
