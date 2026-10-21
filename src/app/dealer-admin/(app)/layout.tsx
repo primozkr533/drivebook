@@ -8,7 +8,7 @@ export default async function DealerAppLayout({ children }: { children: ReactNod
   const { ctx, user } = await requireDealerUser();
   const [basePath, dealerName] = await Promise.all([getSurfaceBasePath(), getDealerName(ctx)]);
   return (
-    <Shell header={<AdminHeader surface="dealer" basePath={basePath} email={user.email} context={dealerName ?? ctx.slug} />}>
+    <Shell header={<AdminHeader surface="dealer" basePath={basePath} email={user.email} context={dealerName ?? ctx.slug} role={user.role} />}>
       {children}
     </Shell>
   );

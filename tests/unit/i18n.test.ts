@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { messages } from "./i18n";
 
 const dir = join(process.cwd(), "messages/sl");
-const namespaces = ["common", "dealerPage", "auth", "privacy", "errors", "dev", "email", "account", "inbox", "backoffice", "holidays"];
+const namespaces = ["common", "dealerPage", "auth", "privacy", "errors", "dev", "email", "account", "inbox", "backoffice", "holidays",
+  "settings", "settingsDealer", "settingsBranding", "settingsBooking", "settingsHours", "settingsClosures", "dealerUsers"];
 
 describe("sl messages", () => {
   it("has exactly the expected namespace files", () => {
@@ -25,5 +26,7 @@ describe("sl messages", () => {
     expect(messages.backoffice.dealers.nav).toBe("Trgovci");
     expect(messages.backoffice.plans.nav).toBe("Paketi");
     expect(messages.holidays.christmas).toBe("božič");
+    expect(messages.settings.nav).toBe("Nastavitve");
+    expect(messages.settings.usersNav).toBe("Uporabniki");
   });
 });

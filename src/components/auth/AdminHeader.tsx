@@ -9,19 +9,31 @@ export async function AdminHeader({
   basePath,
   email,
   context,
+  role,
 }: {
   surface: AuthSurface;
   basePath: string;
   email: string;
   context: string;
+  role?: string;
 }) {
-  const [t, tBackoffice] = await Promise.all([getTranslations("account"), getTranslations("backoffice")]);
+  const [t, tBackoffice, tSettings] = await Promise.all([
+    getTranslations("account"),
+    getTranslations("backoffice"),
+    getTranslations("settings"),
+  ]);
   const nav = [
     ...(surface === "backoffice"
       ? [
           { label: tBackoffice("dealers.nav"), href: `${basePath}/dealers` },
           { label: tBackoffice("plans.nav"), href: `${basePath}/plans` },
           { label: tBackoffice("users.nav"), href: `${basePath}/users` },
+        ]
+      : []),
+    ...(surface === "dealer" && role === "owner"
+      ? [
+          { label: tSettings("nav"), href: `${basePath}/settings` },
+          { label: tSettings("usersNav"), href: `${basePath}/users` },
         ]
       : []),
     { label: t("navAccount"), href: `${basePath}/account` },
