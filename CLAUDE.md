@@ -30,6 +30,7 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 
 ## Structure
 - `src/lib/config.ts` — the only env reader (`getConfig()`); also `RESERVED_SLUGS`
+- `src/lib/address.ts` — `dealerAddress()` (trimmed dealer address parts, shared by the public dealer and privacy pages)
 - `src/lib/date.ts` — the only Europe/Ljubljana date utility; also `easterSunday` / `slovenianWorkFreeDays` (Slovenian work-free days)
 - `src/db/` — schema (`src/db/schema/`), client, migrate, seed, `newPublicId` (`src/db/ids.ts`)
 - `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
@@ -144,3 +145,4 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Inviting the e-mail of a `deactivated` backoffice user re-invites that row (status back to `invited`, new 7-day set-password link, invitation e-mail, audit_log entry); active or invited users still get `taken`.
 - The public dealer page hides the call button, the address block and the maps link while the dealer's phone / address are empty; the suspended message then drops the 'call us' wording.
 - Holiday names are not hardcoded: `slovenianWorkFreeDays` (`src/lib/date.ts`) returns stable `key`s, and the Slovenian name comes from `messages/sl/holidays.json` by key.
+- Public pages never render empty dealer contact data: every public page that shows the address or phone (dealer page, privacy page, and any later one) builds the address with `dealerAddress()` and switches to a translation variant without the address/phone when it is empty.

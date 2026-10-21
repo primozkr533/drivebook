@@ -2,6 +2,7 @@ import type { Car, DayHours } from "@/components/signature";
 import { timeOfDay, timeToMinutes, weekdayShortSl, type IsoWeekday, type LjubljanaParts } from "@/lib/date";
 import type { PublicDealer } from "@/server/data/dealers";
 import type { OpeningHours } from "@/server/data/hours";
+import { dealerAddress, type DealerAddress } from "@/lib/address";
 
 export type DealerPageCar = { car: Car; selected: boolean };
 
@@ -18,18 +19,10 @@ export type DealerPageModel = {
   privacy: { href: string; external: boolean };
 };
 
-export type DealerAddress = { line: string | null; locality: string | null };
-
 const ISO_WEEKDAYS: IsoWeekday[] = [1, 2, 3, 4, 5, 6, 7];
 
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
-}
-
-export function dealerAddress(dealer: Pick<PublicDealer, "addressLine" | "postalCode" | "city">): DealerAddress | null {
-  const line = dealer.addressLine.trim() || null;
-  const locality = [dealer.postalCode.trim(), dealer.city.trim()].filter(Boolean).join(" ") || null;
-  return line || locality ? { line, locality } : null;
 }
 
 export function mapsHref(

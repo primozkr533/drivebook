@@ -1,3 +1,4 @@
+import { dealerAddress } from "@/lib/address";
 import type { messages } from "@/i18n/request";
 import type { PublicDealer } from "@/server/data/dealers";
 
@@ -18,13 +19,16 @@ export const BASE_PATH_HEADER = "x-drivebook-base-path";
 type ControllerFields = Pick<PublicDealer, "legalName" | "addressLine" | "postalCode" | "city" | "email" | "phone">;
 
 export function privacyNotice(t: PrivacyTranslate, dealer: ControllerFields, basePath: string): PrivacyNotice {
+  const address = dealerAddress(dealer);
+  const addressText = address ? [address.line, address.locality].filter(Boolean).join(", ") : "";
+  const phone = dealer.phone.trim();
   return {
     title: t("title"),
-    controller: t("controller", {
-      legalName: dealer.legalName,
-      address: `${dealer.addressLine}, ${dealer.postalCode} ${dealer.city}`,
-    }),
-    contact: t("contact", { email: dealer.email, phone: dealer.phone }),
+    controller: addressText
+      ? t("controller", { legalName: dealer.legalName, address: addressText })
+      : // The sentence ends right after the name; "d.o.o." / "s.p." would otherwise end in "..".
+        t("controllerNoAddress", { legalName: dealer.legalName.trim().replace(/\.$/, "") }),
+    contact: phone ? t("contact", { email: dealer.email, phone }) : t("contactNoPhone", { email: dealer.email }),
     processor: t("processor"),
     sections: [
       { heading: t("dataHeading"), body: t("dataBody") },
