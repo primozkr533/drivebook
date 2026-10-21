@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   auditLog,
+  bookingRules,
   authTokens,
   backofficeSessions,
   backofficeUsers,
@@ -12,7 +13,9 @@ import {
   dealers,
   dealerSessions,
   dealerUsers,
+  dealerClosures,
   holidayOverrides,
+  openingHours,
   messageLog,
   passwordResetRequests,
   plans,
@@ -332,7 +335,7 @@ describe("phase-1 schema", () => {
       "dealers.plan_id": ["uuid", "NO"],
       "plans.name": ["text", "NO"],
       "plans.monthly_sms_quota": ["integer", "NO"],
-      "plans.max_users": ["integer", "NO"],
+      "plans.max_users": ["integer", "YES"],
       "plans.notes": ["text", "YES"],
       "dealer_licence_history.dealer_id": ["uuid", "NO"],
       "dealer_licence_history.previous_valid_until": ["date", "YES"],
@@ -399,11 +402,11 @@ describe("phase-1 schema", () => {
 
     const [holiday] = await db
       .insert(holidayOverrides)
-      .values({ dealerId: dealer.id, date: "2026-12-25", key: "christmas", name: "Božič", isOpen: false })
+      .values({ dealerId: dealer.id, date: "2026-12-25", key: "christmas", name: "Božič" })
       .returning();
-    expect(holiday).toMatchObject({ date: "2026-12-25", key: "christmas", name: "Božič" });
+    expect(holiday).toMatchObject({ date: "2026-12-25", key: "christmas", name: "Božič", openAnyway: false });
     await expectPgError(
-      db.insert(holidayOverrides).values({ dealerId: dealer.id, date: "2026-12-25", name: "Dvojnik", isOpen: false }),
+      db.insert(holidayOverrides).values({ dealerId: dealer.id, date: "2026-12-25", name: "Dvojnik" }),
       "23505",
     );
   });
@@ -418,5 +421,124 @@ describe("phase-1 schema", () => {
       .values({ actorKind: "backoffice_user", actorId: admin.id, action: "plan.create", entity: "plan" })
       .returning();
     expect(row).toMatchObject({ dealerId: null, actorKind: "backoffice_user", actorId: admin.id, action: "plan.create" });
+  });
+
+  it("adds the dealer settings columns and replaces closures with dealer_closures", async () => {
+    const result = await db.execute<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      is_nullable: string;
+      column_default: string | null;
+    }>(sql`
+      SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name IN (
+        'dealers', 'booking_rules', 'opening_hours', 'holiday_overrides', 'dealer_closures', 'plans', 'dealer_users')`);
+    const columns = new Map(result.rows.map((r) => [`${r.table_name}.${r.column_name}`, r]));
+    const expected: Record<string, [string, "YES" | "NO", string | null]> = {
+      "dealers.email": ["text", "NO", null],
+      "dealers.maps_url": ["text", "YES", null],
+      "dealers.privacy_url": ["text", "YES", null],
+      "dealers.logo_key": ["text", "YES", null],
+      "dealers.sms_sender_name": ["text", "YES", null],
+      "dealers.sms_notifications_enabled": ["boolean", "NO", "false"],
+      "dealers.notification_phone": ["text", "YES", null],
+      "booking_rules.test_drive_minutes": ["integer", "NO", "45"],
+      "booking_rules.viewing_minutes": ["integer", "NO", "30"],
+      "booking_rules.other_minutes": ["integer", "NO", "30"],
+      "booking_rules.capacity": ["integer", "NO", "1"],
+      "booking_rules.lead_time_minutes": ["integer", "NO", "120"],
+      "booking_rules.max_days_ahead": ["integer", "NO", "14"],
+      "booking_rules.buffer_minutes": ["integer", "NO", "15"],
+      "booking_rules.cancel_cutoff_minutes": ["integer", "NO", "120"],
+      "booking_rules.slot_minutes": ["integer", "NO", "15"],
+      "opening_hours.dealer_id": ["uuid", "NO", null],
+      "opening_hours.iso_weekday": ["smallint", "NO", null],
+      "opening_hours.opens_at": ["time without time zone", "NO", null],
+      "opening_hours.closes_at": ["time without time zone", "NO", null],
+      "holiday_overrides.open_anyway": ["boolean", "NO", "false"],
+      "dealer_closures.id": ["text", "NO", null],
+      "dealer_closures.dealer_id": ["uuid", "NO", null],
+      "dealer_closures.start_date": ["date", "NO", null],
+      "dealer_closures.end_date": ["date", "NO", null],
+      "dealer_closures.reason": ["text", "YES", null],
+      "dealer_closures.created_at": ["timestamp with time zone", "NO", "now()"],
+      "plans.max_users": ["integer", "YES", null],
+      "dealer_users.name": ["text", "NO", null],
+      "dealer_users.last_login_at": ["timestamp with time zone", "YES", null],
+    };
+    for (const [column, [dataType, nullable, columnDefault]] of Object.entries(expected)) {
+      expect(columns.get(column), column).toMatchObject({
+        data_type: dataType,
+        is_nullable: nullable,
+        column_default: columnDefault,
+      });
+    }
+    expect(columns.has("holiday_overrides.is_open")).toBe(false);
+
+    const tables = await db.execute<{ table_name: string }>(sql`
+      SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'closures'`);
+    expect(tables.rows).toEqual([]);
+    const indexes = await db.execute<{ indexname: string }>(sql`
+      SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'dealer_closures'`);
+    expect(indexes.rows.map((r) => r.indexname)).toContain("dealer_closures_dealer_id_idx");
+  });
+
+  it("stores settings defaults, several ranges per weekday, holiday overrides and closures", async () => {
+    const { dealer } = await insertDealer();
+    expect(dealer).toMatchObject({ smsSenderName: null, smsNotificationsEnabled: false, notificationPhone: null, logoKey: null });
+
+    const [rules] = await db.insert(bookingRules).values({ dealerId: dealer.id }).returning();
+    expect(rules).toMatchObject({
+      testDriveMinutes: 45,
+      viewingMinutes: 30,
+      otherMinutes: 30,
+      capacity: 1,
+      leadTimeMinutes: 120,
+      maxDaysAhead: 14,
+      bufferMinutes: 15,
+      cancelCutoffMinutes: 120,
+      slotMinutes: 15,
+    });
+
+    await db.insert(openingHours).values([
+      { dealerId: dealer.id, isoWeekday: 1, opensAt: "08:00", closesAt: "12:00" },
+      { dealerId: dealer.id, isoWeekday: 1, opensAt: "13:00", closesAt: "17:00" },
+    ]);
+    expect(await db.select().from(openingHours)).toHaveLength(2);
+    await expectPgError(
+      db.insert(openingHours).values({ dealerId: dealer.id, isoWeekday: 8, opensAt: "08:00", closesAt: "12:00" }),
+      "23514",
+    );
+
+    const [holiday] = await db
+      .insert(holidayOverrides)
+      .values({ dealerId: dealer.id, date: "2026-11-01", key: "allSaints", name: "Dan spomina na mrtve" })
+      .returning();
+    expect(holiday.openAnyway).toBe(false);
+    await db.update(holidayOverrides).set({ openAnyway: true });
+    expect((await db.select().from(holidayOverrides))[0].openAnyway).toBe(true);
+    await expectPgError(
+      db.insert(holidayOverrides).values({ dealerId: dealer.id, date: "2026-12-26", name: "Pol ure", opensAt: "08:00" }),
+      "23514",
+    );
+
+    const [single] = await db
+      .insert(dealerClosures)
+      .values({ dealerId: dealer.id, startDate: "2026-08-14", endDate: "2026-08-14" })
+      .returning();
+    expect(single.id).toMatch(/^[0-9A-Za-z]{16}$/);
+    expect(single).toMatchObject({ reason: null });
+    await db.insert(dealerClosures).values({ dealerId: dealer.id, startDate: "2026-08-01", endDate: "2026-08-15", reason: "Dopust" });
+    await expectPgError(
+      db.insert(dealerClosures).values({ dealerId: dealer.id, startDate: "2026-08-15", endDate: "2026-08-14" }),
+      "23514",
+    );
+
+    const [unlimited] = await db
+      .insert(plans)
+      .values({ code: "unlimited", name: "Neomejen", maxCars: 100, priceEurCents: 9900 })
+      .returning();
+    expect(unlimited.maxUsers).toBeNull();
   });
 });
