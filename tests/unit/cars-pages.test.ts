@@ -209,6 +209,25 @@ describe("cars list page", () => {
     expect(html.match(/data-testid="car-add"/g)).toHaveLength(1);
   });
 
+  it.each(["readOnly", "forbidden"] as const)("renders the %s notice for ?notice= and keeps the filter", async (notice) => {
+    mocks.listCarsForAdmin.mockResolvedValue([car()]);
+    const html = decode(
+      await render(await CarsPage({ searchParams: Promise.resolve({ status: "inactive", notice }) })),
+    );
+    expect(html).toContain(`data-state="${notice}"`);
+    expect(html).toContain(c.errors[notice]);
+    expect(html).toContain('name="filter" value="inactive"');
+  });
+
+  it("renders no notice without or with an unknown ?notice=", async () => {
+    mocks.listCarsForAdmin.mockResolvedValue([car()]);
+    for (const query of [{}, { notice: "bogus" }]) {
+      const html = await render(await CarsPage({ searchParams: Promise.resolve(query) }));
+      expect(html).not.toContain('data-testid="cars-notice"');
+      expect(html).not.toContain(c.errors.readOnly);
+    }
+  });
+
   it("shows the empty state with a single Add car primary action", async () => {
     mocks.listCarsForAdmin.mockResolvedValue([]);
     const html = await render(await page());

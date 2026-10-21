@@ -248,6 +248,22 @@ describe("setCarActiveAction", () => {
     expect((await carRow(id)).active).toBe(true);
     expect(revalidatePath).toHaveBeenCalledWith("/dealer-admin/cars");
   });
+
+  it.each([
+    ["read_only", "0", "inactive"],
+    ["suspended", "1", "all"],
+  ] as const)("on a %s dealer redirects to the list with the restricted notice and changes nothing", async (status, active, filter) => {
+    const id = await createdId();
+    if (active === "1") await setCarActiveAction(form({ id, active: "0" }));
+    const before = (await carRow(id)).active;
+    await db.update(dealers).set({ status }).where(eq(dealers.id, a.dealer.id));
+    revalidatePath.mockClear();
+    expect(await redirectOf(setCarActiveAction(form({ id, active, filter })))).toBe(
+      `/_dev/app/cars?status=${filter}&notice=readOnly`,
+    );
+    expect((await carRow(id)).active).toBe(before);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
 });
 
 describe("cross-dealer ids", () => {
