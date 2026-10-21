@@ -17,6 +17,8 @@ export type Config = {
   farmTestAuth: boolean;
   devInboxEnabled: boolean;
   notifyFake: boolean;
+  allowFakeProviders: boolean;
+  missingProviderKeys: readonly string[];
   publicUrlScheme: "http" | "https";
   publicUrlPort: string | null;
   storageDir: string;
@@ -63,6 +65,14 @@ const RESERVED_SET = new Set(RESERVED_SLUGS);
 export function isReservedSlug(slug: string): boolean {
   return RESERVED_SET.has(slug.trim().toLowerCase());
 }
+
+const REQUIRED_PROVIDER_KEYS = [
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_FROM_NUMBER",
+  "BREVO_API_KEY",
+  "BREVO_SENDER_EMAIL",
+] as const;
 
 const DEFAULT_BASE_DOMAIN = "drivebook.localhost";
 const DEFAULT_DATABASE_URL = "postgres://drivebook:drivebook@localhost:5432/drivebook";
@@ -178,6 +188,8 @@ function buildConfig(env: Env): Config {
     farmTestAuth: readFlag(env, "FARM_TEST_AUTH"),
     devInboxEnabled: !isProduction || readFlag(env, "DEV_INBOX_ENABLED"),
     notifyFake: readFlag(env, "NOTIFY_FAKE"),
+    allowFakeProviders: readFlag(env, "ALLOW_FAKE_PROVIDERS"),
+    missingProviderKeys: REQUIRED_PROVIDER_KEYS.filter((name) => read(env, name) === undefined),
     publicUrlScheme: readScheme(env),
     publicUrlPort: readPort(env),
     storageDir: read(env, "STORAGE_DIR") ?? DEFAULT_STORAGE_DIR,
@@ -190,6 +202,19 @@ function buildConfig(env: Env): Config {
     brevo,
     cloudflare,
   };
+}
+
+// Not part of getConfig(): next build and unit tests run without provider keys.
+export function assertProductionProviders(config: Config): void {
+  if (!config.isProduction || config.allowFakeProviders) return;
+  const problems = [
+    config.missingProviderKeys.length > 0 ? `missing ${config.missingProviderKeys.join(", ")}` : null,
+    config.notifyFake ? "NOTIFY_FAKE=1 is set" : null,
+  ].filter((problem): problem is string => problem !== null);
+  if (problems.length === 0) return;
+  throw new Error(
+    `Production requires real providers: ${problems.join("; ")} (set ALLOW_FAKE_PROVIDERS=1 for staging)`,
+  );
 }
 
 let cached: Config | undefined;

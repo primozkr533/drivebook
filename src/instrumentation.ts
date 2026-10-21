@@ -5,5 +5,8 @@ export async function register() {
 
   const { runStartupTasks } = await import("./server/startup");
   // Not awaited: the server must listen while the database is still coming up.
-  void runStartupTasks();
+  runStartupTasks().catch((error: unknown) => {
+    console.error("[startup] Refusing to start:", error);
+    process.exit(1);
+  });
 }
