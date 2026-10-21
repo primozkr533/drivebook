@@ -212,6 +212,25 @@ test("a failed auto-fill shows the notice and the car can still be saved manuall
   await saveAndFindId(page, model);
 });
 
+test("an image URL that can't be downloaded still saves the car and shows the notice", async ({ page }) => {
+  const model = modelName("Corolla");
+  models.push(model);
+  await signIn(page, owner);
+
+  await page.goto(app("cars", "new"));
+  await fillCar(page, { make: "Toyota", model, year: "2021", price: "18900" });
+  // A loopback address is always refused by the download guard.
+  await page.getByTestId("car-image-url").fill(["http:", "", "127.0.0.1", "missing", "car.jpg"].join("/"));
+  const id = await saveAndFindId(page, model);
+
+  const notice = page.getByTestId("cars-notice");
+  await expect(notice).toHaveAttribute("data-state", "imageNotFetched");
+  await expect(notice).toHaveText(carsMessages.notices.imageNotFetched);
+  await expect(page.getByTestId("car-image-url")).toHaveCount(0);
+  const [row] = await getDb().select({ imageKey: cars.imageKey }).from(cars).where(eq(cars.id, id));
+  expect(row.imageKey).toBeNull();
+});
+
 test("another dealer's car edit page is a 404", async ({ page }) => {
   const [car] = await getDb()
     .insert(cars)
