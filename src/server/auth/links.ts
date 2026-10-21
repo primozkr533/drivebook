@@ -123,7 +123,9 @@ export async function requestPasswordReset(surface: AuthSurface, email: string, 
   const now = opts.now ?? new Date();
   const normalized = normalizeEmail(email);
   const user = normalized ? await findUser(surface, "email", normalized) : null;
-  if (!user || user.status !== "active") return;
+  if (!user || user.status === "deactivated") return;
+  // An invited user has no password to reset, so they get their invitation again instead.
+  const purpose: LinkPurpose = user.status === "invited" ? "invite" : "reset";
 
   const [recent] = await db()
     .select({ n: count() })
@@ -132,13 +134,14 @@ export async function requestPasswordReset(surface: AuthSurface, email: string, 
       and(
         eq(authTokens.surface, surface),
         eq(authTokens.userId, user.id),
-        eq(authTokens.purpose, "reset"),
+        eq(authTokens.purpose, purpose),
         gte(authTokens.createdAt, new Date(now.getTime() - RESET_RATE_WINDOW_MS)),
       ),
     );
   if ((recent?.n ?? 0) >= RESET_MAX_PER_HOUR) return;
 
-  await sendPasswordReset(surface, user, now);
+  if (purpose === "invite") await sendInvitation(surface, user, now);
+  else await sendPasswordReset(surface, user, now);
 }
 
 async function sendPasswordReset(surface: AuthSurface, user: LinkUser, now: Date): Promise<{ link: string }> {
