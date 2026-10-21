@@ -50,6 +50,6 @@ export async function forgotPasswordAction(
 ): Promise<ForgotPasswordState> {
   const email = field(form, "email").trim();
   if (!email) return { sent: false, error: "email_required" };
-  await requestPasswordReset(surface, email);
+  await requestPasswordReset(surface, email, clientIp(await headers()));
   return { sent: true };
 }

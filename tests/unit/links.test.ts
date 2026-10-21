@@ -10,6 +10,7 @@ import {
   dealerUsers,
   devOutbox,
   messageLog,
+  passwordResetRequests,
   plans,
 } from "@/db/schema";
 import { resetConfigForTests } from "@/lib/config";
@@ -28,6 +29,7 @@ const {
   inspectLinkToken,
   requestPasswordReset,
   resendInvitation,
+  RESET_MAX_PER_IP_PER_HOUR,
   RESET_TTL_MS,
 } = await import("@/server/auth/links");
 
@@ -35,6 +37,7 @@ const db = getTestDb();
 const previousAppEnv = process.env.APP_ENV;
 const NEW_PASSWORD = "nov-geslo-1234";
 const meta = { ip: "127.0.0.1", userAgent: "vitest" };
+const IP = "203.0.113.7";
 
 async function seedUsers() {
   const [plan] = await db
@@ -218,16 +221,16 @@ describe("invite lifecycle", () => {
 describe("requestPasswordReset", () => {
   it("resolves identically for every case and sends nothing to unknown or deactivated users", async () => {
     await db.update(dealerUsers).set({ status: "deactivated" }).where(eq(dealerUsers.id, seeded.active.id));
-    const unknown = await requestPasswordReset("dealer", "nobody@demo.si");
-    const deactivated = await requestPasswordReset("dealer", "owner@demo.si");
+    const unknown = await requestPasswordReset("dealer", "nobody@demo.si", IP);
+    const deactivated = await requestPasswordReset("dealer", "owner@demo.si", IP);
     expect(await drainNotificationsForTest()).toBe(0);
     expect(await db.select().from(devOutbox)).toHaveLength(0);
     expect(await db.select().from(messageLog)).toHaveLength(0);
     expect(await db.select().from(authTokens)).toHaveLength(0);
 
-    const invited = await requestPasswordReset("dealer", seeded.invited.email);
+    const invited = await requestPasswordReset("dealer", seeded.invited.email, IP);
     await db.update(dealerUsers).set({ status: "active" }).where(eq(dealerUsers.id, seeded.active.id));
-    const active = await requestPasswordReset("dealer", "OWNER@demo.si ");
+    const active = await requestPasswordReset("dealer", "OWNER@demo.si ", IP);
     expect(unknown).toEqual(active);
     expect(deactivated).toEqual(active);
     expect(invited).toEqual(active);
@@ -235,7 +238,7 @@ describe("requestPasswordReset", () => {
 
   it("re-sends the invitation (7-day set-password link, no reset e-mail) to an invited user", async () => {
     const now = new Date();
-    await requestPasswordReset("dealer", "Prodajalec@demo.si", { now });
+    await requestPasswordReset("dealer", "Prodajalec@demo.si", IP, { now });
     expect(await drainNotificationsForTest()).toBe(1);
     const outbox = await db.select().from(devOutbox);
     expect(outbox).toHaveLength(1);
@@ -257,18 +260,18 @@ describe("requestPasswordReset", () => {
 
   it("re-sends at most 3 invitations per account per hour", async () => {
     const now = new Date();
-    for (let i = 0; i < 5; i++) await requestPasswordReset("dealer", seeded.invited.email, { now });
+    for (let i = 0; i < 5; i++) await requestPasswordReset("dealer", seeded.invited.email, IP, { now });
     expect(await db.select().from(authTokens)).toHaveLength(3);
     expect(await drainNotificationsForTest()).toBe(3);
     expect(await db.select().from(messageLog).where(eq(messageLog.template, "invitation"))).toHaveLength(3);
 
     const nextHour = new Date(now.getTime() + 61 * 60 * 1000);
-    await requestPasswordReset("dealer", seeded.invited.email, { now: nextHour });
+    await requestPasswordReset("dealer", seeded.invited.email, IP, { now: nextHour });
     expect(await db.select().from(authTokens)).toHaveLength(4);
   });
 
   it("sends one e-mail with a /reset-password/ link to an active user", async () => {
-    await requestPasswordReset("dealer", "owner@demo.si");
+    await requestPasswordReset("dealer", "owner@demo.si", IP);
     expect(await drainNotificationsForTest()).toBe(1);
     const outbox = await db.select().from(devOutbox);
     expect(outbox).toHaveLength(1);
@@ -280,24 +283,24 @@ describe("requestPasswordReset", () => {
 
   it("expires a reset link after 1 hour and invalidates older reset links", async () => {
     const now = new Date();
-    await requestPasswordReset("dealer", "owner@demo.si", { now });
+    await requestPasswordReset("dealer", "owner@demo.si", IP, { now });
     const first = tokenOf(await outboxResetLink());
     expect(await inspectLinkToken("dealer", "reset", first, { now })).toBe("valid");
     const later = new Date(now.getTime() + RESET_TTL_MS + 1000);
     expect(await inspectLinkToken("dealer", "reset", first, { now: later })).toBe("expired");
 
-    await requestPasswordReset("dealer", "owner@demo.si", { now });
+    await requestPasswordReset("dealer", "owner@demo.si", IP, { now });
     expect(await inspectLinkToken("dealer", "reset", first, { now })).toBe("used");
   });
 
   it("sends at most 3 reset e-mails per email per hour", async () => {
     const now = new Date();
-    for (let i = 0; i < 5; i++) await requestPasswordReset("dealer", "owner@demo.si", { now });
+    for (let i = 0; i < 5; i++) await requestPasswordReset("dealer", "owner@demo.si", IP, { now });
     expect(await db.select().from(authTokens)).toHaveLength(3);
     expect(await drainNotificationsForTest()).toBe(3);
 
     const nextHour = new Date(now.getTime() + 61 * 60 * 1000);
-    await requestPasswordReset("dealer", "owner@demo.si", { now: nextHour });
+    await requestPasswordReset("dealer", "owner@demo.si", IP, { now: nextHour });
     expect(await db.select().from(authTokens)).toHaveLength(4);
   });
 
@@ -305,7 +308,7 @@ describe("requestPasswordReset", () => {
     const before = await createSession("dealer", seeded.active.id, meta);
     expect(await validateSessionToken("dealer", before)).not.toBeNull();
 
-    await requestPasswordReset("dealer", "owner@demo.si");
+    await requestPasswordReset("dealer", "owner@demo.si", IP);
     const token = tokenOf(await outboxResetLink());
     const result = await consumeLinkToken("dealer", "reset", token, NEW_PASSWORD, meta);
     expect(result.ok).toBe(true);
@@ -319,5 +322,52 @@ describe("requestPasswordReset", () => {
     expect(await verifyPassword(user.passwordHash!, NEW_PASSWORD)).toBe(true);
     expect(await db.select().from(auditLog).where(eq(auditLog.action, "auth.password.reset"))).toHaveLength(1);
     expect(await consumeLinkToken("dealer", "reset", token, NEW_PASSWORD, meta)).toEqual({ ok: false, error: "used" });
+  });
+});
+
+describe("requestPasswordReset per-IP cap", () => {
+  it("logs every request and sends nothing on the 11th from one IP, even for a different valid account", async () => {
+    const now = new Date();
+    await requestPasswordReset("dealer", seeded.invited.email, IP, { now });
+    await db.update(dealerUsers).set({ status: "deactivated" }).where(eq(dealerUsers.id, seeded.active.id));
+    await requestPasswordReset("dealer", seeded.active.email, IP, { now });
+    await db.update(dealerUsers).set({ status: "active" }).where(eq(dealerUsers.id, seeded.active.id));
+    for (let i = 2; i < RESET_MAX_PER_IP_PER_HOUR; i++) {
+      expect(await requestPasswordReset("dealer", `nobody-${i}@demo.si`, IP, { now })).toBeUndefined();
+    }
+    expect(await drainNotificationsForTest()).toBe(1);
+
+    expect(await requestPasswordReset("dealer", "owner@demo.si", IP, { now })).toBeUndefined();
+    expect(await drainNotificationsForTest()).toBe(0);
+    expect(await db.select().from(authTokens).where(eq(authTokens.purpose, "reset"))).toHaveLength(0);
+
+    const rows = await db.select().from(passwordResetRequests);
+    expect(rows).toHaveLength(RESET_MAX_PER_IP_PER_HOUR + 1);
+    expect(rows.every((r) => r.surface === "dealer" && r.ip === IP)).toBe(true);
+
+    await requestPasswordReset("dealer", "owner@demo.si", "198.51.100.2", { now });
+    expect(await drainNotificationsForTest()).toBe(1);
+
+    const nextHour = new Date(now.getTime() + 61 * 60 * 1000);
+    await requestPasswordReset("dealer", "owner@demo.si", IP, { now: nextHour });
+    expect(await drainNotificationsForTest()).toBe(1);
+  });
+
+  it.each([
+    { blocked: "dealer", other: "backoffice" },
+    { blocked: "backoffice", other: "dealer" },
+  ] as const)("hitting the cap on $blocked does not block $other", async ({ blocked, other }) => {
+    const now = new Date();
+    for (let i = 0; i < RESET_MAX_PER_IP_PER_HOUR; i++) {
+      await requestPasswordReset(blocked, `nobody-${i}@demo.si`, IP, { now });
+    }
+    const email = (surface: "dealer" | "backoffice") => (surface === "dealer" ? "owner@demo.si" : seeded.admin.email);
+    await requestPasswordReset(blocked, email(blocked), IP, { now });
+    expect(await drainNotificationsForTest()).toBe(0);
+
+    await requestPasswordReset(other, email(other), IP, { now });
+    expect(await drainNotificationsForTest()).toBe(1);
+    const [mail] = await db.select().from(devOutbox);
+    expect(mail.recipient).toBe(email(other));
   });
 });
