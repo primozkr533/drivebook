@@ -1,1 +1,39 @@
-{}
+{
+  "logo": {
+    "title": "Logotip",
+    "description": "Logotip se prikaže na vaši javni strani za rezervacije.",
+    "current": "Trenutni logotip",
+    "placeholder": "Logotip še ni naložen.",
+    "file": "Nova datoteka",
+    "hint": "PNG, JPG, SVG ali WebP, največ 2 MB.",
+    "upload": "Naloži logotip",
+    "remove": "Odstrani logotip",
+    "uploaded": "Logotip je naložen.",
+    "removed": "Logotip je odstranjen.",
+    "errors": {
+      "too_large": "Datoteka je prevelika. Naložite lahko največ 2 MB.",
+      "empty": "Izberite datoteko z logotipom.",
+      "unsupported_type": "Ta vrsta datoteke ni podprta. Uporabite PNG, JPG, SVG ali WebP.",
+      "unsafe_svg": "SVG vsebuje skripte ali zunanje povezave, zato ga ni mogoče uporabiti."
+    }
+  },
+  "color": {
+    "title": "Barva znamke",
+    "description": "Glavna barva gumbov in poudarkov na vaši javni strani. Barva besedila se izbere samodejno, da ostane berljiva.",
+    "picker": "Izbira barve",
+    "hex": "Barvna koda",
+    "hexHint": "V obliki #RRGGBB, npr. #E4572E.",
+    "preview": "Predogled",
+    "previewBand": "Vaša javna stran",
+    "previewButton": "Rezerviraj termin",
+    "submit": "Shrani barvo",
+    "saved": "Barva je shranjena.",
+    "errors": {
+      "invalid": "Vnesite barvo v obliki #RRGGBB."
+    }
+  },
+  "errors": {
+    "forbidden": "Celostno podobo lahko spreminja le lastnik trgovca.",
+    "readOnly": "Račun trgovca je omejen, zato sprememb ni mogoče shraniti."
+  }
+}
