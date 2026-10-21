@@ -55,7 +55,7 @@ export default async function BackofficePlanPage({ params, searchParams }: Props
                 initial={{
                   name: plan.name,
                   monthlySmsQuota: String(plan.monthlySmsQuota),
-                  maxUsers: String(plan.maxUsers),
+                  maxUsers: plan.maxUsers === null ? "" : String(plan.maxUsers),
                   notes: plan.notes ?? "",
                 }}
                 labels={labels}

@@ -100,6 +100,7 @@
     },
     "empty": "Ni paketov.",
     "noNotes": "—",
+    "unlimitedUsers": "Neomejeno",
     "count": "{count, plural, one {# paket} two {# paketa} few {# paketi} other {# paketov}}",
     "errors": {
       "required": "Vnos je obvezen.",

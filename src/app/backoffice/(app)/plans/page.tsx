@@ -60,7 +60,7 @@ export default async function BackofficePlansPage() {
                         </span>
                       </td>
                       <td className="tabular px-4 py-3 text-ink-2">{p.monthlySmsQuota}</td>
-                      <td className="tabular px-4 py-3 text-ink-2">{p.maxUsers}</td>
+                      <td className="tabular px-4 py-3 text-ink-2">{p.maxUsers ?? t("plans.unlimitedUsers")}</td>
                       <td className="tabular px-4 py-3 text-ink-2">{p.dealerCount}</td>
                       <td className="px-4 py-3 text-ink-2">{p.notes ?? t("plans.noNotes")}</td>
                     </tr>
