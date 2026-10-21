@@ -1,0 +1,23 @@
+{
+  "nav": "Nastavitve",
+  "usersNav": "Uporabniki",
+  "title": "Nastavitve",
+  "description": "Podatki o trgovcu, videz, pravila rezervacij, delovni čas in zaprtja.",
+  "subnavLabel": "Razdelki nastavitev",
+  "sections": {
+    "dealer": "Podatki o trgovcu",
+    "branding": "Videz",
+    "booking": "Pravila rezervacij",
+    "hours": "Delovni čas",
+    "closures": "Prazniki in zaprtja"
+  },
+  "placeholder": "Ta razdelek je v pripravi.",
+  "users": {
+    "title": "Uporabniki",
+    "description": "Uporabniki, ki imajo dostop do skrbništva trgovca."
+  },
+  "accessDenied": {
+    "title": "Dostop zavrnjen",
+    "body": "To stran lahko odpre le lastnik trgovca. Za dostop se obrnite nanj."
+  }
+}
