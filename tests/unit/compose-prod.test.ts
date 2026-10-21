@@ -123,6 +123,11 @@ describe("docker-compose.prod.yml", () => {
     }
   });
 
+  it("refuses to start without AUTH_SECRET and POSTGRES_PASSWORD", () => {
+    expect(appEnv).toMatch(/^ {2}- AUTH_SECRET=\$\{AUTH_SECRET:\?[^}]+\}$/m);
+    expect(service("db")).toMatch(/^ {6}- POSTGRES_PASSWORD=\$\{POSTGRES_PASSWORD:\?[^}]+\}$/m);
+  });
+
   it("interpolates every provider key, never pinning it empty", () => {
     for (const text of [compose, local]) {
       expect(text).not.toMatch(/^\s*-\s*(TWILIO|BREVO|CLOUDFLARE)_[A-Z_]*=\s*$/m);
@@ -150,6 +155,16 @@ describe("docker-compose.prod.local.yml", () => {
     expect(local).toContain("- ALLOW_FAKE_PROVIDERS=1");
     expect(local).toContain("- BASE_DOMAIN=drivebook.localhost");
     expect(local).toContain("./docker/caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro");
+    const localEnv = local.match(/^x-local-app-env: &local-app-env\n((?: {2}.*\n)*)/m)?.[1] ?? "";
+    const secret = localEnv.match(/^ {2}- AUTH_SECRET=(\S+)$/m)?.[1] ?? "";
+    expect(secret.length).toBeGreaterThanOrEqual(32);
+    expect(secret).not.toContain("$");
+    const password = local.match(/^ {6}- POSTGRES_PASSWORD=(\S+)$/m)?.[1] ?? "";
+    expect(password).toMatch(/^[\w-]+$/);
+    for (const name of ["migrate", "web", "worker"]) expect(block(local, name, "  ")).toContain("environment: *local-app-env");
+    const databaseUrl = `- DATABASE_URL=postgres://drivebook:${password}@db:5432/drivebook`;
+    expect(localEnv).toContain(databaseUrl);
+    expect(block(local, "backup", "  ")).toContain(databaseUrl);
     const caddyfile = readFileSync(join(root, "docker/caddy/Caddyfile.local"), "utf8");
     expect(caddyfile).toMatch(/^\{\$BASE_DOMAIN\}, \*\.\{\$BASE_DOMAIN\} \{$/m);
     expect(caddyfile).toMatch(/^\ttls internal$/m);
