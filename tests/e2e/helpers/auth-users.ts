@@ -3,7 +3,7 @@ import { eq, inArray, or, type SQL } from "drizzle-orm";
 import { generateSync } from "otplib";
 import { getDb } from "@/db/client";
 import { DEMO_DEALER_SLUG } from "@/db/demo";
-import { authTokens, backofficeUsers, dealers, dealerUsers, loginAttempts } from "@/db/schema";
+import { authTokens, backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers, loginAttempts } from "@/db/schema";
 import { hashPassword } from "@/server/auth/password";
 import { hashToken, newOpaqueToken } from "@/server/auth/tokens";
 import { encryptTotpSecret, generateTotpSecret } from "@/server/auth/totp";
@@ -82,6 +82,18 @@ export async function clearLoginAttempts({ emails = [], ips = [] }: { emails?: s
   if (emails.length) where.push(inArray(loginAttempts.email, emails.map((e) => e.toLowerCase())));
   if (ips.length) where.push(inArray(loginAttempts.ip, ips));
   if (where.length) await getDb().delete(loginAttempts).where(or(...where));
+}
+
+// Pretends the user's sessions were last refreshed long ago, so the next request slides them.
+export async function backdateSessions(user: Pick<E2eUser, "surface" | "id">, lastSeenAt: Date): Promise<void> {
+  const sessions = user.surface === "dealer" ? dealerSessions : backofficeSessions;
+  await getDb().update(sessions).set({ lastSeenAt }).where(eq(sessions.userId, user.id));
+}
+
+export async function sessionExpiries(user: Pick<E2eUser, "surface" | "id">): Promise<Date[]> {
+  const sessions = user.surface === "dealer" ? dealerSessions : backofficeSessions;
+  const rows = await getDb().select({ expiresAt: sessions.expiresAt }).from(sessions).where(eq(sessions.userId, user.id));
+  return rows.map((r) => r.expiresAt);
 }
 
 export type LinkTokenOptions = { state?: "valid" | "expired" | "used" };

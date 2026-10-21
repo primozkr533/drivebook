@@ -22,6 +22,7 @@ const {
   destroyCurrentSession,
   getCurrentSession,
   getDealerContextFromSession,
+  refreshSessionCookie,
   revokeUserSessions,
   setSessionCookie,
   validateSessionToken,
@@ -154,12 +155,54 @@ describe("sliding expiry", () => {
     expect(row.lastSeenAt.getTime()).toBe(recent.getTime());
   });
 
-  it("re-sets the cookie when getCurrentSession slides the expiry", async () => {
+  it("getCurrentSession leaves the cookie to the proxy", async () => {
     const token = await createSession("dealer", seeded.dealerUser.id, meta);
     await db.update(dealerSessions).set({ lastSeenAt: new Date(Date.now() - 2 * 60 * 60 * 1000) });
     jar.set(SESSION_COOKIE.dealer, { value: token });
-    await getCurrentSession("dealer");
-    expect(jar.get(SESSION_COOKIE.dealer)?.options).toEqual(SESSION_COOKIE_OPTIONS);
+    expect((await getCurrentSession("dealer"))?.session.refreshed).toBe(true);
+    expect(jar.get(SESSION_COOKIE.dealer)).toEqual({ value: token });
+  });
+});
+
+describe("refreshSessionCookie", () => {
+  it("slides expires_at of a back-dated session and returns the new expiry", async () => {
+    const token = await createSession("dealer", seeded.dealerUser.id, meta);
+    const nearExpiry = new Date(Date.now() + DAY_MS);
+    await db.update(dealerSessions).set({ lastSeenAt: new Date(Date.now() - 2 * 60 * 60 * 1000), expiresAt: nearExpiry });
+
+    const expiresAt = await refreshSessionCookie("dealer", token);
+    const [row] = await db.select().from(dealerSessions);
+    expect(expiresAt?.getTime()).toBe(row.expiresAt.getTime());
+    expect(row.expiresAt.getTime() - Date.now()).toBeGreaterThan(29 * DAY_MS);
+  });
+
+  it("returns null for a fresh session without touching it", async () => {
+    const token = await createSession("backoffice", seeded.backofficeUser.id, meta);
+    const [before] = await db.select().from(backofficeSessions);
+    expect(await refreshSessionCookie("backoffice", token)).toBeNull();
+    const [after] = await db.select().from(backofficeSessions);
+    expect(after.expiresAt.getTime()).toBe(before.expiresAt.getTime());
+  });
+
+  it("returns null for unknown, expired, cross-surface and deactivated-user sessions", async () => {
+    const stale = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    expect(await refreshSessionCookie("dealer", "nope")).toBeNull();
+    expect(await refreshSessionCookie("dealer", "")).toBeNull();
+
+    const dealerToken = await createSession("dealer", seeded.dealerUser.id, meta);
+    const backofficeToken = await createSession("backoffice", seeded.backofficeUser.id, meta);
+    await db.update(dealerSessions).set({ lastSeenAt: stale });
+    await db.update(backofficeSessions).set({ lastSeenAt: stale });
+    expect(await refreshSessionCookie("backoffice", dealerToken)).toBeNull();
+    expect(await refreshSessionCookie("dealer", backofficeToken)).toBeNull();
+
+    await db.update(dealerSessions).set({ expiresAt: new Date(Date.now() - 1000) });
+    expect(await refreshSessionCookie("dealer", dealerToken)).toBeNull();
+
+    await db.update(backofficeUsers).set({ status: "deactivated" });
+    expect(await refreshSessionCookie("backoffice", backofficeToken)).toBeNull();
+    const [row] = await db.select().from(backofficeSessions);
+    expect(row.lastSeenAt.getTime()).toBe(stale.getTime());
   });
 });
 
