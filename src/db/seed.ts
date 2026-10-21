@@ -28,7 +28,7 @@ export const DEMO_CAR_IDS = {
 
 const LEGACY_DEMO_OWNER_EMAIL = "lastnik@demo.drivebook.localhost";
 
-const PLAN_CODE = "standard";
+export const DEFAULT_PLAN_CODE = "standard";
 const PLAN_MAX_USERS = 10;
 const PLAN_MONTHLY_SMS_QUOTA = 300;
 const AVTO_NET_DETAILS = "https://www.avto.net/Ads/details.asp?id=";
@@ -197,7 +197,7 @@ async function upsertPlan(tx: Tx): Promise<string> {
   const [plan] = await tx
     .insert(plans)
     .values({
-      code: PLAN_CODE,
+      code: DEFAULT_PLAN_CODE,
       name: "Standard",
       maxCars: 50,
       maxUsers: PLAN_MAX_USERS,
