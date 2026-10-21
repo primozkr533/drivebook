@@ -1,0 +1,89 @@
+{
+  "nav": "Avtomobili",
+  "title": "Avtomobili",
+  "description": "Vozila, ki jih stranke lahko rezervirajo za testno vožnjo ali ogled.",
+  "add": "Dodaj avto",
+  "filterLabel": "Prikaz vozil",
+  "filters": {
+    "active": "Aktivna",
+    "inactive": "Neaktivna",
+    "all": "Vsa"
+  },
+  "count": "{count, plural, one {# vozilo} two {# vozili} few {# vozila} other {# vozil}}",
+  "empty": {
+    "active": "Ni aktivnih vozil. Dodajte prvo vozilo in delite njegovo povezavo.",
+    "inactive": "Ni neaktivnih vozil.",
+    "all": "Še niste dodali nobenega vozila."
+  },
+  "status": {
+    "active": "Aktivno",
+    "inactive": "Neaktivno"
+  },
+  "listTitle": "Seznam vozil",
+  "year": "Letnik",
+  "price": "Cena",
+  "deepLink": "Povezava za oglas",
+  "listing": "Oglas na avto.net",
+  "copy": "Kopiraj",
+  "copied": "Kopirano",
+  "edit": "Uredi",
+  "deactivate": "Deaktiviraj",
+  "reactivate": "Ponovno aktiviraj",
+  "back": "Nazaj na seznam",
+  "new": {
+    "title": "Nov avto",
+    "description": "Prilepite povezavo do oglasa na avto.net za samodejno izpolnjevanje ali podatke vnesite ročno."
+  },
+  "editPage": {
+    "title": "Uredi avto",
+    "description": "Spremembe so na javni strani vidne takoj po shranjevanju."
+  },
+  "form": {
+    "details": "Podatki o vozilu",
+    "image": "Slika",
+    "avtonetUrl": "Povezava do oglasa na avto.net",
+    "avtonetHint": "Samodejno izpolnjevanje dopolni le prazna polja.",
+    "autofill": "Samodejno izpolni",
+    "autofilling": "Pridobivam …",
+    "make": "Znamka",
+    "model": "Model",
+    "year": "Letnik",
+    "price": "Cena (EUR)",
+    "priceSuffix": "€",
+    "imageFile": "Naloži sliko",
+    "imageFileHint": "JPEG, PNG ali WebP. Sliko pomanjšamo in stisnemo.",
+    "imageUrl": "ali povezava do slike",
+    "imageUrlHint": "Sliko prenesemo in shranimo pri sebi.",
+    "preview": "Predogled slike",
+    "noImage": "Brez slike",
+    "removeImage": "Odstrani sliko",
+    "keepImage": "Obdrži sliko",
+    "imageRemoved": "Slika bo odstranjena ob shranjevanju.",
+    "save": "Shrani",
+    "saving": "Shranjujem …"
+  },
+  "autofill": {
+    "filled": "{count, plural, one {Izpolnjeno # polje.} two {Izpolnjeni # polji.} few {Izpolnjena # polja.} other {Izpolnjenih # polj.}} Preverite podatke in shranite.",
+    "nothing": "Oglas ne vsebuje podatkov za prazna polja.",
+    "reasons": {
+      "invalid_url": "Povezava ni veljaven oglas na avto.net. Podatke vnesite ročno.",
+      "blocked": "Avto.net je zavrnil zahtevo. Podatke vnesite ročno.",
+      "timeout": "Avto.net se ni odzval pravočasno. Poskusite znova ali podatke vnesite ročno.",
+      "http_error": "Oglasa ni bilo mogoče naložiti. Podatke vnesite ročno.",
+      "parse_failed": "Iz oglasa ni bilo mogoče prebrati podatkov. Podatke vnesite ročno."
+    }
+  },
+  "errors": {
+    "required": "To polje je obvezno.",
+    "too_long": "Vnos je predolg.",
+    "out_of_range": "Vrednost je izven dovoljenega obsega.",
+    "invalid": "Vnos ni veljaven.",
+    "taken": "Ta oglas je že dodan pri drugem vozilu.",
+    "too_large": "Slika je prevelika.",
+    "unsupported_type": "Vrsta slike ni podprta.",
+    "download_failed": "Slike ni bilo mogoče prenesti.",
+    "blocked_host": "S tega naslova slik ne prenašamo.",
+    "forbidden": "Za to dejanje nimate pravic.",
+    "readOnly": "Račun trgovca je omejen, spremembe niso mogoče."
+  }
+}
