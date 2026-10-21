@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
 import {
   bookingRules,
   dealerLicenceHistory,
@@ -9,12 +9,13 @@ import {
   plans,
 } from "@/db/schema";
 import { ljubljanaNow, slovenianWorkFreeDays } from "@/lib/date";
-import { createInvitation } from "@/server/auth/links";
-import { requireBackofficeRole } from "@/server/auth/permissions";
+import { createInvitation, linkCapReached, resendInvitation } from "@/server/auth/links";
+import { requireBackofficeRole, type BackofficeActor } from "@/server/auth/permissions";
 import { normalizeEmail } from "@/server/auth/rate-limit";
 import type { DealerStatus } from "../context";
 import { db } from "../db";
-import { withBackofficeMutation } from "./mutate";
+import type { Tx } from "../mutate";
+import { withBackofficeMutation, type BackofficeAuditEntry } from "./mutate";
 import { validateSlug, type SlugError } from "./slug";
 
 export type DealerListItem = {
@@ -300,4 +301,234 @@ export async function createDealer(input: CreateDealerInput, opts: { now?: Date 
   // Only after the commit, so a rolled-back creation can never leave an invitation e-mail behind.
   await createInvitation("dealer", created.ownerId, { now });
   return { ok: true, id: created.id, slug };
+}
+
+type ActionError = { ok: false; field?: string; error: string };
+export type DealerActionResult<E extends ActionError> = { ok: true } | E;
+
+class ActionRejected extends Error {
+  constructor(readonly result: ActionError) {
+    super(`dealer action rejected: ${result.error}`);
+  }
+}
+
+// Rejections are thrown inside the mutation so the audit row rolls back with them.
+async function mutateDealer<E extends ActionError, T>(
+  id: string,
+  fn: (tx: Tx, dealer: typeof dealers.$inferSelect, actor: BackofficeActor, reject: (e: E) => never) => Promise<T>,
+  audit: (result: T) => BackofficeAuditEntry,
+): Promise<{ ok: true; value: T } | E | { ok: false; error: "notFound" }> {
+  try {
+    const value = await withBackofficeMutation(
+      async (tx, actor) => {
+        const [dealer] = UUID_RE.test(id)
+          ? await tx.select().from(dealers).where(eq(dealers.id, id)).limit(1).for("update")
+          : [];
+        if (!dealer) throw new ActionRejected({ ok: false, error: "notFound" });
+        return fn(tx, dealer, actor, (e) => {
+          throw new ActionRejected(e);
+        });
+      },
+      audit,
+    );
+    return { ok: true, value };
+  } catch (error) {
+    if (error instanceof ActionRejected) return error.result as E | { ok: false; error: "notFound" };
+    if (isUniqueViolation(error)) return { ok: false, field: "slug", error: "taken" } as E;
+    throw error;
+  }
+}
+
+const isUniqueViolation = (error: unknown): boolean =>
+  error instanceof Error &&
+  ((error as { code?: string }).code === "23505" || (error.cause as { code?: string } | undefined)?.code === "23505");
+
+const done = <R extends { ok: boolean }>(result: R) => (result.ok ? { ok: true as const } : result);
+
+export type UpdateDealerResult = DealerActionResult<
+  | { ok: false; error: "notFound" }
+  | { ok: false; field: "name"; error: "required" }
+  | { ok: false; field: "planId"; error: "unknown" }
+>;
+
+export async function updateDealer(
+  id: string,
+  input: { name: string; planId: string; notes?: string | null },
+): Promise<UpdateDealerResult> {
+  const name = input.name.trim();
+  const notes = input.notes?.trim() || null;
+  const result = await mutateDealer<Exclude<UpdateDealerResult, { ok: true }>, { before: object; after: object }>(
+    id,
+    async (tx, dealer, _actor, reject) => {
+      if (!name) reject({ ok: false, field: "name", error: "required" });
+      const [plan] = UUID_RE.test(input.planId)
+        ? await tx.select({ id: plans.id }).from(plans).where(eq(plans.id, input.planId)).limit(1)
+        : [];
+      if (!plan) reject({ ok: false, field: "planId", error: "unknown" });
+      await tx.update(dealers).set({ name, planId: input.planId, notes, updatedAt: new Date() }).where(eq(dealers.id, id));
+      return {
+        before: { name: dealer.name, planId: dealer.planId, notes: dealer.notes },
+        after: { name, planId: input.planId, notes },
+      };
+    },
+    (changes) => ({ action: "dealer.update", entity: "dealer", entityId: id, dealerId: id, details: changes }),
+  );
+  return done(result);
+}
+
+export type ChangeDealerSlugResult = DealerActionResult<
+  { ok: false; error: "notFound" } | { ok: false; field: "slug"; error: SlugError }
+>;
+
+export async function changeDealerSlug(id: string, newSlug: string): Promise<ChangeDealerSlugResult> {
+  const slug = newSlug.trim();
+  const result = await mutateDealer<Exclude<ChangeDealerSlugResult, { ok: true }>, string>(
+    id,
+    async (tx, dealer, _actor, reject) => {
+      const check = await validateSlug(slug, { excludeDealerId: id });
+      if (!check.ok) reject({ ok: false, field: "slug", error: check.error });
+      if (slug === dealer.slug) return dealer.slug;
+      // Taking back one of its own old slugs must not leave that slug redirecting to itself.
+      await tx
+        .delete(dealerSlugHistory)
+        .where(and(eq(dealerSlugHistory.dealerId, id), eq(dealerSlugHistory.slug, slug)));
+      await tx.insert(dealerSlugHistory).values({ dealerId: id, slug: dealer.slug });
+      await tx.update(dealers).set({ slug, updatedAt: new Date() }).where(eq(dealers.id, id));
+      return dealer.slug;
+    },
+    (oldSlug) => ({
+      action: "dealer.slug_change",
+      entity: "dealer",
+      entityId: id,
+      dealerId: id,
+      details: { before: { slug: oldSlug }, after: { slug } },
+    }),
+  );
+  return done(result);
+}
+
+export type SetDealerStatusResult = DealerActionResult<{ ok: false; error: "notFound" }>;
+
+export async function setDealerStatus(id: string, status: "suspended" | "active"): Promise<SetDealerStatusResult> {
+  if (status !== "suspended" && status !== "active") throw new Error(`Unsupported dealer status: ${String(status)}`);
+  const result = await mutateDealer<{ ok: false; error: "notFound" }, DealerStatus>(
+    id,
+    async (tx, dealer) => {
+      await tx.update(dealers).set({ status, updatedAt: new Date() }).where(eq(dealers.id, id));
+      return dealer.status;
+    },
+    (previous) => ({
+      action: status === "suspended" ? "dealer.suspend" : "dealer.reactivate",
+      entity: "dealer",
+      entityId: id,
+      dealerId: id,
+      details: { before: { status: previous }, after: { status } },
+    }),
+  );
+  return done(result);
+}
+
+export type ExtendLicenceResult = DealerActionResult<
+  | { ok: false; error: "notFound" }
+  | { ok: false; field: "validUntil"; error: "format" }
+  | { ok: false; field: "note"; error: "required" }
+>;
+
+export async function extendLicence(
+  id: string,
+  input: { validUntil: string; note: string },
+  opts: { now?: Date } = {},
+): Promise<ExtendLicenceResult> {
+  const now = opts.now ?? new Date();
+  const validUntil = input.validUntil.trim();
+  const note = input.note.trim();
+  const result = await mutateDealer<Exclude<ExtendLicenceResult, { ok: true }>, string | null>(
+    id,
+    async (tx, dealer, actor, reject) => {
+      if (!isRealDate(validUntil)) reject({ ok: false, field: "validUntil", error: "format" });
+      if (!note) reject({ ok: false, field: "note", error: "required" });
+      // History periods may not overlap, so the open period ends where the new one starts.
+      await tx
+        .update(dealerLicenceHistory)
+        .set({ validTo: now, updatedAt: now })
+        .where(and(eq(dealerLicenceHistory.dealerId, id), isNull(dealerLicenceHistory.validTo)));
+      await tx.insert(dealerLicenceHistory).values({
+        dealerId: id,
+        planId: dealer.planId,
+        validFrom: now,
+        previousValidUntil: dealer.licenceValidUntil,
+        validUntil,
+        note,
+        createdByBackofficeUserId: actor.userId,
+      });
+      await tx.update(dealers).set({ licenceValidUntil: validUntil, updatedAt: now }).where(eq(dealers.id, id));
+      return dealer.licenceValidUntil;
+    },
+    (previous) => ({
+      action: "dealer.licence_extend",
+      entity: "dealer",
+      entityId: id,
+      dealerId: id,
+      details: { before: { licenceValidUntil: previous }, after: { licenceValidUntil: validUntil }, note },
+    }),
+  );
+  return done(result);
+}
+
+export type RecordDpaSignedResult = DealerActionResult<
+  { ok: false; error: "notFound" } | { ok: false; field: "signedAt"; error: "format" }
+>;
+
+export async function recordDpaSigned(id: string, input: { signedAt: string }): Promise<RecordDpaSignedResult> {
+  const signedAt = input.signedAt.trim();
+  const result = await mutateDealer<Exclude<RecordDpaSignedResult, { ok: true }>, { dpaSigned: boolean; dpaSignedAt: string | null }>(
+    id,
+    async (tx, dealer, _actor, reject) => {
+      if (!isRealDate(signedAt)) reject({ ok: false, field: "signedAt", error: "format" });
+      await tx.update(dealers).set({ dpaSigned: true, dpaSignedAt: signedAt, updatedAt: new Date() }).where(eq(dealers.id, id));
+      return { dpaSigned: dealer.dpaSigned, dpaSignedAt: dealer.dpaSignedAt };
+    },
+    (before) => ({
+      action: "dealer.dpa_signed",
+      entity: "dealer",
+      entityId: id,
+      dealerId: id,
+      details: { before, after: { dpaSigned: true, dpaSignedAt: signedAt } },
+    }),
+  );
+  return done(result);
+}
+
+export type ResendOwnerInvitationResult = DealerActionResult<
+  { ok: false; error: "notFound" } | { ok: false; error: "notInvited" } | { ok: false; error: "rateLimited" }
+>;
+
+export async function resendOwnerInvitation(id: string, opts: { now?: Date } = {}): Promise<ResendOwnerInvitationResult> {
+  const now = opts.now ?? new Date();
+  const result = await mutateDealer<Exclude<ResendOwnerInvitationResult, { ok: true }>, { id: string; email: string }>(
+    id,
+    async (tx, _dealer, _actor, reject) => {
+      const [owner] = await tx
+        .select({ id: dealerUsers.id, email: dealerUsers.email, status: dealerUsers.status })
+        .from(dealerUsers)
+        .where(and(eq(dealerUsers.dealerId, id), eq(dealerUsers.role, "owner")))
+        .orderBy(asc(dealerUsers.createdAt))
+        .limit(1);
+      if (!owner || owner.status !== "invited") reject({ ok: false, error: "notInvited" });
+      if (await linkCapReached("dealer", owner.id, "invite", now, tx)) reject({ ok: false, error: "rateLimited" });
+      return { id: owner.id, email: owner.email };
+    },
+    (owner) => ({
+      action: "dealer.invite_resend",
+      entity: "dealer",
+      entityId: id,
+      dealerId: id,
+      details: { ownerId: owner.id, email: owner.email },
+    }),
+  );
+  if (!result.ok) return result;
+
+  // Only after the commit, so a rolled-back request never leaves an invitation e-mail behind.
+  const sent = await resendInvitation("dealer", result.value.id, { now });
+  return sent.ok ? { ok: true } : { ok: false, error: "notInvited" };
 }
