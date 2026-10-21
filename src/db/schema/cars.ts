@@ -18,7 +18,7 @@ export const cars = pgTable(
     year: integer("year").notNull(),
     priceEur: integer("price_eur").notNull(),
     body: carBody("body").notNull(),
-    avtoNetUrl: text("avto_net_url").notNull(),
+    avtoNetUrl: text("avto_net_url"),
     imageKey: text("image_key"),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),

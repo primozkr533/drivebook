@@ -12,7 +12,7 @@ export type Car = {
   priceEur: number;
   imageUrl?: string;
   body?: "estate" | "sedan" | "suv";
-  avtoNetUrl: string;
+  avtoNetUrl?: string;
   active?: boolean;
 };
 
@@ -67,17 +67,19 @@ export function CarCard({
         </div>
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-4">
           <span className="type-display text-h2 tabular text-ink">{eur.format(car.priceEur)}</span>
-          <a
-            href={car.avtoNetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-small font-[600] text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-brand"
-          >
-            {labels.listing}
-            <svg viewBox="0 0 12 12" aria-hidden className="size-3">
-              <path d="M3 9l6-6M4 3h5v5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" />
-            </svg>
-          </a>
+          {car.avtoNetUrl && (
+            <a
+              href={car.avtoNetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-small font-[600] text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-brand"
+            >
+              {labels.listing}
+              <svg viewBox="0 0 12 12" aria-hidden className="size-3">
+                <path d="M3 9l6-6M4 3h5v5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" />
+              </svg>
+            </a>
+          )}
         </div>
         {deepLink && <CopyLink url={deepLink} />}
       </div>
