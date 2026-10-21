@@ -81,7 +81,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 2. A `DealerContext` is created only by `resolveDealerSlug` (public host) or, later, by the authenticated session — never from IDs supplied in a request.
 3. Every dealer-scoped query filters by `ctx.dealerId`, including lookups by car ID (`getCar(ctx, id)`).
 4. Every dealer-scoped write goes through `withDealerMutation(ctx, fn, audit?)`, which blocks `read_only`/`suspended` dealers and writes `audit_log` in the same transaction. Exception: self-service credential changes (see `## Decisions`).
-5. Admin actions and routes call `requireDealerRole(ctx, roles)` / `requireBackofficeRole(roles)` first; both are stubs that throw until auth exists.
+5. Admin pages, layouts and server actions first call `requireDealerUser()` / `requireBackofficeUser()` (`src/server/auth/permissions.ts`). These read the surface's own session cookie and redirect to that surface's `/login` when there is no valid session. Role checks use `requireDealerRole(ctx, roles)` (Owner / Salesperson) and `requireBackofficeRole(roles)` (Superadmin / Support). They throw `ForbiddenError` when the session user lacks the role or, for dealer users, when the session's dealer is not `ctx.dealerId`.
 6. Cross-tenant queries are backoffice-only and must call `requireBackofficeRole` first.
 7. Public IDs (cars) are unguessable `newPublicId()` values, never sequential.
 8. Reserved slugs (`RESERVED_SLUGS` in `src/lib/config.ts`) are never resolved as dealers.
@@ -129,3 +129,8 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 ## Decisions
 - Until user-management UI exists, deactivation and invitation resend are operator actions via `npm run user-admin` (deactivate / resend-invite).
 - Self-service credential changes (own password change, TOTP setup/enable/disable in `src/server/auth/account.ts`) are exempt from `withDealerMutation`'s read_only/suspended block, so users of a restricted dealer can still secure their accounts; they must still write `audit_log` in the same transaction.
+- Session cookie renewal: `src/proxy.ts` re-issues the surface session cookie on `app.`/`admin.` requests (and on `/_dev/app/*`, `/_dev/admin/*`) once the session has passed `SESSION_REFRESH_AFTER_MS` since its last refresh. Page navigation alone therefore keeps the 30-day sliding expiry alive. Server Components never set cookies.
+- TOTP codes are single-use. The last accepted time step is stored per user (`totp_last_step`). Codes at or before it are rejected at login, at 2FA setup confirmation and when 2FA is turned off.
+- Account-page credential checks (the current password when changing the password; the password + code when turning 2FA off) count toward the same per-account failure limit and lockout as login. Every failed check is written to audit_log.
+- Forgot password for an `invited` user (no password set yet) re-sends the invitation, under the same 3-per-hour per-account link cap. Deactivated users get nothing. The response is always the same generic message.
+- Password-reset requests are also capped per client IP (via `clientIp`) per surface: 10 per hour, counted in `password_reset_requests`. Over the cap, no e-mail is sent and the usual generic message is shown.
