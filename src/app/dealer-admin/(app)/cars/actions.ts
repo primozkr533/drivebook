@@ -60,6 +60,13 @@ function parseInteger(raw: string): number | "required" {
   return value ? Number(value) : "required";
 }
 
+// Slovenian prices use "." (or ",") as the thousands separator: "12.500 €" is 12500, not 12.5.
+function parsePrice(raw: string): number | "required" {
+  const value = raw.replace(/\s/g, "").replace(/^€|€$/g, "");
+  if (!value) return "required";
+  return Number(/^\d{1,3}([.,]\d{3})+$/.test(value) ? value.replace(/[.,]/g, "") : value);
+}
+
 async function imageFrom(form: FormData, values: CarFormValues): Promise<CarImageInput> {
   const file = form.get("imageFile");
   if (file instanceof File && file.size > 0) return { kind: "upload", bytes: new Uint8Array(await file.arrayBuffer()) };
@@ -86,7 +93,7 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
   };
 
   const year = parseInteger(values.year);
-  const price = parseInteger(values.price);
+  const price = parsePrice(values.price);
   const image = await imageFrom(form, values);
   const fieldErrors: Partial<Record<CarFormField, CarFieldError>> = {};
   if (year === "required") fieldErrors.year = "required";
