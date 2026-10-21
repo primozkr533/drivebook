@@ -6,7 +6,7 @@ import { db } from "@/server/data/db";
 import { hashPassword, verifyPassword } from "./password";
 import { isLoginRateLimited, normalizeEmail, recordLoginAttempt } from "./rate-limit";
 import { createSession, destroyCurrentSession, getCurrentSession, type AuthSurface } from "./session";
-import { decryptTotpSecret, verifyTotpCode } from "./totp";
+import { acceptTotpCode, decryptTotpSecret } from "./totp";
 
 export const PENDING_TOKEN_TTL_MS = 5 * 60 * 1000;
 
@@ -112,7 +112,7 @@ async function loginWithTotp(input: LoginInput, pendingToken: string): Promise<L
     return blocked(input, user.email, user);
   }
 
-  if (!verifyTotpCode(decryptTotpSecret(user.totpSecretEnc), input.totpCode ?? "")) {
+  if (!(await acceptTotpCode(surface, user.id, decryptTotpSecret(user.totpSecretEnc), input.totpCode ?? ""))) {
     await fail(input, user.email, user, "totp_invalid");
     return { ok: false, error: "totp_invalid", pendingToken };
   }
