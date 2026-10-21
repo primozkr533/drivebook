@@ -3,6 +3,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  auditLog,
   authTokens,
   backofficeSessions,
   backofficeUsers,
@@ -11,6 +12,7 @@ import {
   dealers,
   dealerSessions,
   dealerUsers,
+  holidayOverrides,
   messageLog,
   passwordResetRequests,
   plans,
@@ -41,7 +43,7 @@ async function expectPgError(promise: Promise<unknown>, code: string) {
 async function insertDealer() {
   const [plan] = await db
     .insert(plans)
-    .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, smsIncluded: 100, priceEurCents: 4900 })
+    .values({ code: "basic", name: "Basic", maxCars: 20, maxUsers: 5, monthlySmsQuota: 100, priceEurCents: 4900 })
     .returning();
   const [dealer] = await db
     .insert(dealers)
@@ -87,6 +89,7 @@ describe("phase-1 schema", () => {
       planId: plan.id,
       validFrom: new Date("2026-01-01T00:00:00Z"),
       validTo: new Date("2026-07-01T00:00:00Z"),
+      validUntil: "2026-06-30",
       note: "first",
     });
     await expectPgError(
@@ -94,6 +97,7 @@ describe("phase-1 schema", () => {
         dealerId: dealer.id,
         planId: plan.id,
         validFrom: new Date("2026-06-01T00:00:00Z"),
+        validUntil: "2026-12-31",
         note: "overlaps",
       }),
       "23P01",
@@ -102,6 +106,7 @@ describe("phase-1 schema", () => {
       dealerId: dealer.id,
       planId: plan.id,
       validFrom: new Date("2026-07-01T00:00:00Z"),
+      validUntil: "2026-12-31",
       note: "adjacent",
     });
   });
@@ -305,5 +310,113 @@ describe("phase-1 schema", () => {
     expect(row).toMatchObject({ surface: "backoffice", ip: "203.0.113.7" });
     expect(row.createdAt).toBeInstanceOf(Date);
     await expectPgError(db.execute(sql`INSERT INTO password_reset_requests (surface) VALUES ('dealer')`), "23502");
+  });
+
+  it("adds the backoffice operator columns to dealers, plans, licence history and holidays", async () => {
+    const result = await db.execute<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      is_nullable: string;
+      column_default: string | null;
+    }>(sql`
+      SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name IN (
+        'dealers', 'plans', 'dealer_licence_history', 'dealer_slug_history', 'holiday_overrides')`);
+    const columns = new Map(result.rows.map((r) => [`${r.table_name}.${r.column_name}`, r]));
+    const expected: Record<string, [string, "YES" | "NO"]> = {
+      "dealers.notes": ["text", "YES"],
+      "dealers.dpa_signed": ["boolean", "NO"],
+      "dealers.dpa_signed_at": ["date", "YES"],
+      "dealers.licence_valid_until": ["date", "YES"],
+      "dealers.plan_id": ["uuid", "NO"],
+      "plans.name": ["text", "NO"],
+      "plans.monthly_sms_quota": ["integer", "NO"],
+      "plans.max_users": ["integer", "NO"],
+      "plans.notes": ["text", "YES"],
+      "dealer_licence_history.dealer_id": ["uuid", "NO"],
+      "dealer_licence_history.previous_valid_until": ["date", "YES"],
+      "dealer_licence_history.valid_until": ["date", "NO"],
+      "dealer_licence_history.note": ["text", "NO"],
+      "dealer_licence_history.created_by_backoffice_user_id": ["uuid", "YES"],
+      "dealer_licence_history.created_at": ["timestamp with time zone", "NO"],
+      "dealer_slug_history.dealer_id": ["uuid", "NO"],
+      "dealer_slug_history.slug": ["text", "NO"],
+      "dealer_slug_history.replaced_at": ["timestamp with time zone", "NO"],
+      "holiday_overrides.date": ["date", "NO"],
+      "holiday_overrides.key": ["text", "YES"],
+      "holiday_overrides.name": ["text", "NO"],
+    };
+    for (const [column, [dataType, nullable]] of Object.entries(expected)) {
+      expect(columns.get(column), column).toMatchObject({ data_type: dataType, is_nullable: nullable });
+    }
+    expect(columns.get("dealers.dpa_signed")?.column_default).toBe("false");
+    expect(columns.get("plans.monthly_sms_quota")?.column_default).toBe("300");
+    expect(columns.has("plans.sms_included")).toBe(false);
+
+    const indexes = await db.execute<{ indexname: string; indexdef: string }>(sql`
+      SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' AND tablename IN (
+        'plans', 'dealer_licence_history', 'dealer_slug_history', 'holiday_overrides')`);
+    const indexDefs = new Map(indexes.rows.map((r) => [r.indexname, r.indexdef]));
+    expect(indexDefs.get("dealer_licence_history_dealer_id_created_at_idx")).toContain("(dealer_id, created_at)");
+    expect(indexDefs.get("plans_name_unique")).toContain("UNIQUE");
+    expect(indexDefs.get("dealer_slug_history_slug_unique")).toContain("UNIQUE");
+    expect(indexDefs.get("holiday_overrides_dealer_date_unique")).toContain("(dealer_id, date)");
+  });
+
+  it("stores licence extensions, dealer defaults, holiday keys and unique plan names", async () => {
+    const { plan, dealer } = await insertDealer();
+    expect(dealer).toMatchObject({ notes: null, dpaSigned: false, dpaSignedAt: null, licenceValidUntil: null });
+    expect(plan).toMatchObject({ monthlySmsQuota: 100, notes: null });
+
+    const [defaults] = await db
+      .insert(plans)
+      .values({ code: "pro", name: "Pro", maxCars: 100, maxUsers: 20, priceEurCents: 9900 })
+      .returning();
+    expect(defaults.monthlySmsQuota).toBe(300);
+    await expectPgError(
+      db.insert(plans).values({ code: "basic-2", name: "Basic", maxCars: 20, maxUsers: 5, priceEurCents: 4900 }),
+      "23505",
+    );
+
+    const [admin] = await db
+      .insert(backofficeUsers)
+      .values({ email: "admin@drivebook.si", name: "Admin", role: "superadmin" })
+      .returning();
+    const [entry] = await db
+      .insert(dealerLicenceHistory)
+      .values({
+        dealerId: dealer.id,
+        planId: plan.id,
+        validFrom: new Date("2026-01-01T00:00:00Z"),
+        previousValidUntil: "2026-12-31",
+        validUntil: "2027-12-31",
+        note: "Podaljšanje",
+        createdByBackofficeUserId: admin.id,
+      })
+      .returning();
+    expect(entry).toMatchObject({ previousValidUntil: "2026-12-31", validUntil: "2027-12-31", createdByBackofficeUserId: admin.id });
+
+    const [holiday] = await db
+      .insert(holidayOverrides)
+      .values({ dealerId: dealer.id, date: "2026-12-25", key: "christmas", name: "Božič", isOpen: false })
+      .returning();
+    expect(holiday).toMatchObject({ date: "2026-12-25", key: "christmas", name: "Božič" });
+    await expectPgError(
+      db.insert(holidayOverrides).values({ dealerId: dealer.id, date: "2026-12-25", name: "Dvojnik", isOpen: false }),
+      "23505",
+    );
+  });
+
+  it("accepts platform-level audit rows with a backoffice actor and no dealer", async () => {
+    const [admin] = await db
+      .insert(backofficeUsers)
+      .values({ email: "admin@drivebook.si", name: "Admin", role: "superadmin" })
+      .returning();
+    const [row] = await db
+      .insert(auditLog)
+      .values({ actorKind: "backoffice_user", actorId: admin.id, action: "plan.create", entity: "plan" })
+      .returning();
+    expect(row).toMatchObject({ dealerId: null, actorKind: "backoffice_user", actorId: admin.id, action: "plan.create" });
   });
 });

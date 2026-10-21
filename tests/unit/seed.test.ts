@@ -47,7 +47,8 @@ describe("runSeed", () => {
     const dealer = await demoDealer();
     expect(dealer).toMatchObject({ name: "Avtohiša Demo", status: "active", primaryColor: "#1F4FD8" });
     const [plan] = await db.select().from(plans).where(eq(plans.id, dealer.planId));
-    expect(plan.code).toBe("standard");
+    expect(plan).toMatchObject({ code: "standard", monthlySmsQuota: 300, maxUsers: 10 });
+    expect(dealer.licenceValidUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     const demoCars = await db.select().from(cars).where(eq(cars.dealerId, dealer.id));
     expect(demoCars.filter((car) => car.active)).toHaveLength(3);
