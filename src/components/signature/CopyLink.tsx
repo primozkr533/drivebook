@@ -13,7 +13,7 @@ export function CopyLink({ url, label = "Kopiraj", copiedLabel = "Kopirano" }: {
         type="button"
         onClick={async () => {
           try {
-            await navigator.clipboard.writeText(`https://${url}`);
+            await navigator.clipboard.writeText(/^https?:\/\//.test(url) ? url : `https://${url}`);
           } catch {
             /* clipboard unavailable — the URL stays selectable */
           }
