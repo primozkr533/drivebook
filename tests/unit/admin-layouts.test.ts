@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { prerender } from "react-dom/static";
-import { createTranslator } from "next-intl";
+import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { messages } from "./i18n";
 import DealerAppLayout from "@/app/dealer-admin/(app)/layout";
@@ -27,7 +27,7 @@ import DealerUsersPage from "@/app/dealer-admin/(app)/users/page";
 
 vi.mock("next-intl/server", () => ({
   getRequestConfig: <T>(fn: T) => fn,
-  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings") => {
+  getTranslations: async (namespace: "auth" | "account" | "backoffice" | "settings" | "settingsDealer") => {
     const { messages } = await import("./i18n");
     return createTranslator({ locale: "sl", messages, namespace });
   },
@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(),
   getPlan: vi.fn(),
   listBackofficeUsers: vi.fn(),
+  getDealerSettings: vi.fn(),
   pathname: "/",
 }));
 
@@ -65,6 +66,11 @@ vi.mock("@/server/auth/session", () => ({
 vi.mock("@/server/auth/login", () => ({ login: vi.fn(), logout: vi.fn() }));
 vi.mock("@/server/data/dealers", () => ({ getDealerName: mocks.getDealerName }));
 vi.mock("@/server/auth/account", () => ({ getAccountSummary: mocks.getAccountSummary }));
+vi.mock("@/server/data/settings-dealer", () => ({
+  getDealerSettings: mocks.getDealerSettings,
+  updateDealerProfile: vi.fn(),
+  updateSmsSettings: vi.fn(),
+}));
 vi.mock("@/server/data/backoffice/dealers", () => ({ listDealers: mocks.listDealers, createDealer: vi.fn() }));
 vi.mock("@/server/data/backoffice/plans", () => ({
   listPlans: mocks.listPlans,
@@ -483,7 +489,8 @@ describe("dealer settings shell", () => {
     mocks.headers = new Headers({ "x-drivebook-base-path": basePath });
   };
   const sections = ["dealer", "branding", "booking", "hours", "closures"] as const;
-  const pages = [SettingsDealerPage, SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
+  const stubSections = ["branding", "booking", "hours", "closures"] as const;
+  const stubPages = [SettingsBrandingPage, SettingsBookingPage, SettingsHoursPage, SettingsClosuresPage];
   const navLink = (href: string, label: string) => new RegExp(`<a[^>]*href="${href}"[^>]*>${label}</a>`, "g");
 
   it("requireOwnerPage returns the session for an Owner and denies a Salesperson of the same dealer", async () => {
@@ -555,20 +562,62 @@ describe("dealer settings shell", () => {
     expect(await redirectOf(render(createElement(SettingsHomePage)))).toBe(`${basePath}/settings/dealer`);
   });
 
-  it("renders every settings stub for an Owner and access denied for a Salesperson", async () => {
-    for (const [i, Page] of pages.entries()) {
+  it("renders every remaining settings stub for an Owner and access denied for a Salesperson", async () => {
+    for (const [i, Page] of stubPages.entries()) {
       signInAs(owner);
       const html = await render(createElement(Page));
-      expect(html).toContain(`data-testid="settings-${sections[i]}"`);
+      expect(html).toContain(`data-testid="settings-${stubSections[i]}"`);
       expect(html).not.toContain("access-denied");
 
       signInAs(salesperson);
       const denied = await render(createElement(Page));
       expect(denied).toContain('data-testid="access-denied"');
-      expect(denied).not.toContain(`settings-${sections[i]}`);
+      expect(denied).not.toContain(`settings-${stubSections[i]}`);
     }
     signInAs(salesperson);
     expect(await render(createElement(SettingsHomePage))).toContain('data-testid="access-denied"');
+  });
+
+  it("renders the dealer data and SMS forms for an Owner and access denied for a Salesperson", async () => {
+    const t = messages.settingsDealer;
+    mocks.getDealerSettings.mockResolvedValue({
+      name: "Avto Demo d.o.o.",
+      addressLine: "Dunajska 1",
+      postalCode: "1000",
+      city: "Ljubljana",
+      phone: "+38611234567",
+      email: "info@demo.si",
+      googleMapsUrl: null,
+      privacyPolicyUrl: null,
+      smsSenderName: null,
+      effectiveSmsSenderName: "Avto Demo d",
+      smsNotificationsEnabled: true,
+      notificationPhone: "+38641555218",
+    });
+    signInAs(owner);
+    const page = await SettingsDealerPage();
+    const html = await render(
+      createElement(NextIntlClientProvider, { locale: "sl", messages, timeZone: "Europe/Ljubljana", children: page }),
+    );
+    expect(mocks.getDealerSettings).toHaveBeenCalledWith(ctx);
+    expect(html).toContain('class="grid grid-cols-1 lg:grid-cols-2');
+    for (const text of [t.profile.title, t.sms.title, t.profile.fields.googleMapsUrl, t.sms.fields.smsSenderName, ">0/11<"]) {
+      expect(html).toContain(text);
+    }
+    for (const field of ["name", "addressLine", "postalCode", "city", "phone", "email", "googleMapsUrl", "privacyPolicyUrl",
+      "smsSenderName", "smsNotificationsEnabled", "notificationPhone"]) {
+      expect(html).toContain(`name="${field}"`);
+    }
+    expect(html).toContain('placeholder="Avto Demo d"');
+    expect(html).toContain('value="info@demo.si"');
+    expect(html).toMatch(/name="smsNotificationsEnabled"[^>]*checked/);
+
+    signInAs(salesperson);
+    mocks.getDealerSettings.mockClear();
+    const denied = await render(createElement(SettingsDealerPage));
+    expect(denied).toContain('data-testid="access-denied"');
+    expect(denied).not.toContain("settings-dealer-profile");
+    expect(mocks.getDealerSettings).not.toHaveBeenCalled();
   });
 
   it("renders the users stub for an Owner and access denied for a Salesperson", async () => {
