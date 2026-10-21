@@ -7,7 +7,7 @@ import { getSurfaceBasePath, requireDealerUser } from "@/server/auth/permissions
 import { listCarsForAdmin } from "@/server/data/cars";
 import { setCarActiveAction } from "./actions";
 import { CAR_STATUS_FILTERS, parseCarStatusFilter } from "./form-model";
-import { carsListHref, parseCarListNotice } from "./notice";
+import { carsListHref, isCarListWarning, parseCarListNotice } from "./notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("cars"))("title") };
@@ -48,9 +48,15 @@ export default async function CarsPage({ searchParams }: Props) {
         />
         {notice && (
           <Card tone="sunken" data-testid="cars-notice" data-state={notice}>
-            <Text tone="danger" role="alert">
-              {t(`errors.${notice}`)}
-            </Text>
+            {isCarListWarning(notice) ? (
+              <Text tone="warn" role="status">
+                {t(`notices.${notice}`)}
+              </Text>
+            ) : (
+              <Text tone="danger" role="alert">
+                {t(`errors.${notice}`)}
+              </Text>
+            )}
           </Card>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -8,6 +8,7 @@ import { Button, ButtonLink, Card, CardHeader, Grid, Input, Stack, Text } from "
 import { isCarImageTooLarge } from "@/lib/car-image-limits";
 import { autofillFromAvtonetAction, saveCarAction, type CarFormField, type SaveCarState } from "./actions";
 import { mergeAutofill, type CarDraft } from "./form-model";
+import { carsListHref } from "./notice";
 
 export type CarFormInitial = CarDraft & { id: string; avtonetUrl: string; currentImageUrl: string | null };
 
@@ -47,7 +48,7 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
   const [fileTooLarge, setFileTooLarge] = useState(false);
 
   useEffect(() => {
-    if (state?.ok) router.push(listHref);
+    if (state?.ok) router.push(state.notice ? carsListHref(listHref, "active", state.notice) : listHref);
   }, [state, router, listHref]);
 
   useEffect(() => () => {

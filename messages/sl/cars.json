@@ -73,6 +73,9 @@
       "parse_failed": "Iz oglasa ni bilo mogoče prebrati podatkov. Podatke vnesite ročno."
     }
   },
+  "notices": {
+    "imageNotFetched": "Vozilo je shranjeno brez slike, ker fotografije s povezave ni bilo mogoče prenesti. Sliko lahko dodate pozneje."
+  },
   "errors": {
     "required": "To polje je obvezno.",
     "too_long": "Vnos je predolg.",
