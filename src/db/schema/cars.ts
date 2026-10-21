@@ -27,6 +27,7 @@ export const cars = pgTable(
   },
   (t) => [
     index("cars_dealer_id_idx").on(t.dealerId),
+    index("cars_dealer_id_active_idx").on(t.dealerId, t.active),
     unique("cars_dealer_avto_net_url_unique").on(t.dealerId, t.avtoNetUrl),
   ],
 );
