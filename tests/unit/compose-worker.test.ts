@@ -24,6 +24,13 @@ describe("docker-compose worker service", () => {
     expect(web).toMatch(/environment: \*app-env/);
   });
 
+  it("gives web STORAGE_DIR and the storage volume at /data/storage", () => {
+    expect(compose).toContain("- STORAGE_DIR=${STORAGE_DIR:-/data/storage}");
+    expect(service("web")).toMatch(/volumes:\n\s+- storage:\/data\/storage/);
+    expect(service("worker")).not.toMatch(/storage:\/data\/storage/);
+    expect(compose).toMatch(/^volumes:\n(?:  .*\n)*  storage:/m);
+  });
+
   it("interpolates provider keys from the environment", () => {
     for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "BREVO_API_KEY", "BREVO_SENDER_EMAIL"]) {
       expect(compose).toContain(`- ${key}=\${${key}:-}`);

@@ -8,4 +8,5 @@ next-env.d.ts
 test-results/
 playwright-report/
 coverage/
+data/
 !.env.example

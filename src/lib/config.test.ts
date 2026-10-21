@@ -105,6 +105,12 @@ describe("getConfig", () => {
     expect(getConfig().publicUrlPort).toBe("3000");
   });
 
+  it("reads STORAGE_DIR and defaults to ./data/storage", () => {
+    expect(getConfig().storageDir).toBe("./data/storage");
+    setEnv({ STORAGE_DIR: "/data/storage" });
+    expect(getConfig().storageDir).toBe("/data/storage");
+  });
+
   it("rejects an invalid public URL scheme", () => {
     setEnv({ PUBLIC_URL_SCHEME: "ftp" });
     expect(() => getConfig()).toThrow(/PUBLIC_URL_SCHEME/);

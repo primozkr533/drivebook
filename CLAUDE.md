@@ -62,6 +62,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `NOTIFY_FAKE` — `1` forces the fake SMS/e-mail adapters even when provider keys are present
 - `PUBLIC_URL_SCHEME` — `https` (default) or `http` (dev); scheme for absolute links in e-mails
 - `PUBLIC_URL_PORT` — optional port appended to absolute links (`3000` in dev, empty in production)
+- `STORAGE_DIR` — directory for uploaded files (dealer logos); a Docker volume at /data/storage in compose, `./data/storage` by default
 - `TWILIO_ACCOUNT_SID` — Twilio account SID for SMS
 - `TWILIO_AUTH_TOKEN` — Twilio auth token
 - `TWILIO_FROM_NUMBER` — Twilio sender number (E.164)
