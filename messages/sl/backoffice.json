@@ -1,0 +1,28 @@
+{
+  "dealers": {
+    "nav": "Trgovci",
+    "title": "Trgovci",
+    "description": "Vsi trgovci na platformi DriveBook.",
+    "search": "Iskanje",
+    "searchHint": "Del imena ali slug.",
+    "status": "Stanje",
+    "statusAll": "Vsa",
+    "submit": "Filtriraj",
+    "reset": "Počisti",
+    "statuses": {
+      "active": "Aktiven",
+      "suspended": "Začasno ustavljen",
+      "read_only": "Samo branje"
+    },
+    "columns": {
+      "name": "Ime",
+      "slug": "Slug",
+      "status": "Stanje",
+      "licenceValidUntil": "Licenca velja do",
+      "plan": "Paket"
+    },
+    "noLicence": "Ni določeno",
+    "empty": "Ni trgovcev, ki ustrezajo iskanju.",
+    "count": "{count, plural, one {# trgovec} two {# trgovca} few {# trgovci} other {# trgovcev}}"
+  }
+}
