@@ -295,6 +295,12 @@ export async function createDealer(input: CreateDealerInput, opts: { now?: Date 
     );
   } catch (error) {
     if (error instanceof CreateDealerRejected) return error.result;
+    // A concurrent creation can take the slug or e-mail between validation and insert.
+    if (isUniqueViolation(error)) {
+      const constraint = uniqueConstraint(error);
+      if (constraint === "dealers_slug_unique") return { ok: false, field: "slug", error: "taken" };
+      if (constraint === "dealer_users_email_unique") return { ok: false, field: "ownerEmail", error: "taken" };
+    }
     throw error;
   }
 
@@ -342,6 +348,9 @@ async function mutateDealer<E extends ActionError, T>(
 const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Error &&
   ((error as { code?: string }).code === "23505" || (error.cause as { code?: string } | undefined)?.code === "23505");
+
+const uniqueConstraint = (error: Error): string | undefined =>
+  (error as { constraint?: string }).constraint ?? (error.cause as { constraint?: string } | undefined)?.constraint;
 
 const done = <R extends { ok: boolean }>(result: R) => (result.ok ? { ok: true as const } : result);
 
@@ -430,7 +439,7 @@ export async function setDealerStatus(id: string, status: "suspended" | "active"
 
 export type ExtendLicenceResult = DealerActionResult<
   | { ok: false; error: "notFound" }
-  | { ok: false; field: "validUntil"; error: "format" }
+  | { ok: false; field: "validUntil"; error: "format" | "past" | "beforeCurrent" }
   | { ok: false; field: "note"; error: "required" }
 >;
 
@@ -446,6 +455,10 @@ export async function extendLicence(
     id,
     async (tx, dealer, actor, reject) => {
       if (!isRealDate(validUntil)) reject({ ok: false, field: "validUntil", error: "format" });
+      if (validUntil < ljubljanaNow(now).dateISO) reject({ ok: false, field: "validUntil", error: "past" });
+      if (dealer.licenceValidUntil && validUntil < dealer.licenceValidUntil) {
+        reject({ ok: false, field: "validUntil", error: "beforeCurrent" });
+      }
       if (!note) reject({ ok: false, field: "note", error: "required" });
       // History periods may not overlap, so the open period ends where the new one starts.
       await tx
