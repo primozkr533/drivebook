@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { CarSilhouette } from "@/components/signature";
 import { Button, ButtonLink, Card, CardHeader, Grid, Input, Stack, Text } from "@/components/ui";
+import { isCarImageTooLarge } from "@/lib/car-image-limits";
 import { autofillFromAvtonetAction, saveCarAction, type CarFormField, type SaveCarState } from "./actions";
 import { mergeAutofill, type CarDraft } from "./form-model";
 
@@ -12,12 +13,23 @@ export type CarFormInitial = CarDraft & { id: string; avtonetUrl: string; curren
 
 type Notice = { kind: "filled"; count: number } | { kind: "nothing" } | { kind: "failed"; reason: string };
 
+type CarFormState = SaveCarState | (Omit<Extract<SaveCarState, { ok: false }>, "error"> & { error: "failed" });
+
+// A rejected call (e.g. a body over the server-action limit) shows the form error instead of an error page.
+async function saveCar(_prev: CarFormState | null, form: FormData): Promise<CarFormState> {
+  try {
+    return await saveCarAction(null, form);
+  } catch {
+    return { ok: false, fieldErrors: {}, error: "failed" };
+  }
+}
+
 const isHttpUrl = (value: string) => /^https?:\/\/\S+$/i.test(value.trim());
 
 export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHref: string }) {
   const t = useTranslations("cars");
   const router = useRouter();
-  const [state, formAction, saving] = useActionState<SaveCarState | null, FormData>(saveCarAction, null);
+  const [state, formAction, saving] = useActionState<CarFormState | null, FormData>(saveCar, null);
   const [, startSave] = useTransition();
   const [autofilling, startAutofill] = useTransition();
   const [draft, setDraft] = useState<CarDraft>({
@@ -32,6 +44,7 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [fileKey, setFileKey] = useState(0);
+  const [fileTooLarge, setFileTooLarge] = useState(false);
 
   useEffect(() => {
     if (state?.ok) router.push(listHref);
@@ -43,7 +56,7 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : {};
   const fieldError = (name: CarFormField) => {
-    const code = fieldErrors[name];
+    const code = name === "imageFile" && fileTooLarge ? "too_large" : fieldErrors[name];
     return code ? t(`errors.${code}`) : undefined;
   };
   const formError = state && !state.ok ? state.error : undefined;
@@ -78,12 +91,18 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const file = form.get("imageFile");
+    if (file instanceof File && isCarImageTooLarge(file)) {
+      setFileTooLarge(true);
+      return;
+    }
     startSave(() => formAction(form));
   };
 
   const clearFile = () => {
     setFileKey((k) => k + 1);
     setFilePreview(null);
+    setFileTooLarge(false);
   };
 
   return (
@@ -219,6 +238,7 @@ export function CarForm({ initial, listHref }: { initial: CarFormInitial; listHr
                 onChange={(event) => {
                   const file = event.currentTarget.files?.[0];
                   setFilePreview(file ? URL.createObjectURL(file) : null);
+                  setFileTooLarge(isCarImageTooLarge(file));
                   if (file) setRemoveImage(false);
                 }}
                 data-testid="car-image-file"

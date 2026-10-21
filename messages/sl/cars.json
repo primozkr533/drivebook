@@ -85,6 +85,7 @@
     "blocked_host": "S tega naslova slik ne prenašamo.",
     "forbidden": "Za to dejanje nimate pravic.",
     "readOnly": "Račun trgovca je omejen, spremembe niso mogoče.",
-    "limit": "Dosegli ste največje število aktivnih vozil v vašem paketu. Deaktivirajte vozilo ali nadgradite paket."
+    "limit": "Dosegli ste največje število aktivnih vozil v vašem paketu. Deaktivirajte vozilo ali nadgradite paket.",
+    "failed": "Shranjevanje ni uspelo. Poskusite znova."
   }
 }
