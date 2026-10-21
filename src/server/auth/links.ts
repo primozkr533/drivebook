@@ -1,5 +1,13 @@
 import { and, count, eq, gte, isNull } from "drizzle-orm";
-import { authTokens, backofficeSessions, backofficeUsers, dealers, dealerSessions, dealerUsers } from "@/db/schema";
+import {
+  authTokens,
+  backofficeSessions,
+  backofficeUsers,
+  dealers,
+  dealerSessions,
+  dealerUsers,
+  passwordResetRequests,
+} from "@/db/schema";
 import { surfaceOrigin } from "@/lib/config";
 import { formatDate, formatTime } from "@/lib/date";
 import { db } from "@/server/data/db";
@@ -18,6 +26,7 @@ export type LinkTokenState = "valid" | "expired" | "used" | "invalid";
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const RESET_TTL_MS = 60 * 60 * 1000;
 export const RESET_MAX_PER_HOUR = 3;
+export const RESET_MAX_PER_IP_PER_HOUR = 10;
 const RESET_RATE_WINDOW_MS = 60 * 60 * 1000;
 
 const LINK_PATH = { invite: "set-password", reset: "reset-password" } as const;
@@ -119,8 +128,30 @@ export async function resendInvitation(
   return { ok: true, ...(await sendInvitation(surface, user, opts.now ?? new Date())) };
 }
 
-export async function requestPasswordReset(surface: AuthSurface, email: string, opts: Clock = {}): Promise<void> {
+// Every request is recorded before counting, so requests made while over the cap keep the IP blocked.
+async function ipOverResetCap(surface: AuthSurface, ip: string, now: Date): Promise<boolean> {
+  await db().insert(passwordResetRequests).values({ surface, ip, createdAt: now });
+  const [recent] = await db()
+    .select({ n: count() })
+    .from(passwordResetRequests)
+    .where(
+      and(
+        eq(passwordResetRequests.surface, surface),
+        eq(passwordResetRequests.ip, ip),
+        gte(passwordResetRequests.createdAt, new Date(now.getTime() - RESET_RATE_WINDOW_MS)),
+      ),
+    );
+  return (recent?.n ?? 0) > RESET_MAX_PER_IP_PER_HOUR;
+}
+
+export async function requestPasswordReset(
+  surface: AuthSurface,
+  email: string,
+  ip: string,
+  opts: Clock = {},
+): Promise<void> {
   const now = opts.now ?? new Date();
+  if (await ipOverResetCap(surface, ip, now)) return;
   const normalized = normalizeEmail(email);
   const user = normalized ? await findUser(surface, "email", normalized) : null;
   if (!user || user.status === "deactivated") return;
