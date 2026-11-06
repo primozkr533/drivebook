@@ -43,7 +43,7 @@ export default async function SettingsBookingPage() {
   };
 
   const labels: BookingRulesFormLabels = {
-    groups: { durations: t("groups.durations"), capacity: t("groups.capacity"), timing: t("groups.timing") },
+    groups: { durations: t("groups.durations"), schedule: t("groups.schedule"), timing: t("groups.timing") },
     fields: Object.fromEntries(BOOKING_FORM_FIELDS.map((field) => [field, fieldLabels(field)])) as BookingRulesFormLabels["fields"],
     slotOptions: (BOOKING_RULE_LIMITS.slotIntervalMinutes.options ?? []).map((value) => ({
       value,

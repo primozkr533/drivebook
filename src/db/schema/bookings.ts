@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { newPublicId } from "../ids";
 import { createdAt, tstz, updatedAt } from "./columns";
 import { cars } from "./cars";
@@ -29,6 +29,13 @@ export const bookings = pgTable(
     customerNote: text("customer_note"),
     // Short human code printed on the ticket.
     code: text("code").notNull(),
+    // SMS phone verification: sha256 of the 6-digit code; the pending slot is held until verify_expires_at.
+    phoneVerified: boolean("phone_verified").notNull().default(false),
+    verifyCodeHash: text("verify_code_hash"),
+    verifyExpiresAt: tstz("verify_expires_at"),
+    verifyAttempts: integer("verify_attempts").notNull().default(0),
+    verifySends: integer("verify_sends").notNull().default(0),
+    verifyLastSentAt: tstz("verify_last_sent_at"),
     cancelledAt: tstz("cancelled_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -36,6 +43,7 @@ export const bookings = pgTable(
   (t) => [
     index("bookings_dealer_starts_idx").on(t.dealerId, t.startsAt),
     index("bookings_car_starts_idx").on(t.carId, t.startsAt),
+    index("bookings_dealer_phone_created_idx").on(t.dealerId, t.customerPhone, t.createdAt),
     check("bookings_valid_range", sql`${t.endsAt} > ${t.startsAt}`),
   ],
 );

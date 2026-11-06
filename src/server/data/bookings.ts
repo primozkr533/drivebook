@@ -1,5 +1,5 @@
-import { randomInt } from "node:crypto";
-import { and, asc, eq, gte, inArray, lt, ne } from "drizzle-orm";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { and, asc, count, eq, gt, gte, inArray, lt, ne, or } from "drizzle-orm";
 import { bookingRules, bookings, cars, dealers } from "@/db/schema";
 import { dealerSiteOrigin, surfaceOrigin } from "@/lib/config";
 import { addDays, formatDateShort, formatTime, ljubljanaNow, toLjubljanaParts, zonedToUtc } from "@/lib/date";
@@ -9,6 +9,7 @@ import { sendEmail, sendSms } from "@/server/notify/queue";
 import { emailT, layout, senderNameFor } from "@/server/notify/templates/layout";
 import { getOpeningRangesBetween } from "./availability";
 import type { DealerContext } from "./context";
+import { newPublicId } from "@/db/ids";
 import { db } from "./db";
 import { withDealerMutation, type Tx } from "./mutate";
 import { BOOKING_RULE_DEFAULTS } from "./settings-booking";
@@ -16,7 +17,15 @@ import { defaultSmsSenderName, normalizePhone } from "./settings-dealer";
 
 export type BookingKind = "test_drive" | "viewing";
 export const BOOKING_KINDS: readonly BookingKind[] = ["test_drive", "viewing"];
-export type BookingStatus = "confirmed" | "cancelled";
+export type BookingStatus = "pending" | "confirmed" | "cancelled";
+
+// SMS code verification of the customer's phone.
+export const VERIFY_CODE_TTL_MINUTES = 10;
+export const VERIFY_MAX_ATTEMPTS = 5;
+export const VERIFY_MAX_SENDS = 3;
+export const VERIFY_RESEND_COOLDOWN_SECONDS = 60;
+// Unverified bookings per phone number per hour (each one sends an SMS).
+export const UNVERIFIED_PER_PHONE_PER_HOUR = 3;
 
 export const CUSTOMER_NAME_MAX = 100;
 export const CUSTOMER_NOTE_MAX = 500;
@@ -29,6 +38,7 @@ type Rules = {
   maxDaysAhead: number;
   bufferMinutes: number;
   cancelCutoffMinutes: number;
+  requirePhoneVerification: boolean;
 };
 
 const ruleColumns = {
@@ -39,6 +49,7 @@ const ruleColumns = {
   maxDaysAhead: bookingRules.maxDaysAhead,
   bufferMinutes: bookingRules.bufferMinutes,
   cancelCutoffMinutes: bookingRules.cancelCutoffMinutes,
+  requirePhoneVerification: bookingRules.requirePhoneVerification,
 };
 
 const DEFAULT_RULES: Rules = {
@@ -49,6 +60,7 @@ const DEFAULT_RULES: Rules = {
   maxDaysAhead: BOOKING_RULE_DEFAULTS.horizonDays,
   bufferMinutes: BOOKING_RULE_DEFAULTS.bufferMinutes,
   cancelCutoffMinutes: BOOKING_RULE_DEFAULTS.cancelCutoffMinutes,
+  requirePhoneVerification: true,
 };
 
 async function loadRules(ctx: DealerContext, tx?: Tx): Promise<Rules> {
@@ -62,7 +74,15 @@ export function isBookingKind(value: unknown): value is BookingKind {
   return value === "test_drive" || value === "viewing";
 }
 
-async function busyIntervals(exec: Tx | ReturnType<typeof db>, ctx: DealerContext, carId: string, from: Date, to: Date): Promise<Interval[]> {
+/** A booking blocks its car while confirmed, or while pending and its SMS code is still valid. */
+async function busyIntervals(
+  exec: Tx | ReturnType<typeof db>,
+  ctx: DealerContext,
+  carId: string,
+  from: Date,
+  to: Date,
+  now: Date,
+): Promise<Interval[]> {
   const rows = await exec
     .select({ start: bookings.startsAt, end: bookings.endsAt })
     .from(bookings)
@@ -70,7 +90,7 @@ async function busyIntervals(exec: Tx | ReturnType<typeof db>, ctx: DealerContex
       and(
         eq(bookings.dealerId, ctx.dealerId),
         eq(bookings.carId, carId),
-        eq(bookings.status, "confirmed"),
+        or(eq(bookings.status, "confirmed"), and(eq(bookings.status, "pending"), gt(bookings.verifyExpiresAt, now))),
         lt(bookings.startsAt, to),
         gte(bookings.endsAt, from),
       ),
@@ -99,7 +119,7 @@ async function computeAvailability(
   const to = onlyDate ?? lastDay;
   if (from < today || to > lastDay) return [];
   const ranges = await getOpeningRangesBetween(ctx, from, to);
-  const busy = await busyIntervals(exec, ctx, carId, zonedToUtc(from, "00:00"), zonedToUtc(addDays(to, 1), "00:00"));
+  const busy = await busyIntervals(exec, ctx, carId, zonedToUtc(from, "00:00"), zonedToUtc(addDays(to, 1), "00:00"), now);
   const earliest = new Date(now.getTime() + rules.leadTimeMinutes * 60_000);
   const slotRules = { durationMinutes: durationFor(rules, kind), stepMinutes: rules.slotMinutes, bufferMinutes: rules.bufferMinutes };
   return [...ranges.entries()].map(([date, dayRanges]) => ({
@@ -128,11 +148,11 @@ export async function getCarAvailability(
 // ---- Public: create a booking ----
 
 export type BookingField = "kind" | "start" | "name" | "phone" | "email" | "note";
-export type BookingError = "required" | "invalid" | "too_long" | "slot_taken";
+export type BookingError = "required" | "invalid" | "too_long" | "slot_taken" | "too_many";
 export type BookingInput = Partial<Record<BookingField | "carId", string>>;
 
 export type CreateBookingResult =
-  | { ok: true; bookingId: string }
+  | { ok: true; bookingId: string; needsVerification: boolean }
   | { ok: false; errors: Partial<Record<BookingField, BookingError>> }
   | { ok: false; carNotFound: true };
 
@@ -141,6 +161,20 @@ function newBookingCode(): string {
   let code = "";
   for (let i = 0; i < 6; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   return code;
+}
+
+function newVerifyCode(): string {
+  return String(randomInt(1_000_000)).padStart(6, "0");
+}
+
+function hashVerifyCode(bookingId: string, code: string): string {
+  return createHash("sha256").update(`${bookingId}:${code}`).digest("hex");
+}
+
+function codeMatches(bookingId: string, code: string, hash: string): boolean {
+  const a = Buffer.from(hashVerifyCode(bookingId, code), "hex");
+  const b = Buffer.from(hash, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -177,14 +211,38 @@ export async function createBooking(ctx: DealerContext, input: BookingInput, now
         .where(and(eq(cars.dealerId, ctx.dealerId), eq(cars.id, carId), eq(cars.active, true)))
         .for("update");
       if (!car) return { carNotFound: true as const };
+      const [{ recent }] = await tx
+        .select({ recent: count() })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.dealerId, ctx.dealerId),
+            eq(bookings.customerPhone, phone),
+            eq(bookings.phoneVerified, false),
+            gt(bookings.createdAt, new Date(now.getTime() - 3_600_000)),
+          ),
+        );
       const rules = await loadRules(ctx, tx);
+      if (rules.requirePhoneVerification && recent >= UNVERIFIED_PER_PHONE_PER_HOUR) return { tooMany: true as const };
       const date = toLjubljanaParts(start).dateISO;
       const [day] = await computeAvailability(tx, ctx, carId, kind, now, rules, date);
       const slot = day?.slots.find((s) => s.start.getTime() === start.getTime());
       if (!slot) return { slotTaken: true as const };
+      const verify = rules.requirePhoneVerification;
+      const id = newPublicId();
+      const code = verify ? newVerifyCode() : null;
       const [row] = await tx
         .insert(bookings)
         .values({
+          id,
+          status: verify ? "pending" : "confirmed",
+          createdAt: now,
+          ...(code && {
+            verifyCodeHash: hashVerifyCode(id, code),
+            verifyExpiresAt: new Date(now.getTime() + VERIFY_CODE_TTL_MINUTES * 60_000),
+            verifySends: 1,
+            verifyLastSentAt: now,
+          }),
           dealerId: ctx.dealerId,
           carId,
           kind,
@@ -197,17 +255,22 @@ export async function createBooking(ctx: DealerContext, input: BookingInput, now
           code: newBookingCode(),
         })
         .returning({ id: bookings.id });
-      return { bookingId: row.id };
+      return { bookingId: row.id, code };
     },
     (r) =>
       "bookingId" in r
         ? { action: "booking.create", entity: "booking", entityId: r.bookingId, actorKind: "customer", data: { carId, kind } }
-        : { action: "booking.create_refused", entity: "car", entityId: carId, actorKind: "customer" },
+        : { action: "booking.create_refused", entity: "car", entityId: carId, actorKind: "customer", data: { reason: Object.keys(r)[0] } },
   );
   if ("carNotFound" in result) return { ok: false, carNotFound: true };
   if ("slotTaken" in result) return { ok: false, errors: { start: "slot_taken" } };
+  if ("tooMany" in result) return { ok: false, errors: { phone: "too_many" } };
+  if (result.code) {
+    await sendVerifyCode(ctx, result.bookingId, result.code);
+    return { ok: true, bookingId: result.bookingId, needsVerification: true };
+  }
   await notifyBookingCreated(ctx, result.bookingId);
-  return { ok: true, bookingId: result.bookingId };
+  return { ok: true, bookingId: result.bookingId, needsVerification: false };
 }
 
 // ---- Reads ----
@@ -225,6 +288,9 @@ export type BookingView = {
   customerNote: string | null;
   car: { id: string; make: string; model: string; year: number | null; mileageKm: number | null };
   cancelCutoffMinutes: number;
+  phoneVerified: boolean;
+  /** Only for a pending booking: the code's state, for the customer's verification form. */
+  verification: { expiresAt: Date; expired: boolean; attemptsLeft: number; sendsLeft: number; resendAt: Date } | null;
 };
 
 const bookingColumns = {
@@ -238,6 +304,11 @@ const bookingColumns = {
   customerPhone: bookings.customerPhone,
   customerEmail: bookings.customerEmail,
   customerNote: bookings.customerNote,
+  phoneVerified: bookings.phoneVerified,
+  verifyExpiresAt: bookings.verifyExpiresAt,
+  verifyAttempts: bookings.verifyAttempts,
+  verifySends: bookings.verifySends,
+  verifyLastSentAt: bookings.verifyLastSentAt,
   carId: cars.id,
   make: cars.make,
   model: cars.model,
@@ -256,6 +327,11 @@ type BookingRow = {
   customerPhone: string;
   customerEmail: string | null;
   customerNote: string | null;
+  phoneVerified: boolean;
+  verifyExpiresAt: Date | null;
+  verifyAttempts: number;
+  verifySends: number;
+  verifyLastSentAt: Date | null;
   carId: string;
   make: string;
   model: string;
@@ -263,7 +339,8 @@ type BookingRow = {
   mileageKm: number | null;
 };
 
-function toView(r: BookingRow, rules: Rules): BookingView {
+function toView(r: BookingRow, rules: Rules, now: Date = new Date()): BookingView {
+  const pending = r.status === "pending" && r.verifyExpiresAt !== null;
   return {
     id: r.id,
     code: r.code,
@@ -277,11 +354,21 @@ function toView(r: BookingRow, rules: Rules): BookingView {
     customerNote: r.customerNote,
     car: { id: r.carId, make: r.make, model: r.model, year: r.year, mileageKm: r.mileageKm },
     cancelCutoffMinutes: rules.cancelCutoffMinutes,
+    phoneVerified: r.phoneVerified,
+    verification: pending
+      ? {
+          expiresAt: r.verifyExpiresAt!,
+          expired: r.verifyExpiresAt! <= now || r.verifyAttempts >= VERIFY_MAX_ATTEMPTS,
+          attemptsLeft: Math.max(0, VERIFY_MAX_ATTEMPTS - r.verifyAttempts),
+          sendsLeft: Math.max(0, VERIFY_MAX_SENDS - r.verifySends),
+          resendAt: new Date((r.verifyLastSentAt ?? now).getTime() + VERIFY_RESEND_COOLDOWN_SECONDS * 1000),
+        }
+      : null,
   };
 }
 
 /** The confirmation page reads a booking by its unguessable id, scoped to the dealer of the host. */
-export async function getPublicBooking(ctx: DealerContext, bookingId: string): Promise<BookingView | null> {
+export async function getPublicBooking(ctx: DealerContext, bookingId: string, now: Date = new Date()): Promise<BookingView | null> {
   const [row] = await db()
     .select(bookingColumns)
     .from(bookings)
@@ -289,7 +376,7 @@ export async function getPublicBooking(ctx: DealerContext, bookingId: string): P
     .where(and(eq(bookings.dealerId, ctx.dealerId), eq(bookings.id, bookingId)))
     .limit(1);
   if (!row) return null;
-  return toView(row, await loadRules(ctx));
+  return toView(row, await loadRules(ctx), now);
 }
 
 // ---- Dealer admin ----
@@ -311,6 +398,8 @@ export async function listBookings(
       .where(
         and(
           eq(bookings.dealerId, ctx.dealerId),
+          // Unverified bookings are not real yet; the dealer sees them once the customer enters the SMS code.
+          ne(bookings.status, "pending"),
           gte(bookings.startsAt, from),
           lt(bookings.startsAt, to),
           carId ? eq(bookings.carId, carId) : undefined,
@@ -334,7 +423,7 @@ export async function cancelBooking(ctx: DealerContext, bookingId: string): Prom
         .from(bookings)
         .where(and(eq(bookings.dealerId, ctx.dealerId), eq(bookings.id, bookingId)))
         .for("update");
-      if (!row) return { ok: false, notFound: true };
+      if (!row || row.status === "pending") return { ok: false, notFound: true };
       if (row.status === "cancelled") return { ok: false, alreadyCancelled: true };
       await tx
         .update(bookings)
@@ -374,6 +463,110 @@ export async function countUpcomingBookingsByCar(ctx: DealerContext, carIds: str
   return map;
 }
 
+// ---- Public: SMS code verification ----
+
+export type VerifyBookingResult =
+  | { ok: true }
+  | { ok: false; error: "not_found" }
+  | { ok: false; error: "wrong_code"; attemptsLeft: number }
+  | { ok: false; error: "expired" };
+
+/** Confirms a pending booking with the SMS code. Wrong codes count; after VERIFY_MAX_ATTEMPTS the slot is released. */
+export async function verifyBooking(ctx: DealerContext, bookingId: string, rawCode: string, now: Date = new Date()): Promise<VerifyBookingResult> {
+  const code = rawCode.replace(/\s+/g, "");
+  const result = await withDealerMutation(
+    ctx,
+    async (tx): Promise<VerifyBookingResult & { confirmedNow?: boolean }> => {
+      const [row] = await tx
+        .select({
+          status: bookings.status,
+          hash: bookings.verifyCodeHash,
+          expiresAt: bookings.verifyExpiresAt,
+          attempts: bookings.verifyAttempts,
+        })
+        .from(bookings)
+        .where(and(eq(bookings.dealerId, ctx.dealerId), eq(bookings.id, bookingId)))
+        .for("update");
+      if (!row) return { ok: false, error: "not_found" };
+      if (row.status === "confirmed") return { ok: true };
+      if (row.status !== "pending" || !row.hash || !row.expiresAt) return { ok: false, error: "expired" };
+      if (row.expiresAt <= now || row.attempts >= VERIFY_MAX_ATTEMPTS) return { ok: false, error: "expired" };
+      if (!/^\d{6}$/.test(code) || !codeMatches(bookingId, code, row.hash)) {
+        const attempts = row.attempts + 1;
+        // The last wrong attempt also ends the hold, so the slot is free for others again.
+        await tx
+          .update(bookings)
+          .set({ verifyAttempts: attempts, ...(attempts >= VERIFY_MAX_ATTEMPTS && { verifyExpiresAt: now }), updatedAt: now })
+          .where(eq(bookings.id, bookingId));
+        return attempts >= VERIFY_MAX_ATTEMPTS
+          ? { ok: false, error: "expired" }
+          : { ok: false, error: "wrong_code", attemptsLeft: VERIFY_MAX_ATTEMPTS - attempts };
+      }
+      await tx
+        .update(bookings)
+        .set({ status: "confirmed", phoneVerified: true, verifyCodeHash: null, updatedAt: now })
+        .where(eq(bookings.id, bookingId));
+      return { ok: true, confirmedNow: true };
+    },
+    (r) => ({
+      action: r.ok ? "booking.verify" : "booking.verify_failed",
+      entity: "booking",
+      entityId: bookingId,
+      actorKind: "customer",
+      ...(!r.ok && { data: { error: r.error } }),
+    }),
+  );
+  // Notify only on the transition to confirmed, not on a repeated submit of a confirmed booking.
+  if (!result.ok) return result;
+  if (result.confirmedNow) await notifyBookingCreated(ctx, bookingId);
+  return { ok: true };
+}
+
+export type ResendCodeResult = { ok: true } | { ok: false; error: "not_found" | "expired" | "too_soon" | "limit" };
+
+export async function resendVerifyCode(ctx: DealerContext, bookingId: string, now: Date = new Date()): Promise<ResendCodeResult> {
+  const result = await withDealerMutation(
+    ctx,
+    async (tx): Promise<{ ok: true; code: string } | { ok: false; error: "not_found" | "expired" | "too_soon" | "limit" }> => {
+      const [row] = await tx
+        .select({
+          status: bookings.status,
+          expiresAt: bookings.verifyExpiresAt,
+          attempts: bookings.verifyAttempts,
+          sends: bookings.verifySends,
+          lastSentAt: bookings.verifyLastSentAt,
+        })
+        .from(bookings)
+        .where(and(eq(bookings.dealerId, ctx.dealerId), eq(bookings.id, bookingId)))
+        .for("update");
+      if (!row) return { ok: false, error: "not_found" };
+      if (row.status !== "pending" || !row.expiresAt || row.expiresAt <= now || row.attempts >= VERIFY_MAX_ATTEMPTS) {
+        return { ok: false, error: "expired" };
+      }
+      if (row.sends >= VERIFY_MAX_SENDS) return { ok: false, error: "limit" };
+      if (row.lastSentAt && now.getTime() - row.lastSentAt.getTime() < VERIFY_RESEND_COOLDOWN_SECONDS * 1000) {
+        return { ok: false, error: "too_soon" };
+      }
+      const code = newVerifyCode();
+      await tx
+        .update(bookings)
+        .set({
+          verifyCodeHash: hashVerifyCode(bookingId, code),
+          verifyExpiresAt: new Date(now.getTime() + VERIFY_CODE_TTL_MINUTES * 60_000),
+          verifySends: row.sends + 1,
+          verifyLastSentAt: now,
+          updatedAt: now,
+        })
+        .where(eq(bookings.id, bookingId));
+      return { ok: true, code };
+    },
+    (r) => ({ action: r.ok ? "booking.code_resend" : "booking.code_resend_refused", entity: "booking", entityId: bookingId, actorKind: "customer" }),
+  );
+  if (!result.ok) return result;
+  await sendVerifyCode(ctx, bookingId, result.code);
+  return { ok: true };
+}
+
 // ---- Notifications (after commit; sendEmail/sendSms never throw) ----
 
 async function loadNotifyData(ctx: DealerContext, bookingId: string) {
@@ -404,6 +597,22 @@ function bookingFacts(row: NonNullable<Awaited<ReturnType<typeof loadNotifyData>
     time: formatTime(row.startsAt),
     code: row.code,
   };
+}
+
+async function sendVerifyCode(ctx: DealerContext, bookingId: string, code: string): Promise<void> {
+  try {
+    const row = await loadNotifyData(ctx, bookingId);
+    if (!row) return;
+    await sendSms({
+      to: row.customerPhone,
+      body: emailT("booking.smsVerifyCode", { dealerName: row.dealerName, code, minutes: VERIFY_CODE_TTL_MINUTES }),
+      alphaSender: row.smsSenderName || defaultSmsSenderName(row.dealerName),
+      dealerId: ctx.dealerId,
+      template: "booking_verify_code",
+    });
+  } catch (error) {
+    console.error("[bookings] Could not send verification code", error);
+  }
 }
 
 async function notifyBookingCreated(ctx: DealerContext, bookingId: string): Promise<void> {

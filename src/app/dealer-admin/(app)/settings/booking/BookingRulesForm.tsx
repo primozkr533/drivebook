@@ -9,7 +9,7 @@ import type { BookingFormField, BookingFormValues } from "./fields";
 export type BookingFieldLabels = { label: string; hint: string; errors: Record<BookingRuleError, string> };
 
 export type BookingRulesFormLabels = {
-  groups: { durations: string; capacity: string; timing: string };
+  groups: { durations: string; schedule: string; timing: string };
   fields: Record<BookingFormField, BookingFieldLabels>;
   slotOptions: { value: number; label: string }[];
   submit: string;
@@ -21,7 +21,7 @@ export type BookingRulesFormLabels = {
 
 const groups: { key: keyof BookingRulesFormLabels["groups"]; fields: BookingFormField[] }[] = [
   { key: "durations", fields: ["testDriveMinutes", "viewingMinutes", "otherMinutes"] },
-  { key: "capacity", fields: ["capacity", "bufferMinutes", "slotIntervalMinutes"] },
+  { key: "schedule", fields: ["bufferMinutes", "slotIntervalMinutes"] },
   { key: "timing", fields: ["minNoticeHours", "horizonDays", "cancelCutoffHours"] },
 ];
 

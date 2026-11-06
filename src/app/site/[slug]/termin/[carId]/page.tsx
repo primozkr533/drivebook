@@ -82,7 +82,7 @@ export default async function BookingPage({ params, searchParams }: Props) {
     submit: t("submit"),
     fieldErrors: {
       name: common,
-      phone: { ...common, invalid: t("errors.invalidPhone") },
+      phone: { ...common, invalid: t("errors.invalidPhone"), too_many: t("errors.too_many") },
       email: { ...common, invalid: t("errors.invalidEmail") },
       note: common,
       kind: common,

@@ -9,7 +9,6 @@ export const BOOKING_FORM_FIELDS = [
   "testDriveMinutes",
   "viewingMinutes",
   "otherMinutes",
-  "capacity",
   "minNoticeHours",
   "horizonDays",
   "bufferMinutes",
@@ -20,13 +19,12 @@ export const BOOKING_FORM_FIELDS = [
 export type BookingFormField = (typeof BOOKING_FORM_FIELDS)[number];
 export type BookingFormValues = Record<BookingFormField, string>;
 export type BookingFormErrors = Partial<Record<BookingFormField, BookingRuleError>>;
-export type BookingFieldUnit = "minutes" | "hours" | "days" | "count";
+export type BookingFieldUnit = "minutes" | "hours" | "days";
 
 export const BOOKING_FORM_RULE: Record<BookingFormField, BookingRuleField> = {
   testDriveMinutes: "testDriveMinutes",
   viewingMinutes: "viewingMinutes",
   otherMinutes: "otherMinutes",
-  capacity: "capacity",
   minNoticeHours: "minNoticeMinutes",
   horizonDays: "horizonDays",
   bufferMinutes: "bufferMinutes",
@@ -38,7 +36,6 @@ export const BOOKING_FORM_UNIT: Record<BookingFormField, BookingFieldUnit> = {
   testDriveMinutes: "minutes",
   viewingMinutes: "minutes",
   otherMinutes: "minutes",
-  capacity: "count",
   minNoticeHours: "hours",
   horizonDays: "days",
   bufferMinutes: "minutes",

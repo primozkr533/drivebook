@@ -9,7 +9,6 @@ export type BookingRules = {
   testDriveMinutes: number;
   viewingMinutes: number;
   otherMinutes: number;
-  capacity: number;
   minNoticeMinutes: number;
   horizonDays: number;
   bufferMinutes: number;
@@ -30,7 +29,6 @@ export const BOOKING_RULE_DEFAULTS: Readonly<BookingRules> = Object.freeze({
   testDriveMinutes: 45,
   viewingMinutes: 30,
   otherMinutes: 30,
-  capacity: 1,
   minNoticeMinutes: 120,
   horizonDays: 14,
   bufferMinutes: 15,
@@ -42,7 +40,6 @@ export const BOOKING_RULE_LIMITS: Readonly<Record<BookingRuleField, BookingRuleL
   testDriveMinutes: { min: 15, max: 240, step: 5 },
   viewingMinutes: { min: 10, max: 240, step: 5 },
   otherMinutes: { min: 10, max: 240, step: 5 },
-  capacity: { min: 1, max: 20 },
   minNoticeMinutes: { min: 0, max: 10080 },
   horizonDays: { min: 1, max: 180 },
   bufferMinutes: { min: 0, max: 120 },
@@ -56,7 +53,6 @@ const columns = {
   testDriveMinutes: bookingRules.testDriveMinutes,
   viewingMinutes: bookingRules.viewingMinutes,
   otherMinutes: bookingRules.otherMinutes,
-  capacity: bookingRules.capacity,
   minNoticeMinutes: bookingRules.leadTimeMinutes,
   horizonDays: bookingRules.maxDaysAhead,
   bufferMinutes: bookingRules.bufferMinutes,
@@ -69,7 +65,6 @@ function toRow(rules: BookingRules) {
     testDriveMinutes: rules.testDriveMinutes,
     viewingMinutes: rules.viewingMinutes,
     otherMinutes: rules.otherMinutes,
-    capacity: rules.capacity,
     leadTimeMinutes: rules.minNoticeMinutes,
     maxDaysAhead: rules.horizonDays,
     bufferMinutes: rules.bufferMinutes,

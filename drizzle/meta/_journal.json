@@ -43,6 +43,13 @@
       "when": 1793953707667,
       "tag": "0005_cars_listing_and_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793970228503,
+      "tag": "0006_booking_sms_verification_drop_capacity",
+      "breakpoints": true
     }
   ]
 }

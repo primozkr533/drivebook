@@ -42,6 +42,7 @@
     "dealerWhat": "{kind}: {car}, {date} ob {time} (koda {code}).",
     "dealerCustomer": "Stranka: {name}, telefon {phone}, e-pošta {email}.",
     "dealerNote": "Opomba stranke: {note}",
-    "dealerButton": "Odpri rezervacije"
+    "dealerButton": "Odpri rezervacije",
+    "smsVerifyCode": "{dealerName}: vaša koda za potrditev rezervacije je {code}. Velja {minutes} minut."
   }
 }

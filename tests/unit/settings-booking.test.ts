@@ -70,7 +70,6 @@ const valid = {
   testDriveMinutes: 60,
   viewingMinutes: 20,
   otherMinutes: 40,
-  capacity: 3,
   minNoticeMinutes: 60,
   horizonDays: 30,
   bufferMinutes: 10,
@@ -99,7 +98,6 @@ describe("getBookingRules", () => {
       testDriveMinutes: 45,
       viewingMinutes: 30,
       otherMinutes: 30,
-      capacity: 1,
       minNoticeMinutes: 120,
       horizonDays: 14,
       bufferMinutes: 15,
@@ -121,9 +119,7 @@ describe("updateBookingRules validation", () => {
     ["viewingMinutes", 33, "invalid_step"],
     ["otherMinutes", 241, "out_of_range"],
     ["otherMinutes", 12, "invalid_step"],
-    ["capacity", 0, "out_of_range"],
-    ["capacity", 21, "out_of_range"],
-    ["capacity", "two", "not_integer"],
+    ["horizonDays", "two", "not_integer"],
     ["minNoticeMinutes", -1, "out_of_range"],
     ["minNoticeMinutes", 10081, "out_of_range"],
     ["horizonDays", 0, "out_of_range"],
@@ -154,7 +150,6 @@ describe("updateBookingRules validation", () => {
       testDriveMinutes: "240",
       viewingMinutes: "10",
       otherMinutes: "10",
-      capacity: "20",
       minNoticeMinutes: "0",
       horizonDays: "180",
       bufferMinutes: "0",
@@ -173,7 +168,7 @@ describe("updateBookingRules", () => {
     expect(await updateBookingRules(ctx, valid)).toEqual({ ok: true, rules: valid });
     expect(await getBookingRules(ctx)).toEqual(valid);
 
-    const next = { ...valid, capacity: 5 };
+    const next = { ...valid, viewingMinutes: 40 };
     await updateBookingRules(ctx, next);
     expect(await getBookingRules(ctx)).toEqual(next);
     expect(await rulesRows()).toHaveLength(1);
@@ -211,7 +206,7 @@ describe("updateBookingRules", () => {
   it("never changes another dealer's rules", async () => {
     const a = await seedDealer("dealer-a");
     const b = await seedDealer("dealer-b");
-    const bRules = { ...valid, capacity: 7 };
+    const bRules = { ...valid, viewingMinutes: 50 };
     signIn(b.ctx.dealerId);
     await updateBookingRules(b.ctx, bRules);
 
@@ -219,8 +214,8 @@ describe("updateBookingRules", () => {
     signIn(a.ctx.dealerId);
     await expect(updateBookingRules(b.ctx, valid)).rejects.toBeInstanceOf(ForbiddenError);
 
-    await updateBookingRules(a.ctx, { ...valid, capacity: 2 });
-    expect(await getBookingRules(a.ctx)).toEqual({ ...valid, capacity: 2 });
+    await updateBookingRules(a.ctx, { ...valid, viewingMinutes: 35 });
+    expect(await getBookingRules(a.ctx)).toEqual({ ...valid, viewingMinutes: 35 });
     signIn(b.ctx.dealerId);
     expect(await getBookingRules(b.ctx)).toEqual(bRules);
   });

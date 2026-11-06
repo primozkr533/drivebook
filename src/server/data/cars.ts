@@ -1,4 +1,4 @@
-import { and, asc, count, eq, max } from "drizzle-orm";
+import { and, asc, count, eq, max, ne } from "drizzle-orm";
 import type { Car } from "@/components/signature";
 import { bookings, cars } from "@/db/schema";
 import { requireDealerRole } from "@/server/auth/permissions";
@@ -124,7 +124,7 @@ export async function listCarsForAdmin(ctx: DealerContext): Promise<AdminCar[]> 
     db()
       .select({ carId: bookings.carId, n: count() })
       .from(bookings)
-      .where(eq(bookings.dealerId, ctx.dealerId))
+      .where(and(eq(bookings.dealerId, ctx.dealerId), ne(bookings.status, "pending")))
       .groupBy(bookings.carId),
   ]);
   const byCar = new Map(counts.map((c) => [c.carId, c.n]));
@@ -249,7 +249,7 @@ export async function setCarActive(ctx: DealerContext, carId: string, active: bo
   return found ? { ok: true } : { ok: false, notFound: true };
 }
 
-/** Deletes a car that has never been booked; booked cars can only be hidden (their bookings keep history). */
+/** Deletes a car with no confirmed or cancelled bookings; booked cars can only be hidden (their bookings keep history). */
 export async function deleteCar(ctx: DealerContext, carId: string): Promise<CarByIdResult> {
   const actor = await requireDealerRole(ctx, [...CAR_ROLES]);
   return withDealerMutation(
@@ -261,8 +261,13 @@ export async function deleteCar(ctx: DealerContext, carId: string): Promise<CarB
         .where(and(eq(cars.dealerId, ctx.dealerId), eq(cars.id, carId)))
         .for("update");
       if (!car) return { ok: false, notFound: true };
-      const [{ n }] = await tx.select({ n: count() }).from(bookings).where(eq(bookings.carId, carId));
+      const [{ n }] = await tx
+        .select({ n: count() })
+        .from(bookings)
+        .where(and(eq(bookings.carId, carId), ne(bookings.status, "pending")));
       if (n > 0) return { ok: false, hasBookings: true };
+      // Never-verified bookings are not history; they go with the car.
+      await tx.delete(bookings).where(and(eq(bookings.dealerId, ctx.dealerId), eq(bookings.carId, carId), eq(bookings.status, "pending")));
       await tx.delete(cars).where(and(eq(cars.dealerId, ctx.dealerId), eq(cars.id, carId)));
       return { ok: true };
     },

@@ -1,11 +1,24 @@
 // Real-database tests: start Postgres with `docker compose up -d db` (uses TEST_DATABASE_URL).
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLog, bookings, cars, dealers, messageLog, openingHours, plans } from "@/db/schema";
+import { auditLog, bookingRules, bookings, cars, dealers, openingHours, plans } from "@/db/schema";
 import { zonedToUtc } from "@/lib/date";
 import { getTestDb, truncateAll } from "../setup/db";
 
-const state = vi.hoisted(() => ({ user: null as { id: string; role: "owner" | "salesperson"; dealerId: string } | null }));
+const state = vi.hoisted(() => ({
+  user: null as { id: string; role: "owner" | "salesperson"; dealerId: string } | null,
+  sms: [] as { to: string; body: string; template: string }[],
+}));
+vi.mock("@/server/notify/queue", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/notify/queue")>();
+  return {
+    ...actual,
+    sendSms: async (input: { to: string; body: string; template: string }) => {
+      state.sms.push({ to: input.to, body: input.body, template: input.template });
+    },
+    sendEmail: async () => {},
+  };
+});
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (location: string) => {
@@ -33,8 +46,9 @@ const { DealerReadOnlyError } = await import("@/server/auth/permissions");
 const { setDbForTests } = await import("@/server/data/db");
 const { resolveDealerSlug } = await import("@/server/data/dealers");
 const { addCar, deleteCar, listCarsForAdmin, setCarActive, setListingFetcherForTests, updateCar } = await import("@/server/data/cars");
-const { cancelBooking, createBooking, getCarAvailability, getPublicBooking, listBookings } = await import("@/server/data/bookings");
-const { stopBossForTests } = await import("@/server/notify/queue");
+const { cancelBooking, createBooking, getCarAvailability, getPublicBooking, listBookings, resendVerifyCode, verifyBooking } = await import(
+  "@/server/data/bookings"
+);
 
 const db = getTestDb();
 
@@ -45,7 +59,7 @@ const TUESDAY = "2026-11-10";
 const LISTING_HTML = `<html><head><meta property="og:image" content="https://images.avto.net/1.jpg"></head>
 <body><h1>Škoda Octavia Combi 2.0 TDI</h1><p>Prva registracija: 2021</p><p>Prevoženih km: 87.400 km</p><p>Cena: 18.900 €</p></body></html>`;
 
-async function seedDealer(slug: string) {
+async function seedDealer(slug: string, { verify = false }: { verify?: boolean } = {}) {
   const [plan] = await db
     .insert(plans)
     .values({ code: `plan-${slug}`, name: `Basic ${slug}`, maxCars: 20, maxUsers: 5, monthlySmsQuota: 100, priceEurCents: 4900 })
@@ -68,6 +82,7 @@ async function seedDealer(slug: string) {
   await db.insert(openingHours).values(
     [1, 2, 3, 4, 5].map((d) => ({ dealerId: dealer.id, isoWeekday: d, opensAt: "08:00", closesAt: "16:00" })),
   );
+  await db.insert(bookingRules).values({ dealerId: dealer.id, requirePhoneVerification: verify });
   const resolved = await resolveDealerSlug(slug);
   if (resolved.kind !== "current") throw new Error("dealer not found");
   return { dealer, ctx: resolved.ctx };
@@ -93,12 +108,12 @@ beforeAll(() => setDbForTests(db));
 beforeEach(async () => {
   await truncateAll();
   state.user = null;
+  state.sms = [];
   setListingFetcherForTests(async () => null);
 });
 afterAll(async () => {
   setListingFetcherForTests(undefined);
   setDbForTests(undefined);
-  await stopBossForTests();
   await db.$client.end();
 });
 
@@ -211,8 +226,7 @@ describe("bookings", () => {
     const booking = await getPublicBooking(ctx, ok.bookingId);
     expect(booking).toMatchObject({ customerPhone: "+38641123456", status: "confirmed", car: { id: car.id } });
     expect(booking!.code).toMatch(/^[A-Z2-9]{6}$/);
-    const sms = await db.select().from(messageLog).where(eq(messageLog.channel, "sms"));
-    expect(sms.map((m) => m.recipient)).toContain("+38641123456");
+    expect(state.sms).toMatchObject([{ to: "+38641123456", template: "booking_created_customer" }]);
   });
 
   it("refuses hidden cars, other dealers' cars and read-only dealers", async () => {
@@ -250,5 +264,96 @@ describe("bookings", () => {
     const [row] = await db.select().from(bookings).where(eq(bookings.id, created.bookingId));
     expect(row.status).toBe("cancelled");
     expect(await createBooking(ctx, { carId: car.id, kind: "test_drive", start, ...customer }, NOW)).toMatchObject({ ok: true });
+  });
+});
+
+describe("SMS code verification", () => {
+  const start = () => zonedToUtc(TUESDAY, "10:00").toISOString();
+  const codeFromSms = () => /koda za potrditev rezervacije je (\d{6})/.exec(state.sms.at(-1)!.body)![1];
+
+  it("holds the slot while pending and confirms with the SMS code", async () => {
+    const { ctx } = await seedDealer("demo", { verify: true });
+    const car = await insertCar(ctx.dealerId, 1);
+    const created = await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer }, NOW);
+    if (!created.ok) throw new Error("expected booking");
+    expect(created.needsVerification).toBe(true);
+    expect(state.sms).toMatchObject([{ to: "+38641123456", template: "booking_verify_code" }]);
+
+    // Held: nobody else can take the slot, but the dealer doesn't see it yet.
+    expect(await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer, phone: "041 999 999" }, NOW)).toEqual({
+      ok: false,
+      errors: { start: "slot_taken" },
+    });
+    signIn(ctx.dealerId);
+    expect(await listBookings(ctx, { fromDate: "2026-11-09" })).toEqual([]);
+    expect((await getPublicBooking(ctx, created.bookingId, NOW))!.verification).toMatchObject({ expired: false, attemptsLeft: 5 });
+
+    expect(await verifyBooking(ctx, created.bookingId, "000000", NOW)).toEqual({ ok: false, error: "wrong_code", attemptsLeft: 4 });
+    const code = codeFromSms();
+    expect(await verifyBooking(ctx, created.bookingId, ` ${code} `, NOW)).toEqual({ ok: true });
+    const booking = (await getPublicBooking(ctx, created.bookingId, NOW))!;
+    expect(booking).toMatchObject({ status: "confirmed", phoneVerified: true, verification: null });
+    expect(state.sms.at(-1)).toMatchObject({ template: "booking_created_customer" });
+    expect((await listBookings(ctx, { fromDate: "2026-11-09" })).map((b) => b.id)).toEqual([created.bookingId]);
+    // Submitting again is harmless and sends nothing new.
+    const sent = state.sms.length;
+    expect(await verifyBooking(ctx, created.bookingId, code, NOW)).toEqual({ ok: true });
+    expect(state.sms).toHaveLength(sent);
+  });
+
+  it("releases the slot when the code expires or after too many wrong codes", async () => {
+    const { ctx } = await seedDealer("demo", { verify: true });
+    const car = await insertCar(ctx.dealerId, 1);
+    const first = await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer }, NOW);
+    if (!first.ok) throw new Error("expected booking");
+    const later = new Date(NOW.getTime() + 11 * 60_000);
+    expect(await verifyBooking(ctx, first.bookingId, codeFromSms(), later)).toEqual({ ok: false, error: "expired" });
+    const second = await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer }, later);
+    if (!second.ok) throw new Error("expected the expired hold to be free");
+
+    for (let i = 4; i >= 1; i--) {
+      expect(await verifyBooking(ctx, second.bookingId, "111111", later)).toEqual({ ok: false, error: "wrong_code", attemptsLeft: i });
+    }
+    expect(await verifyBooking(ctx, second.bookingId, "111111", later)).toEqual({ ok: false, error: "expired" });
+    expect(await verifyBooking(ctx, second.bookingId, codeFromSms(), later)).toEqual({ ok: false, error: "expired" });
+    const slots = (await getCarAvailability(ctx, car.id, "test_drive", later))!.days.find((d) => d.date === TUESDAY)!.slots;
+    expect(slots.map((s) => s.label)).toContain("10:00");
+  });
+
+  it("resends a new code with a cooldown and a limit", async () => {
+    const { ctx } = await seedDealer("demo", { verify: true });
+    const car = await insertCar(ctx.dealerId, 1);
+    const created = await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer }, NOW);
+    if (!created.ok) throw new Error("expected booking");
+    const oldCode = codeFromSms();
+    expect(await resendVerifyCode(ctx, created.bookingId, new Date(NOW.getTime() + 30_000))).toEqual({ ok: false, error: "too_soon" });
+    const t1 = new Date(NOW.getTime() + 61_000);
+    expect(await resendVerifyCode(ctx, created.bookingId, t1)).toEqual({ ok: true });
+    const t2 = new Date(t1.getTime() + 61_000);
+    expect(await resendVerifyCode(ctx, created.bookingId, t2)).toEqual({ ok: true });
+    expect(await resendVerifyCode(ctx, created.bookingId, new Date(t2.getTime() + 61_000))).toEqual({ ok: false, error: "limit" });
+    const newCode = codeFromSms();
+    if (oldCode !== newCode) expect(await verifyBooking(ctx, created.bookingId, oldCode, t2)).toMatchObject({ error: "wrong_code" });
+    expect(await verifyBooking(ctx, created.bookingId, newCode, t2)).toEqual({ ok: true });
+  });
+
+  it("limits unverified bookings per phone number", async () => {
+    const { ctx } = await seedDealer("demo", { verify: true });
+    const car = await insertCar(ctx.dealerId, 1);
+    for (const time of ["09:00", "11:00", "13:00"]) {
+      const r = await createBooking(ctx, { carId: car.id, kind: "test_drive", start: zonedToUtc(TUESDAY, time).toISOString(), ...customer }, NOW);
+      expect(r.ok).toBe(true);
+    }
+    expect(
+      await createBooking(ctx, { carId: car.id, kind: "test_drive", start: zonedToUtc(TUESDAY, "15:00").toISOString(), ...customer }, NOW),
+    ).toEqual({ ok: false, errors: { phone: "too_many" } });
+  });
+
+  it("a car with only unverified bookings can still be deleted", async () => {
+    const { ctx } = await seedDealer("demo", { verify: true });
+    const car = await insertCar(ctx.dealerId, 1);
+    await createBooking(ctx, { carId: car.id, kind: "test_drive", start: start(), ...customer }, NOW);
+    signIn(ctx.dealerId);
+    expect(await deleteCar(ctx, car.id)).toEqual({ ok: true });
   });
 });

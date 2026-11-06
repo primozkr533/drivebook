@@ -146,7 +146,6 @@ describe("createDealer", () => {
       testDriveMinutes: 45,
       viewingMinutes: 30,
       otherMinutes: 30,
-      capacity: 1,
       leadTimeMinutes: 120,
       maxDaysAhead: 14,
       bufferMinutes: 15,
