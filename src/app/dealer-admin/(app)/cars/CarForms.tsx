@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useId } from "react";
 import { Button, Input, Stack, Switch, Text } from "@/components/ui";
 import type { CarError, CarField } from "@/server/data/cars";
 import type { AddCarState, CarFormValues, CarsActionError, CarToggleState, DeleteCarState, UpdateCarState } from "./actions";
@@ -32,21 +32,22 @@ function fieldErrorFor(labels: CarFormLabels, errors: Partial<Record<CarField, C
   };
 }
 
-function NotesField({ labels, value, error }: { labels: CarFormLabels; value: string; error?: string }) {
+function NotesField({ labels, value, error, testId }: { labels: CarFormLabels; value: string; error?: string; testId: string }) {
+  const id = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="car-notes" className="type-utility text-ink">
+      <label htmlFor={id} className="type-utility text-ink">
         {labels.fields.notes} <span className="text-muted">({labels.optional})</span>
       </label>
       <textarea
-        id="car-notes"
+        id={id}
         name="notes"
         rows={3}
         defaultValue={value}
         placeholder={labels.notesPlaceholder}
         aria-invalid={error ? true : undefined}
         className="w-full rounded-soft bg-surface px-3.5 py-2.5 text-body text-ink placeholder:text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:shadow-[inset_0_0_0_1px_var(--ink-2)] focus:outline-none focus:shadow-[inset_0_0_0_2px_var(--ink)] aria-[invalid=true]:shadow-[inset_0_0_0_2px_var(--danger)]"
-        data-testid="car-notes"
+        data-testid={testId}
       />
       {error && <p className="text-small text-danger">{error}</p>}
     </div>
@@ -58,7 +59,9 @@ function DetailFields({
   values,
   fieldError,
   requireNames,
+  suffix = "",
 }: {
+  suffix?: string;
   labels: CarFormLabels;
   values: CarFormValues;
   fieldError: (f: CarField) => string | undefined;
@@ -66,10 +69,10 @@ function DetailFields({
 }) {
   const opt = ` (${labels.optional})`;
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5" data-testid="car-details">
-      <Input label={labels.fields.make} name="make" defaultValue={values.make} error={fieldError("make")} required={requireNames} data-testid="car-make" />
-      <Input label={labels.fields.model} name="model" defaultValue={values.model} error={fieldError("model")} required={requireNames} data-testid="car-model" />
-      <Input label={labels.fields.year + opt} name="year" inputMode="numeric" defaultValue={values.year} error={fieldError("year")} data-testid="car-year" />
+    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5" data-testid={`car-details${suffix}`}>
+      <Input label={labels.fields.make} name="make" defaultValue={values.make} error={fieldError("make")} required={requireNames} data-testid={`car-make${suffix}`} />
+      <Input label={labels.fields.model} name="model" defaultValue={values.model} error={fieldError("model")} required={requireNames} data-testid={`car-model${suffix}`} />
+      <Input label={labels.fields.year + opt} name="year" inputMode="numeric" defaultValue={values.year} error={fieldError("year")} data-testid={`car-year${suffix}`} />
       <Input
         label={labels.fields.mileageKm + opt}
         name="mileageKm"
@@ -77,7 +80,7 @@ function DetailFields({
         suffix="km"
         defaultValue={values.mileageKm}
         error={fieldError("mileageKm")}
-        data-testid="car-mileage"
+        data-testid={`car-mileage${suffix}`}
       />
       <Input
         label={labels.fields.priceEur + opt}
@@ -86,7 +89,7 @@ function DetailFields({
         suffix="€"
         defaultValue={values.priceEur}
         error={fieldError("priceEur")}
-        data-testid="car-price"
+        data-testid={`car-price${suffix}`}
       />
     </div>
   );
@@ -116,7 +119,7 @@ export function AddCarForm({
           required
           data-testid="car-url"
         />
-        <NotesField labels={labels} value={values.notes} error={fieldError("notes")} />
+        <NotesField labels={labels} value={values.notes} error={fieldError("notes")} testId="car-notes" />
         {state.needsDetails && (
           <div className="flex flex-col gap-4 border-l-2 border-warn pl-4" role="status" data-testid="car-manual">
             <div className="flex flex-col gap-1">
@@ -167,8 +170,8 @@ export function EditCarForm({
     <form action={formAction} noValidate data-testid={`car-edit-form-${id}`}>
       <input type="hidden" name="id" value={id} />
       <Stack gap={6}>
-        <DetailFields labels={labels} values={values} fieldError={fieldError} requireNames />
-        <NotesField labels={labels} value={values.notes} error={fieldError("notes")} />
+        <DetailFields labels={labels} values={values} fieldError={fieldError} requireNames suffix={`-${id}`} />
+        <NotesField labels={labels} value={values.notes} error={fieldError("notes")} testId={`car-notes-${id}`} />
         {state.error && (
           <Text size="small" tone="danger" role="alert" data-state={state.error}>
             {labels.errors[state.error]}
