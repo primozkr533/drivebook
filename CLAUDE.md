@@ -36,7 +36,13 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/server/data/` — the tenant-isolated data layer (`DealerContext`, reads, `mutate.ts`)
 - `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
 - `src/server/data/settings-dealer.ts`, `src/server/data/settings-branding.ts`, `src/server/data/settings-booking.ts`, `src/server/data/settings-hours.ts`, `src/server/data/dealer-users.ts` — Owner-only settings services (every function calls `requireDealerRole(ctx, ['owner'])` first)
-- `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getClosedDatesBetween` (shared with the phase-2 slot engine)
+- `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getOpeningRangesBetween`, `getClosedDatesBetween` (shared with the slot engine)
+- `src/server/data/cars.ts` — public car reads + car management for Owner and Salesperson (`addCar` from an avto.net link with manual fallback, `updateCar`, `setCarActive`, `deleteCar`)
+- `src/server/avtonet.ts` — `normalizeAvtoNetUrl` (canonical `https://www.avto.net/Ads/details.asp?id=N`) and best-effort listing reader (`readListing`/`parseListingHtml`; returns null when blocked)
+- `src/lib/slots.ts` — pure `computeDaySlots` (step, duration, buffer, minimum notice, busy intervals)
+- `src/server/data/bookings.ts` — per-car availability (`getCarAvailability`), `createBooking` (public), `getPublicBooking`, `listBookings` / `cancelBooking` (Owner and Salesperson), booking SMS/e-mail notifications
+- `src/app/dealer-admin/(app)/cars` and `src/app/dealer-admin/(app)/bookings` — car management and bookings pages (Owner and Salesperson)
+- `src/app/site/[slug]/termin/[carId]` (slot picker + customer form) and `src/app/site/[slug]/rezervacija/[bookingId]` (confirmation DriveTicket); `DealerSiteShell.tsx` is the shared public header/footer
 - `src/app/dealer-admin/(app)/settings/*` (`src/app/dealer-admin/(app)/settings/`) and `src/app/dealer-admin/(app)/users` — Owner settings and users pages, gated by `requireOwnerPage()` in `src/app/dealer-admin/(app)/owner-gate.tsx`
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
@@ -164,3 +170,9 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Uploaded files use unique keys (`logos/<publicId>.<ext>`) and are served with `Cache-Control: public, max-age=31536000, immutable`; replacing a logo deletes the old file after commit. The logo type is detected from content; unsafe SVGs are rejected, and SVGs are served with a sandbox CSP.
 - `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
+- Cars are added by their avto.net listing link plus an optional customer-facing note. The server tries to read make/model/year/mileage/price/photo from the listing; avto.net usually blocks server requests, so when nothing usable is read the form asks for make and model (required) plus year, mileage and price (optional). Manually entered values win over listing values. One link per dealer (`taken`).
+- Every car has its own calendar: a booking blocks only its car (plus `bufferMinutes` on both sides). Opening hours, holidays, closures, minimum notice, horizon and slot step are shared by the dealer. Durations come from booking rules (`test_drive` / `viewing`). The dealer-wide `capacity` rule is not used by the slot engine.
+- `createBooking` locks the car row (`FOR UPDATE`) and re-computes the day's slots in the transaction, so two customers can't take the same slot of one car. Bookings are confirmed immediately (no phone verification yet); the customer gets an SMS, the dealer an e-mail (and an SMS when SMS notifications are on).
+- A car with bookings can't be deleted (FK `no action`); it can only be hidden. Hidden cars are not shown publicly and can't be booked.
+- Cars and bookings are managed by Owners and Salespeople alike; the bookings page shows the next 31 days and can filter by car. Cancelling sends the customer an SMS.
+- Public booking URLs: `/termin/{carId}?kind=&date=&start=` (server-rendered slot picker) and `/rezervacija/{bookingId}` (unguessable id). The public booking action resolves the dealer from the page's slug via `resolveDealerSlug`; non-active dealers can't take bookings.
