@@ -130,3 +130,31 @@ export async function getOpeningRangesForDate(ctx: DealerContext, date: string):
   if (holiday?.opens && holiday.closes) return [{ opens: holiday.opens, closes: holiday.closes }];
   return hours.filter((h) => h.isoWeekday === weekday).map((h) => ({ opens: h.opensAt, closes: h.closesAt }));
 }
+
+/** Opening ranges for every day in [from, to] (inclusive), loading hours, holidays and closures once. */
+export async function getOpeningRangesBetween(
+  ctx: DealerContext,
+  from: string,
+  to: string,
+): Promise<Map<string, OpeningRange[]>> {
+  const [{ days, holidays, closures }, hours] = await Promise.all([loadDays(ctx, from, to), listOpeningHours(ctx)]);
+  const result = new Map<string, OpeningRange[]>();
+  for (let i = 0; i < days; i++) {
+    const date = addDays(from, i);
+    if (closedOn(date, holidays, closures)) {
+      result.set(date, []);
+      continue;
+    }
+    const holiday = holidays.get(date);
+    if (holiday?.opens && holiday.closes) {
+      result.set(date, [{ opens: holiday.opens, closes: holiday.closes }]);
+      continue;
+    }
+    const weekday = isoWeekday(date);
+    result.set(
+      date,
+      hours.filter((h) => h.isoWeekday === weekday).map((h) => ({ opens: h.opensAt, closes: h.closesAt })),
+    );
+  }
+  return result;
+}

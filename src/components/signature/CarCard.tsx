@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import { Badge } from "@/components/ui/Badge";
 import { CarSilhouette } from "./CarSilhouette";
@@ -8,30 +9,39 @@ export type Car = {
   make: string;
   model: string;
   trim?: string;
-  year: number;
-  priceEur: number;
+  year?: number;
+  mileageKm?: number;
+  priceEur?: number;
   imageUrl?: string;
   body?: "estate" | "sedan" | "suv";
   avtoNetUrl: string;
+  /** Dealer's note for customers. */
+  notes?: string;
   active?: boolean;
 };
 
+export type CarCardLabels = { selected: string; listing: string; inactive: string; km?: string };
+
 const eur = new Intl.NumberFormat("sl-SI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const int = new Intl.NumberFormat("sl-SI", { maximumFractionDigits: 0 });
 
 /**
  * CarCard — the public page's unit. `selected` = arrived via ?car={id}
  * (shown first, signal-framed). `deepLink` (admin) adds the copyable URL.
+ * `action` is the card's call to action (e.g. the public "book" button), rendered last.
  */
 export function CarCard({
   car,
   selected = false,
   deepLink,
-  labels = { selected: "Izbrano vozilo", listing: "Oglej si oglas na avto.net", inactive: "Neaktivno" },
+  action,
+  labels = { selected: "Izbrano vozilo", listing: "Oglej si oglas na avto.net", inactive: "Neaktivno", km: "km" },
 }: {
   car: Car;
   selected?: boolean;
   deepLink?: string;
-  labels?: { selected: string; listing: string; inactive: string };
+  action?: ReactNode;
+  labels?: CarCardLabels;
 }) {
   const inactive = car.active === false;
   return (
@@ -54,7 +64,9 @@ export function CarCard({
             <CarSilhouette body={car.body} className="w-4/5 max-w-[16rem] transition-transform duration-[var(--dur-base)] ease-out group-hover/car:translate-x-1" />
           </div>
         )}
-        <span className="type-utility absolute bottom-0 right-0 bg-ink px-2 py-1 tabular text-ground">{car.year}</span>
+        {car.year !== undefined && (
+          <span className="type-utility absolute bottom-0 right-0 bg-ink px-2 py-1 tabular text-ground">{car.year}</span>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
@@ -62,11 +74,21 @@ export function CarCard({
             <p className="type-utility text-muted">{car.make}</p>
             <h3 className="mt-1 text-h3 font-[700] text-ink">{car.model}</h3>
             {car.trim && <p className="mt-0.5 truncate text-small text-ink-2">{car.trim}</p>}
+            {car.mileageKm !== undefined && (
+              <p className="type-utility mt-2 tabular text-ink-2">
+                {int.format(car.mileageKm)} {labels.km ?? "km"}
+              </p>
+            )}
           </div>
           {inactive && <Badge tone="neutral">{labels.inactive}</Badge>}
         </div>
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-4">
-          <span className="type-display text-h2 tabular text-ink">{eur.format(car.priceEur)}</span>
+        {car.notes && <p className="whitespace-pre-line text-small text-ink-2">{car.notes}</p>}
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-line pt-4">
+          {car.priceEur !== undefined ? (
+            <span className="type-display text-h2 tabular text-ink">{eur.format(car.priceEur)}</span>
+          ) : (
+            <span />
+          )}
           <a
             href={car.avtoNetUrl}
             target="_blank"
@@ -79,6 +101,7 @@ export function CarCard({
             </svg>
           </a>
         </div>
+        {action}
         {deepLink && <CopyLink url={deepLink} />}
       </div>
     </article>

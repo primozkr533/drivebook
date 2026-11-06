@@ -1,0 +1,54 @@
+{
+  "nav": "Vozila",
+  "title": "Vozila za testne vožnje",
+  "description": "Prilepite povezavo do oglasa na avto.net. Vozilo se prikaže na vaši javni strani in stranke lahko zanj rezervirajo termin. Vsako vozilo ima svoj koledar.",
+  "add": {
+    "title": "Dodaj vozilo",
+    "fields": {
+      "avtoNetUrl": "Povezava do oglasa na avto.net",
+      "notes": "Opombe za stranke",
+      "make": "Znamka",
+      "model": "Model",
+      "year": "Letnik",
+      "mileageKm": "Prevoženi kilometri",
+      "priceEur": "Cena (€)"
+    },
+    "urlPlaceholder": "https://www.avto.net/Ads/details.asp?id=…",
+    "notesPlaceholder": "npr. Vozilo je na lokaciji Ljubljana, s seboj prinesite vozniško dovoljenje.",
+    "optional": "neobvezno",
+    "submit": "Dodaj vozilo",
+    "added": "Vozilo je dodano in objavljeno na javni strani.",
+    "addedManual": "Vozilo je dodano s podatki, ki ste jih vnesli.",
+    "manualTitle": "Podatkov iz oglasa ni bilo mogoče prebrati",
+    "manualBody": "avto.net včasih ne dovoli samodejnega branja oglasov. Vpišite podatke o vozilu ročno, nato znova kliknite »Dodaj vozilo«."
+  },
+  "list": {
+    "title": "Vaša vozila",
+    "empty": "Še niste dodali nobenega vozila. Dodajte prvo vozilo z obrazcem zgoraj.",
+    "visible": "Objavljeno",
+    "hidden": "Skrito",
+    "upcoming": "{count, plural, =0 {Ni prihodnjih rezervacij} one {# prihodnja rezervacija} two {# prihodnji rezervaciji} few {# prihodnje rezervacije} other {# prihodnjih rezervacij}}",
+    "showOnPage": "Prikaži na javni strani",
+    "showOnPageHint": "Skrito vozilo ni vidno strankam in zanj ni mogoče rezervirati termina.",
+    "edit": "Uredi podatke",
+    "save": "Shrani",
+    "saved": "Shranjeno.",
+    "cancel": "Prekliči",
+    "delete": "Izbriši",
+    "deleteLabel": "Izbriši vozilo {car}",
+    "bookings": "Rezervacije",
+    "listing": "Oglas na avto.net",
+    "km": "km"
+  },
+  "errors": {
+    "required": "To polje je obvezno.",
+    "invalid": "Vrednost ni veljavna.",
+    "invalidUrl": "Vnesite povezavo do oglasa na avto.net (…/Ads/details.asp?id=…).",
+    "too_long": "Besedilo je predolgo.",
+    "out_of_range": "Vrednost je izven dovoljenega razpona.",
+    "taken": "To vozilo je že dodano.",
+    "hasBookings": "Vozilo ima rezervacije, zato ga ni mogoče izbrisati. Lahko ga skrijete.",
+    "forbidden": "Za to dejanje nimate pravic.",
+    "readOnly": "Račun avtohiše je v načinu samo za branje, zato sprememb ni mogoče shraniti."
+  }
+}

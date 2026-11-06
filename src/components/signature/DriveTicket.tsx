@@ -1,6 +1,6 @@
 import { cx } from "@/lib/cx";
 
-export type TicketStatus = "confirmed" | "pending" | "attended" | "no-show";
+export type TicketStatus = "confirmed" | "pending" | "attended" | "no-show" | "cancelled";
 
 export type DriveTicketData = {
   kind: string; // "Testna vožnja"
@@ -26,6 +26,7 @@ const statusStyle: Record<TicketStatus, string> = {
   pending: "text-warn shadow-[inset_0_0_0_2px_var(--warn)]",
   attended: "text-ink shadow-[inset_0_0_0_2px_var(--ink)]",
   "no-show": "text-danger shadow-[inset_0_0_0_2px_var(--danger)]",
+  cancelled: "text-muted shadow-[inset_0_0_0_2px_var(--muted)]",
 };
 
 /**

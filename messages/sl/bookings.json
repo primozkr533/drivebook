@@ -1,0 +1,23 @@
+{
+  "nav": "Rezervacije",
+  "title": "Rezervacije",
+  "description": "Prihajajoči termini po vozilih. Vsako vozilo ima svoj koledar, delovni čas je skupen za vso avtohišo.",
+  "filterLabel": "Vozilo",
+  "allCars": "Vsa vozila",
+  "filter": "Prikaži",
+  "empty": "V tem obdobju ni rezervacij.",
+  "kind": { "test_drive": "Testna vožnja", "viewing": "Ogled" },
+  "status": { "confirmed": "Potrjeno", "cancelled": "Odpovedano" },
+  "code": "Koda {code}",
+  "noEmail": "brez e-pošte",
+  "note": "Opomba: {note}",
+  "cancel": "Odpovej",
+  "cancelLabel": "Odpovej rezervacijo {code}",
+  "cancelHint": "Stranka prejme SMS o odpovedi.",
+  "range": "Naslednjih {days} dni",
+  "errors": {
+    "forbidden": "Za to dejanje nimate pravic.",
+    "readOnly": "Račun avtohiše je v načinu samo za branje, zato sprememb ni mogoče shraniti.",
+    "alreadyCancelled": "Rezervacija je že odpovedana."
+  }
+}

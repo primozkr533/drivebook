@@ -9,3 +9,5 @@ export const authTokenPurpose = pgEnum("auth_token_purpose", ["invite", "reset"]
 export const carBody = pgEnum("car_body", ["estate", "sedan", "suv"]);
 export const messageChannel = pgEnum("message_channel", ["sms", "email"]);
 export const messageStatus = pgEnum("message_status", ["queued", "sent", "failed"]);
+export const bookingKind = pgEnum("booking_kind", ["test_drive", "viewing"]);
+export const bookingStatus = pgEnum("booking_status", ["confirmed", "cancelled"]);
