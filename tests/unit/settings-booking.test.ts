@@ -75,6 +75,7 @@ const valid = {
   bufferMinutes: 10,
   cancelCutoffMinutes: 240,
   slotIntervalMinutes: 30,
+  requirePhoneVerification: true,
 };
 
 const rulesRows = () => db.select().from(bookingRules);
@@ -103,6 +104,7 @@ describe("getBookingRules", () => {
       bufferMinutes: 15,
       cancelCutoffMinutes: 120,
       slotIntervalMinutes: 15,
+      requirePhoneVerification: true,
     });
     expect(await rulesRows()).toHaveLength(0);
   });
@@ -168,7 +170,7 @@ describe("updateBookingRules", () => {
     expect(await updateBookingRules(ctx, valid)).toEqual({ ok: true, rules: valid });
     expect(await getBookingRules(ctx)).toEqual(valid);
 
-    const next = { ...valid, viewingMinutes: 40 };
+    const next = { ...valid, viewingMinutes: 40, requirePhoneVerification: false };
     await updateBookingRules(ctx, next);
     expect(await getBookingRules(ctx)).toEqual(next);
     expect(await rulesRows()).toHaveLength(1);

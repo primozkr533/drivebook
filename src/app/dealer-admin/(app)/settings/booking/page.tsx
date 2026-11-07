@@ -49,6 +49,7 @@ export default async function SettingsBookingPage() {
       value,
       label: t("slotOption", { value }),
     })),
+    verification: { legend: t("groups.verification"), label: t("verification.label"), hint: t("verification.hint") },
     submit: t("submit"),
     reset: t("reset"),
     resetHint: t("resetHint"),

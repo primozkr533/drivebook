@@ -17,7 +17,8 @@ export const BOOKING_FORM_FIELDS = [
 ] as const;
 
 export type BookingFormField = (typeof BOOKING_FORM_FIELDS)[number];
-export type BookingFormValues = Record<BookingFormField, string>;
+// requirePhoneVerification is "true" / "false" (a switch, not a number field).
+export type BookingFormValues = Record<BookingFormField, string> & { requirePhoneVerification: string };
 export type BookingFormErrors = Partial<Record<BookingFormField, BookingRuleError>>;
 export type BookingFieldUnit = "minutes" | "hours" | "days";
 
@@ -50,18 +51,25 @@ export function fromRuleValue(field: BookingFormField, value: number): number {
 }
 
 export function toFormValues(rules: BookingRules): BookingFormValues {
-  return Object.fromEntries(
-    BOOKING_FORM_FIELDS.map((field) => [field, String(fromRuleValue(field, rules[BOOKING_FORM_RULE[field]]))]),
-  ) as BookingFormValues;
+  return {
+    ...(Object.fromEntries(
+      BOOKING_FORM_FIELDS.map((field) => [field, String(fromRuleValue(field, rules[BOOKING_FORM_RULE[field]]))]),
+    ) as Record<BookingFormField, string>),
+    requirePhoneVerification: String(rules.requirePhoneVerification),
+  };
 }
 
 export function readFormValues(form: FormData): BookingFormValues {
-  return Object.fromEntries(
-    BOOKING_FORM_FIELDS.map((field) => {
-      const value = form.get(field);
-      return [field, typeof value === "string" ? value : ""];
-    }),
-  ) as BookingFormValues;
+  return {
+    ...(Object.fromEntries(
+      BOOKING_FORM_FIELDS.map((field) => {
+        const value = form.get(field);
+        return [field, typeof value === "string" ? value : ""];
+      }),
+    ) as Record<BookingFormField, string>),
+    // An unchecked checkbox is not submitted at all.
+    requirePhoneVerification: form.get("requirePhoneVerification") === null ? "false" : "true",
+  };
 }
 
 function hoursToMinutes(raw: string): unknown {
@@ -73,12 +81,15 @@ function hoursToMinutes(raw: string): unknown {
 }
 
 export function toRulesInput(values: BookingFormValues): BookingRulesInput {
-  return Object.fromEntries(
-    BOOKING_FORM_FIELDS.map((field) => [
-      BOOKING_FORM_RULE[field],
-      isHours(field) ? hoursToMinutes(values[field]) : values[field],
-    ]),
-  );
+  return {
+    ...Object.fromEntries(
+      BOOKING_FORM_FIELDS.map((field) => [
+        BOOKING_FORM_RULE[field],
+        isHours(field) ? hoursToMinutes(values[field]) : values[field],
+      ]),
+    ),
+    requirePhoneVerification: values.requirePhoneVerification !== "false",
+  };
 }
 
 export function toFormErrors(errors: Partial<Record<BookingRuleField, BookingRuleError>>): BookingFormErrors {
