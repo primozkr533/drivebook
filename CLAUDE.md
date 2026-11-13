@@ -56,7 +56,6 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/app/backoffice/(app)/dealers`, `src/app/backoffice/(app)/plans`, `src/app/backoffice/(app)/users` — operator pages (Support: read-only UI, writes refused on the server)
 - `src/i18n/request.ts` + `messages/sl/` — translations (backoffice strings in `messages/sl/backoffice.json`)
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
-- `deploy/` — test/demo server: `docker-compose.yml` (Caddy + web + worker + Postgres, `APP_ENV=production`), `Caddyfile`, `.env.example`, `README.md` (setup steps)
 
 ## Required environment variables
 All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
