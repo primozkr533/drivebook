@@ -146,6 +146,25 @@ Staging is a separate server (or at least a separate checkout and compose projec
 
 Never set `ALLOW_FAKE_PROVIDERS=1` on production.
 
+### Test / demo server without Twilio and Brevo keys
+
+For an internal test or demo server (staging setup on its own domain), no Twilio or Brevo account is needed. Do **not** put made-up keys into `.env`: the app would start, but every SMS and e-mail would fail at the provider, and customers would never get their booking code. Use the fake providers instead. In `.env`:
+
+```
+ALLOW_FAKE_PROVIDERS=1
+NOTIFY_FAKE=1
+DEV_INBOX_ENABLED=1
+SEED_ON_START=1
+```
+
+- `ALLOW_FAKE_PROVIDERS=1` lets `APP_ENV=production` start without the Twilio/Brevo keys. `NOTIFY_FAKE=1` sends nothing out; messages are stored instead.
+- `DEV_INBOX_ENABLED=1` serves those messages at `https://<BASE_DOMAIN>/_dev/inbox`: booking SMS codes, booking confirmations, invitation and password-reset links. The page has **no password**: use it only on an internal test domain and share the URL only with the team.
+- `SEED_ON_START=1` creates the demo dealer (`https://demo.<BASE_DOMAIN>`, four cars, opening hours) and its users `owner@demo.drivebook.si` (Owner) and `prodaja@demo.drivebook.localhost` (Salesperson). They have no password: on `https://app.<BASE_DOMAIN>` use *Pozabljeno geslo* and open the reset link from the inbox.
+- To demo bookings without SMS codes at all, the dealer Owner can turn off *Potrditev s SMS kodo* under *Nastavitve → Pravila rezervacij*; bookings are then confirmed immediately.
+- Updating a test server that ran an earlier version needs nothing extra: pending migrations (including `0007`, bookings) run on start.
+
+When real accounts exist, put the Twilio and Brevo keys into `.env`, remove these four lines (or set `SEED_ON_START=0`) and restart with `docker compose -f docker-compose.prod.yml up -d`.
+
 ## 7. Backups
 
 The `backup` service runs every night at **03:00 Europe/Ljubljana** and writes `db-YYYYmmdd-HHMMSS.dump` (`pg_dump -Fc`) and `uploads-YYYYmmdd-HHMMSS.tar.gz` into the `backups` volume. Files older than `BACKUP_RETENTION_DAYS` (**14**) days are deleted after each run. Details: `docker/backup/README.md`.

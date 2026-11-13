@@ -5,11 +5,10 @@ import type { DealerContext } from "./context";
 import { db } from "./db";
 import { withDealerMutation, type AuditEntry } from "./mutate";
 
-export type BookingRules = {
+type NumericBookingRules = {
   testDriveMinutes: number;
   viewingMinutes: number;
   otherMinutes: number;
-  capacity: number;
   minNoticeMinutes: number;
   horizonDays: number;
   bufferMinutes: number;
@@ -17,11 +16,16 @@ export type BookingRules = {
   slotIntervalMinutes: number;
 };
 
-export type BookingRuleField = keyof BookingRules;
+export type BookingRules = NumericBookingRules & {
+  /** New bookings must be confirmed with an SMS code before they count. */
+  requirePhoneVerification: boolean;
+};
+
+export type BookingRuleField = keyof NumericBookingRules;
 export type BookingRuleError = "required" | "not_integer" | "out_of_range" | "invalid_step";
 export type BookingRuleLimit = { min: number; max: number; step?: number; options?: readonly number[] };
 
-export type BookingRulesInput = Partial<Record<BookingRuleField, unknown>>;
+export type BookingRulesInput = Partial<Record<BookingRuleField | "requirePhoneVerification", unknown>>;
 export type UpdateBookingRulesResult =
   | { ok: true; rules: BookingRules }
   | { ok: false; errors: Partial<Record<BookingRuleField, BookingRuleError>> };
@@ -30,19 +34,18 @@ export const BOOKING_RULE_DEFAULTS: Readonly<BookingRules> = Object.freeze({
   testDriveMinutes: 45,
   viewingMinutes: 30,
   otherMinutes: 30,
-  capacity: 1,
   minNoticeMinutes: 120,
   horizonDays: 14,
   bufferMinutes: 15,
   cancelCutoffMinutes: 120,
   slotIntervalMinutes: 15,
+  requirePhoneVerification: true,
 });
 
 export const BOOKING_RULE_LIMITS: Readonly<Record<BookingRuleField, BookingRuleLimit>> = Object.freeze({
   testDriveMinutes: { min: 15, max: 240, step: 5 },
   viewingMinutes: { min: 10, max: 240, step: 5 },
   otherMinutes: { min: 10, max: 240, step: 5 },
-  capacity: { min: 1, max: 20 },
   minNoticeMinutes: { min: 0, max: 10080 },
   horizonDays: { min: 1, max: 180 },
   bufferMinutes: { min: 0, max: 120 },
@@ -50,18 +53,18 @@ export const BOOKING_RULE_LIMITS: Readonly<Record<BookingRuleField, BookingRuleL
   slotIntervalMinutes: { min: 5, max: 60, options: [5, 10, 15, 20, 30, 60] },
 });
 
-const FIELDS = Object.keys(BOOKING_RULE_DEFAULTS) as BookingRuleField[];
+const FIELDS = Object.keys(BOOKING_RULE_LIMITS) as BookingRuleField[];
 
 const columns = {
   testDriveMinutes: bookingRules.testDriveMinutes,
   viewingMinutes: bookingRules.viewingMinutes,
   otherMinutes: bookingRules.otherMinutes,
-  capacity: bookingRules.capacity,
   minNoticeMinutes: bookingRules.leadTimeMinutes,
   horizonDays: bookingRules.maxDaysAhead,
   bufferMinutes: bookingRules.bufferMinutes,
   cancelCutoffMinutes: bookingRules.cancelCutoffMinutes,
   slotIntervalMinutes: bookingRules.slotMinutes,
+  requirePhoneVerification: bookingRules.requirePhoneVerification,
 };
 
 function toRow(rules: BookingRules) {
@@ -69,12 +72,12 @@ function toRow(rules: BookingRules) {
     testDriveMinutes: rules.testDriveMinutes,
     viewingMinutes: rules.viewingMinutes,
     otherMinutes: rules.otherMinutes,
-    capacity: rules.capacity,
     leadTimeMinutes: rules.minNoticeMinutes,
     maxDaysAhead: rules.horizonDays,
     bufferMinutes: rules.bufferMinutes,
     cancelCutoffMinutes: rules.cancelCutoffMinutes,
     slotMinutes: rules.slotIntervalMinutes,
+    requirePhoneVerification: rules.requirePhoneVerification,
   };
 }
 
@@ -93,7 +96,9 @@ export function validateBookingRules(
   input: BookingRulesInput,
 ): { ok: true; rules: BookingRules } | { ok: false; errors: Partial<Record<BookingRuleField, BookingRuleError>> } {
   const errors: Partial<Record<BookingRuleField, BookingRuleError>> = {};
-  const rules = {} as BookingRules;
+  // Omitted means the default (on); only an explicit false turns SMS verification off.
+  const rawVerify = input.requirePhoneVerification;
+  const rules = { requirePhoneVerification: !(rawVerify === false || rawVerify === "false") } as BookingRules;
   for (const field of FIELDS) {
     const result = validateField(field, input[field]);
     if (typeof result === "number") rules[field] = result;

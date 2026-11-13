@@ -24,7 +24,7 @@ import { carsListHref, type CarListNotice } from "./notice";
 
 const CARS_LIST_PATH = "/dealer-admin/cars";
 
-export type CarFormField = "make" | "model" | "year" | "price" | "avtonetUrl" | "imageFile" | "imageUrl";
+export type CarFormField = "make" | "model" | "year" | "price" | "mileage" | "notes" | "avtonetUrl" | "imageFile" | "imageUrl";
 
 export type CarFormValues = {
   id: string;
@@ -32,6 +32,8 @@ export type CarFormValues = {
   model: string;
   year: string;
   price: string;
+  mileage: string;
+  notes: string;
   avtonetUrl: string;
   imageUrl: string;
   removeImage: string;
@@ -87,6 +89,8 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
     model: text(form, "model"),
     year: text(form, "year"),
     price: text(form, "price"),
+    mileage: text(form, "mileage"),
+    notes: text(form, "notes"),
     avtonetUrl: text(form, "avtonetUrl"),
     imageUrl: text(form, "imageUrl"),
     removeImage: text(form, "removeImage"),
@@ -94,6 +98,8 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
 
   const year = parseInteger(values.year);
   const price = parsePrice(values.price);
+  // Mileage is optional and uses the same thousands separators as prices ("87.400 km").
+  const mileage = parsePrice(values.mileage.replace(/km$/i, "").trim());
   const image = await imageFrom(form, values);
   const fieldErrors: Partial<Record<CarFormField, CarFieldError>> = {};
   if (year === "required") fieldErrors.year = "required";
@@ -107,6 +113,8 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
     model: values.model,
     year: year as number,
     priceEur: price as number,
+    mileageKm: mileage === "required" ? null : mileage,
+    notes: values.notes,
     avtonetUrl: values.avtonetUrl,
     image,
   };
@@ -114,12 +122,13 @@ export async function saveCarAction(_prev: SaveCarState | null, form: FormData):
   try {
     const result = values.id ? await updateCar(ctx, values.id, input) : await createCar(ctx, input);
     if (!result.ok) {
-      const { priceEur, image: imageError, ...rest } = result.errors;
+      const { priceEur, mileageKm, image: imageError, ...rest } = result.errors;
       return {
         ok: false,
         fieldErrors: {
           ...rest,
           ...(priceEur && { price: priceEur }),
+          ...(mileageKm && { mileage: mileageKm }),
           ...(imageError && { [image.kind === "upload" ? "imageFile" : "imageUrl"]: imageError }),
         },
         values,

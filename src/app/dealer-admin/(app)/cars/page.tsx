@@ -30,6 +30,7 @@ export default async function CarsPage({ searchParams }: Props) {
     deepLink: t("deepLink"),
     copy: t("copy"),
     copied: t("copied"),
+    km: t("km"),
   };
 
   return (

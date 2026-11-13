@@ -17,9 +17,12 @@ export const cars = pgTable(
     trim: text("trim"),
     year: integer("year").notNull(),
     priceEur: integer("price_eur").notNull(),
+    mileageKm: integer("mileage_km"),
     body: carBody("body").notNull(),
     avtoNetUrl: text("avto_net_url"),
     imageKey: text("image_key"),
+    // Dealer's note, shown to customers on the public page and booking page.
+    notes: text("notes"),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),

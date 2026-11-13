@@ -135,12 +135,12 @@ describe("parseCarStatusFilter", () => {
 });
 
 describe("mergeAutofill", () => {
-  const empty: CarDraft = { make: "", model: "", year: "", price: "", imageUrl: "" };
+  const empty: CarDraft = { make: "", model: "", year: "", price: "", mileage: "", notes: "", imageUrl: "" };
   const fields = { make: "BMW", model: "320d", year: 2019, price: 21500, imageUrl: "https://images.avto.net/1.jpg" };
 
   it("fills every empty field and reports them", () => {
     expect(mergeAutofill(empty, fields)).toEqual({
-      draft: { make: "BMW", model: "320d", year: "2019", price: "21500", imageUrl: "https://images.avto.net/1.jpg" },
+      draft: { ...empty, make: "BMW", model: "320d", year: "2019", price: "21500", imageUrl: "https://images.avto.net/1.jpg" },
       filled: ["make", "model", "year", "price", "imageUrl"],
     });
   });

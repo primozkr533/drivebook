@@ -35,6 +35,8 @@ export default async function EditCarPage({ params }: Props) {
             model: car.model,
             year: String(car.year),
             price: String(car.priceEur),
+            mileage: car.mileageKm !== undefined ? String(car.mileageKm) : "",
+            notes: car.notes ?? "",
             avtonetUrl: car.avtoNetUrl ?? "",
             imageUrl: "",
             currentImageUrl: car.imageUrl ?? null,

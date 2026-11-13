@@ -47,6 +47,8 @@ export function CarForm({
     model: initial.model,
     year: initial.year,
     price: initial.price,
+    mileage: initial.mileage,
+    notes: initial.notes,
     imageUrl: initial.imageUrl,
   });
   const [avtonetUrl, setAvtonetUrl] = useState(initial.avtonetUrl);
@@ -216,7 +218,39 @@ export function CarForm({
                   className="tabular"
                   data-testid="car-price"
                 />
+                <Input
+                  label={`${t("form.mileage")} (${t("form.optional")})`}
+                  error={fieldError("mileage")}
+                  name="mileage"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={draft.mileage}
+                  onChange={set("mileage")}
+                  suffix={t("form.mileageSuffix")}
+                  className="tabular"
+                  data-testid="car-mileage"
+                />
               </Grid>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="car-notes" className="type-utility text-ink">
+                  {t("form.notes")} <span className="text-muted">({t("form.optional")})</span>
+                </label>
+                <textarea
+                  id="car-notes"
+                  name="notes"
+                  rows={3}
+                  value={draft.notes}
+                  onChange={set("notes")}
+                  placeholder={t("form.notesPlaceholder")}
+                  aria-invalid={fieldError("notes") ? true : undefined}
+                  aria-describedby="car-notes-msg"
+                  className="w-full rounded-soft bg-surface px-3.5 py-2.5 text-body text-ink placeholder:text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:shadow-[inset_0_0_0_1px_var(--ink-2)] focus:outline-none focus:shadow-[inset_0_0_0_2px_var(--ink)] aria-[invalid=true]:shadow-[inset_0_0_0_2px_var(--danger)]"
+                  data-testid="car-notes"
+                />
+                <p id="car-notes-msg" className={fieldError("notes") ? "text-small text-danger" : "text-small text-muted"}>
+                  {fieldError("notes") ?? t("form.notesHint")}
+                </p>
+              </div>
             </Stack>
           </Card>
           <Card className="min-w-0 lg:col-span-5">

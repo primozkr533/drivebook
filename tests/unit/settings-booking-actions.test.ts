@@ -61,17 +61,18 @@ const formValues = {
   testDriveMinutes: "60",
   viewingMinutes: "20",
   otherMinutes: "40",
-  capacity: "3",
   minNoticeHours: "3",
   horizonDays: "30",
   bufferMinutes: "10",
   cancelCutoffHours: "1,5",
   slotIntervalMinutes: "30",
+  requirePhoneVerification: "true",
 };
 
 const form = (values: Record<string, string>) => {
   const data = new FormData();
-  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  // Like a browser: an unchecked switch is not submitted at all.
+  for (const [key, value] of Object.entries(values)) if (!(key === "requirePhoneVerification" && value === "false")) data.set(key, value);
   return data;
 };
 
@@ -94,12 +95,12 @@ describe("booking form mapping", () => {
       testDriveMinutes: "45",
       viewingMinutes: "30",
       otherMinutes: "30",
-      capacity: "1",
       minNoticeHours: "2",
       horizonDays: "14",
       bufferMinutes: "15",
       cancelCutoffHours: "2",
       slotIntervalMinutes: "15",
+      requirePhoneVerification: "true",
     });
   });
 
@@ -108,12 +109,12 @@ describe("booking form mapping", () => {
       testDriveMinutes: "60",
       viewingMinutes: "20",
       otherMinutes: "40",
-      capacity: "3",
       minNoticeMinutes: 180,
       horizonDays: "30",
       bufferMinutes: "10",
       cancelCutoffMinutes: 90,
       slotIntervalMinutes: "30",
+      requirePhoneVerification: true,
     });
     expect(toRulesInput({ ...formValues, minNoticeHours: " ", cancelCutoffHours: "abc" })).toMatchObject({
       minNoticeMinutes: "",
@@ -130,17 +131,27 @@ describe("saveBookingRulesAction", () => {
     const result = await saveBookingRulesAction({}, form(formValues));
     expect(result).toEqual({ values: { ...formValues, cancelCutoffHours: "1.5" }, saved: true });
     const [row] = await rulesRows();
-    expect(row).toMatchObject({ dealerId: dealer.id, leadTimeMinutes: 180, cancelCutoffMinutes: 90, slotMinutes: 30, capacity: 3 });
+    expect(row).toMatchObject({ dealerId: dealer.id, leadTimeMinutes: 180, cancelCutoffMinutes: 90, slotMinutes: 30 });
     expect((await audits()).map((a) => a.action)).toEqual(["booking_rules.update"]);
+  });
+
+  it("turns SMS code verification off when the switch is unchecked, and back on", async () => {
+    const dealer = await seedDealer();
+    state.user = { id: "owner-1", role: "owner", dealerId: dealer.id };
+    const off = await saveBookingRulesAction({}, form({ ...formValues, requirePhoneVerification: "false" }));
+    expect(off).toMatchObject({ saved: true, values: { requirePhoneVerification: "false" } });
+    expect((await rulesRows())[0].requirePhoneVerification).toBe(false);
+    await saveBookingRulesAction({}, form(formValues));
+    expect((await rulesRows())[0].requirePhoneVerification).toBe(true);
   });
 
   it("returns per-field errors for out-of-range values and saves nothing", async () => {
     const dealer = await seedDealer();
     state.user = { id: "owner-1", role: "owner", dealerId: dealer.id };
-    const values = { ...formValues, minNoticeHours: "200", testDriveMinutes: "47", capacity: "" };
+    const values = { ...formValues, minNoticeHours: "200", testDriveMinutes: "47", horizonDays: "" };
     expect(await saveBookingRulesAction({}, form(values))).toEqual({
       values,
-      errors: { minNoticeHours: "out_of_range", testDriveMinutes: "invalid_step", capacity: "required" },
+      errors: { minNoticeHours: "out_of_range", testDriveMinutes: "invalid_step", horizonDays: "required" },
     });
     expect(await rulesRows()).toHaveLength(0);
     expect(await audits()).toHaveLength(0);

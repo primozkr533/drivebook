@@ -89,7 +89,6 @@ const rulesRow = (r: typeof BOOKING_RULE_DEFAULTS) => ({
   testDriveMinutes: r.testDriveMinutes,
   viewingMinutes: r.viewingMinutes,
   otherMinutes: r.otherMinutes,
-  capacity: r.capacity,
   leadTimeMinutes: r.minNoticeMinutes,
   maxDaysAhead: r.horizonDays,
   bufferMinutes: r.bufferMinutes,
@@ -97,8 +96,8 @@ const rulesRow = (r: typeof BOOKING_RULE_DEFAULTS) => ({
   slotMinutes: r.slotIntervalMinutes,
 });
 
-const A_RULES = { ...BOOKING_RULE_DEFAULTS, testDriveMinutes: 60, capacity: 2 };
-const B_RULES = { ...BOOKING_RULE_DEFAULTS, testDriveMinutes: 90, capacity: 5, horizonDays: 30 };
+const A_RULES = { ...BOOKING_RULE_DEFAULTS, testDriveMinutes: 60 };
+const B_RULES = { ...BOOKING_RULE_DEFAULTS, testDriveMinutes: 90, horizonDays: 30 };
 
 async function seedDealer(slug: string, name: string, planId: string, extra: Partial<typeof dealers.$inferInsert> = {}) {
   await db.insert(dealers).values({

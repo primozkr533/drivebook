@@ -778,7 +778,6 @@ describe("dealer settings shell", () => {
     expect(value("testDriveMinutes")).toBe("45");
     expect(value("viewingMinutes")).toBe("30");
     expect(value("otherMinutes")).toBe("30");
-    expect(value("capacity")).toBe("1");
     expect(value("minNoticeHours")).toBe("3");
     expect(value("horizonDays")).toBe("14");
     expect(value("bufferMinutes")).toBe("15");

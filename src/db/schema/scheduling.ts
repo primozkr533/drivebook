@@ -25,7 +25,6 @@ export const bookingRules = pgTable("booking_rules", {
   testDriveMinutes: integer("test_drive_minutes").notNull().default(45),
   viewingMinutes: integer("viewing_minutes").notNull().default(30),
   otherMinutes: integer("other_minutes").notNull().default(30),
-  capacity: integer("capacity").notNull().default(1),
   // Slot interval: the step between bookable start times.
   slotMinutes: integer("slot_minutes").notNull().default(15),
   // Minimum notice.

@@ -1,0 +1,80 @@
+{
+  "title": "Rezervacija termina",
+  "back": "Nazaj na ponudbo vozil",
+  "kindLabel": "Kaj želite?",
+  "kind": {
+    "test_drive": "Testna vožnja",
+    "viewing": "Ogled vozila"
+  },
+  "duration": "Trajanje: {minutes} min",
+  "dayLabel": "Izberite dan",
+  "timeLabel": "Izberite uro",
+  "noSlotsDay": "Ta dan za to vozilo ni prostih terminov. Izberite drug dan.",
+  "noSlots": "Za to vozilo v naslednjih dneh ni prostih terminov. Pokličite nas in skupaj najdemo termin.",
+  "closedDay": "zaprto",
+  "freeCount": "{count, plural, =0 {ni prostih} one {# prost} two {# prosta} few {# prosti} other {# prostih}}",
+  "formTitle": "Vaši podatki",
+  "selected": "{kind}, {date} ob {time}",
+  "fields": {
+    "name": "Ime in priimek",
+    "phone": "Mobilna številka",
+    "email": "E-pošta",
+    "note": "Sporočilo za prodajalca"
+  },
+  "optional": "neobvezno",
+  "phoneHint": "Na to številko vam pošljemo SMS s kodo za potrditev rezervacije.",
+  "consent": "Z rezervacijo se strinjate, da avtohiša vaše podatke uporabi za izvedbo termina.",
+  "privacy": "Varstvo osebnih podatkov",
+  "submit": "Potrdi rezervacijo",
+  "errors": {
+    "required": "To polje je obvezno.",
+    "invalid": "Vrednost ni veljavna.",
+    "invalidPhone": "Vnesite veljavno telefonsko številko, npr. 041 123 456.",
+    "invalidEmail": "Vnesite veljaven e-poštni naslov.",
+    "too_long": "Besedilo je predolgo.",
+    "slot_taken": "Ta termin je medtem zaseden. Izberite drugo uro.",
+    "readOnly": "Spletna rezervacija pri tej avtohiši trenutno ni mogoča. Pokličite nas.",
+    "carGone": "To vozilo ni več na voljo za rezervacijo.",
+    "too_many": "S to številko je bilo v zadnji uri preveč nepotrjenih rezervacij. Poskusite pozneje ali nas pokličite."
+  },
+  "unavailable": "Spletna rezervacija pri tej avtohiši trenutno ni mogoča.",
+  "confirmation": {
+    "title": "Rezervacija je potrjena",
+    "cancelledTitle": "Rezervacija je odpovedana",
+    "body": "Potrditev smo poslali v SMS sporočilu na {phone}. Prosimo, pridite nekaj minut pred terminom.",
+    "cancelledBody": "Ta termin je bil odpovedan. Za nov termin izberite vozilo na naši strani.",
+    "status": {
+      "confirmed": "Potrjeno",
+      "pending": "Čaka potrditev",
+      "expired": "Ni potrjeno",
+      "cancelled": "Odpovedano"
+    },
+    "cutoff": "Za spremembo ali odpoved nas pokličite do {date} ob {time}.",
+    "cutoffNoPhone": "Za spremembo ali odpoved se obrnite na avtohišo do {date} ob {time}.",
+    "customer": "Stranka",
+    "phone": "Telefon",
+    "verified": "potrjeno",
+    "code": "Koda rezervacije",
+    "note": "Opomba avtohiše",
+    "another": "Rezerviraj še en termin"
+  },
+  "verify": {
+    "title": "Potrdite rezervacijo",
+    "body": "Na {phone} smo poslali SMS s 6-mestno kodo. Vpišite jo spodaj. Termin je za vas zadržan še {minutes} min.",
+    "code": "Koda iz SMS-a",
+    "codeHint": "6 številk",
+    "submit": "Potrdi",
+    "resend": "Pošlji kodo znova",
+    "wrongCode": "Koda ni pravilna. Preostali poskusi: {attemptsLeft}.",
+    "unavailable": "Potrditev trenutno ni mogoča. Pokličite avtohišo.",
+    "resent": {
+      "ok": "Novo kodo smo poslali.",
+      "too_soon": "Počakajte minuto, preden zahtevate novo kodo.",
+      "limit": "Kodo smo poslali že večkrat. Uporabite zadnjo prejeto kodo.",
+      "expired": "Koda je potekla."
+    },
+    "expiredTitle": "Rezervacija ni potrjena",
+    "expiredBody": "Koda je potekla ali je bila večkrat vpisana napačno, zato termin ni rezerviran. Izberite termin znova.",
+    "bookAgain": "Izberi nov termin"
+  }
+}

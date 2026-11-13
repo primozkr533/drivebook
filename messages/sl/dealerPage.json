@@ -5,7 +5,6 @@
   "call": "Pokliči",
   "maps": "Odpri zemljevid",
   "bookingTitle": "Rezervacija testne vožnje",
-  "bookingSoon": "Spletna rezervacija termina bo kmalu na voljo. Do takrat nas pokličite.",
   "suspendedTitle": "Stran trenutno ni na voljo",
   "suspendedBody": "Spletno naročanje pri tej avtohiši je začasno onemogočeno. Za informacije jih pokličite.",
   "suspendedBodyNoPhone": "Spletno naročanje pri tej avtohiši trenutno ni mogoče. Poskusite znova pozneje.",
@@ -14,5 +13,8 @@
   "closedDatesTitle": "Zaprto",
   "carSelected": "Izbrano vozilo",
   "carListing": "Oglej si oglas na avto.net",
-  "carInactive": "Neaktivno"
+  "carInactive": "Neaktivno",
+  "bookingHowTo": "Izberite vozilo in kliknite »Rezerviraj termin«. Prikažejo se prosti termini za to vozilo.",
+  "bookCar": "Rezerviraj termin",
+  "km": "km"
 }

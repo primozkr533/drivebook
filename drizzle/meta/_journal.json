@@ -50,6 +50,13 @@
       "when": 1792612661449,
       "tag": "0006_car_avto_net_url_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794562478243,
+      "tag": "0007_bookings_sms_verification_car_notes",
+      "breakpoints": true
     }
   ]
 }

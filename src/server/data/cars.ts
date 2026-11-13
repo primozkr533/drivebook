@@ -29,12 +29,16 @@ export type CarInput = {
   year: number;
   priceEur: number;
   avtonetUrl?: string;
+  /** Optional; null clears it. */
+  mileageKm?: number | null;
+  /** Customer-facing note; empty clears it. */
+  notes?: string;
   body?: CarBody;
   image?: CarImageInput;
   active?: boolean;
 };
 
-export type CarField = "make" | "model" | "year" | "priceEur" | "avtonetUrl" | "image";
+export type CarField = "make" | "model" | "year" | "priceEur" | "mileageKm" | "notes" | "avtonetUrl" | "image";
 export type CarFieldError = "required" | "too_long" | "out_of_range" | "invalid" | "taken" | CarImageErrorCode;
 export type CarFieldErrors = Partial<Record<CarField, CarFieldError>>;
 
@@ -58,6 +62,8 @@ export class CarLimitError extends Error {
 
 export const MIN_CAR_YEAR = 1950;
 export const MAX_CAR_PRICE_EUR = 10_000_000;
+export const MAX_CAR_MILEAGE_KM = 2_000_000;
+export const MAX_CAR_NOTES_LENGTH = 500;
 const MAX_NAME_LENGTH = 60;
 const DEFAULT_BODY: CarBody = "sedan";
 
@@ -69,9 +75,11 @@ function toCar(row: CarRow): Car {
     trim: row.trim ?? undefined,
     year: row.year,
     priceEur: row.priceEur,
+    mileageKm: row.mileageKm ?? undefined,
     imageUrl: row.imageKey ? getStorage().url(row.imageKey) : undefined,
     body: row.body,
     avtoNetUrl: row.avtoNetUrl ?? undefined,
+    notes: row.notes ?? undefined,
     active: row.active,
   };
 }
@@ -131,7 +139,15 @@ export async function getCarForAdmin(ctx: DealerContext, publicId: string): Prom
   return row ? toAdminCar(row) : null;
 }
 
-type ValidCar = { make: string; model: string; year: number; priceEur: number; avtoNetUrl: string | null };
+type ValidCar = {
+  make: string;
+  model: string;
+  year: number;
+  priceEur: number;
+  mileageKm: number | null;
+  notes: string | null;
+  avtoNetUrl: string | null;
+};
 
 function validateCar(input: CarInput): { ok: true; value: ValidCar } | { ok: false; errors: CarFieldErrors } {
   const errors: CarFieldErrors = {};
@@ -151,11 +167,20 @@ function validateCar(input: CarInput): { ok: true; value: ValidCar } | { ok: fal
   if (!Number.isInteger(input.priceEur)) errors.priceEur = "invalid";
   else if (input.priceEur < 0 || input.priceEur > MAX_CAR_PRICE_EUR) errors.priceEur = "out_of_range";
 
+  const mileageKm = input.mileageKm ?? null;
+  if (mileageKm !== null) {
+    if (!Number.isInteger(mileageKm)) errors.mileageKm = "invalid";
+    else if (mileageKm < 0 || mileageKm > MAX_CAR_MILEAGE_KM) errors.mileageKm = "out_of_range";
+  }
+
+  const notes = input.notes?.trim() || null;
+  if (notes && notes.length > MAX_CAR_NOTES_LENGTH) errors.notes = "too_long";
+
   const avtoNetUrl = input.avtonetUrl?.trim() || null;
   if (avtoNetUrl && !isAvtonetUrl(avtoNetUrl)) errors.avtonetUrl = "invalid";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { make, model, year: input.year, priceEur: input.priceEur, avtoNetUrl } };
+  return { ok: true, value: { make, model, year: input.year, priceEur: input.priceEur, mileageKm, notes, avtoNetUrl } };
 }
 
 type StoredImage = { key: string | null; notice?: CarSaveNotice };
@@ -199,6 +224,8 @@ const snapshot = (row: CarRow) => ({
   model: row.model,
   year: row.year,
   priceEur: row.priceEur,
+  mileageKm: row.mileageKm,
+  notes: row.notes,
   avtoNetUrl: row.avtoNetUrl,
   imageKey: row.imageKey,
   active: row.active,

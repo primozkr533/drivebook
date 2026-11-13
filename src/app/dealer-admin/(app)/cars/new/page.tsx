@@ -18,7 +18,7 @@ export default async function NewCarPage() {
         <PageHeader title={t("new.title")} description={t("new.description")} />
         <CarForm
           listHref={`${basePath}/cars`}
-          initial={{ id: "", make: "", model: "", year: "", price: "", avtonetUrl: "", imageUrl: "", currentImageUrl: null }}
+          initial={{ id: "", make: "", model: "", year: "", price: "", mileage: "", notes: "", avtonetUrl: "", imageUrl: "", currentImageUrl: null }}
         />
       </Stack>
     </Container>

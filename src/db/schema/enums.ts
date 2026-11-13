@@ -9,3 +9,6 @@ export const authTokenPurpose = pgEnum("auth_token_purpose", ["invite", "reset"]
 export const carBody = pgEnum("car_body", ["estate", "sedan", "suv"]);
 export const messageChannel = pgEnum("message_channel", ["sms", "email"]);
 export const messageStatus = pgEnum("message_status", ["queued", "sent", "failed"]);
+export const bookingKind = pgEnum("booking_kind", ["test_drive", "viewing"]);
+// pending: waiting for the customer to enter the SMS code; holds its slot until verify_expires_at.
+export const bookingStatus = pgEnum("booking_status", ["pending", "confirmed", "cancelled"]);

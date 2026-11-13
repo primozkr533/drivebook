@@ -13,6 +13,7 @@ import {
   dealerSessions,
   dealerUsers,
   loginAttempts,
+  openingHours,
   plans,
 } from "@/db/schema";
 import { hashPassword } from "@/server/auth/password";
@@ -185,6 +186,13 @@ export async function deleteUsers(users: E2eUser[]): Promise<void> {
     await getDb().delete(backofficeUsers).where(inArray(backofficeUsers.id, ids("backoffice")));
   }
   await clearLoginAttempts({ emails: users.map((u) => u.email) });
+}
+
+// Opening hours every day of the week, so booking specs find free slots whenever they run.
+export async function openAllWeek(dealerId: string): Promise<void> {
+  await getDb()
+    .insert(openingHours)
+    .values([1, 2, 3, 4, 5, 6, 7].map((d) => ({ dealerId, isoWeekday: d, opensAt: "00:00", closesAt: "23:45" })));
 }
 
 export async function closeDb(): Promise<void> {

@@ -7,7 +7,8 @@ export function parseCarStatusFilter(raw: string | string[] | undefined): CarSta
   return CAR_STATUS_FILTERS.find((s) => s === value) ?? "active";
 }
 
-export type CarDraft = { make: string; model: string; year: string; price: string; imageUrl: string };
+// mileage and notes are never auto-filled from the listing.
+export type CarDraft = { make: string; model: string; year: string; price: string; mileage: string; notes: string; imageUrl: string };
 export type AutofillFields = { make?: string; model?: string; year?: number; price?: number; imageUrl?: string };
 
 const DRAFT_KEYS = ["make", "model", "year", "price", "imageUrl"] as const;

@@ -17,11 +17,12 @@ export async function AdminHeader({
   context: string;
   role?: string;
 }) {
-  const [t, tBackoffice, tSettings, tCars] = await Promise.all([
+  const [t, tBackoffice, tSettings, tCars, tBookings] = await Promise.all([
     getTranslations("account"),
     getTranslations("backoffice"),
     getTranslations("settings"),
     getTranslations("cars"),
+    getTranslations("bookings"),
   ]);
   const nav = [
     ...(surface === "backoffice"
@@ -31,7 +32,12 @@ export async function AdminHeader({
           { label: tBackoffice("users.nav"), href: `${basePath}/users` },
         ]
       : []),
-    ...(surface === "dealer" ? [{ label: tCars("nav"), href: `${basePath}/cars` }] : []),
+    ...(surface === "dealer"
+      ? [
+          { label: tBookings("nav"), href: `${basePath}/bookings` },
+          { label: tCars("nav"), href: `${basePath}/cars` },
+        ]
+      : []),
     ...(surface === "dealer" && role === "owner"
       ? [
           { label: tSettings("nav"), href: `${basePath}/settings` },

@@ -11,9 +11,12 @@ export type Car = {
   trim?: string;
   year: number;
   priceEur: number;
+  mileageKm?: number;
   imageUrl?: string;
   body?: "estate" | "sedan" | "suv";
   avtoNetUrl?: string;
+  /** Dealer's note for customers. */
+  notes?: string;
   active?: boolean;
 };
 
@@ -25,9 +28,12 @@ export type CarCardLabels = {
   deepLink?: string;
   copy?: string;
   copied?: string;
+  /** Unit after the mileage ("km"). */
+  km?: string;
 };
 
 const eur = new Intl.NumberFormat("sl-SI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const int = new Intl.NumberFormat("sl-SI", { maximumFractionDigits: 0 });
 
 /**
  * CarCard — the public page's unit. `selected` = arrived via ?car={id}
@@ -94,6 +100,11 @@ export function CarCard({
               {car.model}
             </h3>
             {car.trim && <p className="mt-0.5 truncate text-small text-ink-2">{car.trim}</p>}
+            {car.mileageKm !== undefined && (
+              <p className="type-utility mt-2 tabular text-ink-2" data-testid="car-mileage">
+                {int.format(car.mileageKm)} {labels.km ?? "km"}
+              </p>
+            )}
           </div>
           {(inactive || (showStatus && labels.active)) && (
             <span data-testid="car-status" data-status={inactive ? "inactive" : "active"}>
@@ -101,6 +112,11 @@ export function CarCard({
             </span>
           )}
         </div>
+        {car.notes && (
+          <p className={cx("whitespace-pre-line text-small text-ink-2", dim)} data-testid="car-notes">
+            {car.notes}
+          </p>
+        )}
         <div className={cx("mt-auto flex items-end justify-between gap-3 border-t border-line pt-4", dim)}>
           <span className="type-display text-h2 tabular text-ink" data-testid="car-price">
             {eur.format(car.priceEur)}

@@ -5,13 +5,13 @@ import { getTranslations } from "next-intl/server";
 import { cache } from "react";
 import { CarCard } from "@/components/signature/CarCard";
 import { HoursStrip } from "@/components/signature/HoursStrip";
-import { ButtonLink, Card, CardHeader, Container, Grid, Heading, Shell, Stack, Text } from "@/components/ui";
-import { brandStyle } from "@/lib/color";
+import { ButtonLink, Card, CardHeader, Container, Grid, Heading, Stack, Text } from "@/components/ui";
 import { addDays, ljubljanaNow } from "@/lib/date";
 import { getClosedDatesBetween, isDealerClosed } from "@/server/data/availability";
 import { listActiveCars } from "@/server/data/cars";
 import { resolveDealerSlug } from "@/server/data/dealers";
 import { listOpeningHours } from "@/server/data/hours";
+import { DealerSiteShell } from "./DealerSiteShell";
 import { buildDealerPageModel } from "./model";
 
 export const dynamic = "force-dynamic";
@@ -61,79 +61,13 @@ export default async function DealerPage({ params, searchParams }: Props) {
     holidayName: (key) => holidayT(key),
   });
 
-  const carLabels = { selected: t("carSelected"), listing: t("carListing"), inactive: t("carInactive") };
+  const carLabels = { selected: t("carSelected"), listing: t("carListing"), inactive: t("carInactive"), km: t("km") };
 
-  const header = (
-    <header className="relative border-b border-line-strong">
-      <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
-      <Container className="flex flex-col gap-6 pb-6 pt-8 md:flex-row md:items-end md:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="min-w-0">
-            <Heading size="d1">
-              {dealer.logoUrl ? (
-                // The stored-file URL is app-relative and served on every host, so no base-path prefix.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={dealer.logoUrl}
-                  alt={dealer.name}
-                  width={256}
-                  height={64}
-                  decoding="async"
-                  className="h-16 w-64 max-w-full object-contain object-left"
-                />
-              ) : (
-                dealer.name
-              )}
-            </Heading>
-            {model.address && (
-              <address className="mt-1 not-italic">
-                {model.address.line && <Text>{model.address.line}</Text>}
-                {model.address.locality && <Text>{model.address.locality}</Text>}
-              </address>
-            )}
-          </div>
-        </div>
-        {(model.telHref || model.emailHref || model.mapsHref) && (
-          <div className="flex flex-wrap items-center gap-3">
-            {model.telHref && (
-              <ButtonLink href={model.telHref} variant="brand">
-                {t("call")} <span className="tabular">{model.phone}</span>
-              </ButtonLink>
-            )}
-            {model.emailHref && (
-              <ButtonLink href={model.emailHref} variant="quiet">
-                {model.email}
-              </ButtonLink>
-            )}
-            {model.mapsHref && (
-              <ButtonLink href={model.mapsHref} variant="quiet" target="_blank" rel="noopener noreferrer">
-                {t("maps")}
-              </ButtonLink>
-            )}
-          </div>
-        )}
-      </Container>
-    </header>
-  );
-
-  const footer = (
-    <footer className="border-t border-line">
-      <Container className="flex flex-col gap-2 py-5 text-small text-muted md:flex-row md:justify-between">
-        <span>{dealer.legalName}</span>
-        <a
-          href={model.privacy.href}
-          className="text-ink-2 underline underline-offset-4"
-          {...(model.privacy.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-        >
-          {t("privacy")}
-        </a>
-      </Container>
-    </footer>
-  );
+  const basePath = h.get("x-drivebook-base-path") ?? "";
+  const bookHref = (carId: string) => `${basePath}/termin/${carId}`;
 
   return (
-    <div style={brandStyle(dealer.primaryColor)}>
-      <Shell header={header} footer={footer}>
+    <DealerSiteShell dealer={dealer} basePath={basePath}>
         <Container className="py-8">
           <Grid cols={12} from="lg" gap="lg">
             <section className="lg:col-span-8" aria-labelledby={model.suspended ? "suspended" : "cars"}>
@@ -156,7 +90,18 @@ export default async function DealerPage({ params, searchParams }: Props) {
                   ) : (
                     <Grid cols={2} from="sm">
                       {model.cars.map(({ car, selected }, i) => (
-                        <CarCard key={car.id} car={car} selected={selected} priority={i === 0} labels={carLabels} />
+                        <CarCard
+                          key={car.id}
+                          car={car}
+                          selected={selected}
+                          priority={i === 0}
+                          labels={carLabels}
+                          actions={
+                            <ButtonLink href={bookHref(car.id)} variant={selected ? "brand" : "secondary"} data-testid={`book-${car.id}`}>
+                              {t("bookCar")}
+                            </ButtonLink>
+                          }
+                        />
                       ))}
                     </Grid>
                   )}
@@ -168,7 +113,7 @@ export default async function DealerPage({ params, searchParams }: Props) {
               {!model.suspended && (
                 <Card>
                   <CardHeader title={t("bookingTitle")} />
-                  <Text size="small">{t("bookingSoon")}</Text>
+                  <Text size="small">{t("bookingHowTo")}</Text>
                 </Card>
               )}
               <Card>
@@ -193,7 +138,6 @@ export default async function DealerPage({ params, searchParams }: Props) {
             </aside>
           </Grid>
         </Container>
-      </Shell>
-    </div>
+    </DealerSiteShell>
   );
 }

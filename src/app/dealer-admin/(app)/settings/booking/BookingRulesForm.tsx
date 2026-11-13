@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Button, Eyebrow, Input, Select, Stack, Text } from "@/components/ui";
+import { Button, Eyebrow, Input, Select, Stack, Switch, Text } from "@/components/ui";
 import type { BookingRuleError } from "@/server/data/settings-booking";
 import type { BookingRulesFormState } from "./actions";
 import type { BookingFormField, BookingFormValues } from "./fields";
@@ -9,9 +9,10 @@ import type { BookingFormField, BookingFormValues } from "./fields";
 export type BookingFieldLabels = { label: string; hint: string; errors: Record<BookingRuleError, string> };
 
 export type BookingRulesFormLabels = {
-  groups: { durations: string; capacity: string; timing: string };
+  groups: { durations: string; schedule: string; timing: string };
   fields: Record<BookingFormField, BookingFieldLabels>;
   slotOptions: { value: number; label: string }[];
+  verification: { legend: string; label: string; hint: string };
   submit: string;
   reset: string;
   resetHint: string;
@@ -21,7 +22,7 @@ export type BookingRulesFormLabels = {
 
 const groups: { key: keyof BookingRulesFormLabels["groups"]; fields: BookingFormField[] }[] = [
   { key: "durations", fields: ["testDriveMinutes", "viewingMinutes", "otherMinutes"] },
-  { key: "capacity", fields: ["capacity", "bufferMinutes", "slotIntervalMinutes"] },
+  { key: "schedule", fields: ["bufferMinutes", "slotIntervalMinutes"] },
   { key: "timing", fields: ["minNoticeHours", "horizonDays", "cancelCutoffHours"] },
 ];
 
@@ -104,6 +105,20 @@ export function BookingRulesForm({
             <div className="grid gap-6 md:grid-cols-3">{group.fields.map(renderField)}</div>
           </fieldset>
         ))}
+        <fieldset>
+          <Eyebrow as="legend" className="mb-4">
+            {labels.verification.legend}
+          </Eyebrow>
+          <div className="max-w-2xl">
+            <Switch
+              label={labels.verification.label}
+              hint={labels.verification.hint}
+              name="requirePhoneVerification"
+              defaultChecked={values.requirePhoneVerification !== "false"}
+              data-testid="booking-require-phone-verification"
+            />
+          </div>
+        </fieldset>
         {shown.error ? (
           <Text size="small" tone="danger" role="alert" data-testid="booking-error" data-state={shown.error}>
             {labels.errors[shown.error]}

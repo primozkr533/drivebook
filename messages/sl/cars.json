@@ -60,7 +60,13 @@
     "keepImage": "Obdrži sliko",
     "imageRemoved": "Slika bo odstranjena ob shranjevanju.",
     "save": "Shrani",
-    "saving": "Shranjujem …"
+    "saving": "Shranjujem …",
+    "mileage": "Prevoženi kilometri",
+    "mileageSuffix": "km",
+    "optional": "neobvezno",
+    "notes": "Opombe za stranke",
+    "notesPlaceholder": "npr. Vozilo je na lokaciji Ljubljana, s seboj prinesite vozniško dovoljenje.",
+    "notesHint": "Prikažejo se na javni strani pri vozilu."
   },
   "autofill": {
     "filled": "{count, plural, one {Izpolnjeno # polje.} two {Izpolnjeni # polji.} few {Izpolnjena # polja.} other {Izpolnjenih # polj.}} Preverite podatke in shranite.",
@@ -90,5 +96,6 @@
     "readOnly": "Račun trgovca je omejen, spremembe niso mogoče.",
     "limit": "Dosegli ste največje število aktivnih vozil v vašem paketu. Deaktivirajte vozilo ali nadgradite paket.",
     "failed": "Shranjevanje ni uspelo. Poskusite znova."
-  }
+  },
+  "km": "km"
 }

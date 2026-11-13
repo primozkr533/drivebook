@@ -28,5 +28,21 @@
     "button": "Ponastavi geslo",
     "expiry": "Povezava velja {validMinutes} minut in jo lahko uporabite samo enkrat.",
     "ignore": "Če ponastavitve niste zahtevali, lahko to sporočilo prezrete. Vaše geslo ostane nespremenjeno."
+  },
+  "booking": {
+    "kind": {
+      "test_drive": "Testna vožnja",
+      "viewing": "Ogled vozila"
+    },
+    "smsCustomerCreated": "{dealerName}: {kind} {car} je potrjena za {date} ob {time}. Koda: {code}. Podrobnosti: {link}",
+    "smsCustomerCancelled": "{dealerName}: {kind} {car} {date} ob {time} (koda {code}) je odpovedana. Za nov termin nas kontaktirajte.",
+    "smsDealerCreated": "Nova rezervacija: {kind} {car}, {date} ob {time}. {name}, {phone}. Koda {code}.",
+    "dealerSubject": "Nova rezervacija: {car}, {date} ob {time}",
+    "dealerHeading": "Nova rezervacija termina",
+    "dealerWhat": "{kind}: {car}, {date} ob {time} (koda {code}).",
+    "dealerCustomer": "Stranka: {name}, telefon {phone}, e-pošta {email}.",
+    "dealerNote": "Opomba stranke: {note}",
+    "dealerButton": "Odpri rezervacije",
+    "smsVerifyCode": "{dealerName}: vaša koda za potrditev rezervacije je {code}. Velja {minutes} minut."
   }
 }
