@@ -15,21 +15,22 @@
     "db:seed": "tsx src/db/seed-cli.ts",
     "worker": "tsx src/worker.ts",
     "create-superadmin": "tsx src/server/auth/create-superadmin-cli.ts",
-    "user-admin": "tsx src/server/auth/user-admin-cli.ts"
+    "user-admin": "tsx src/server/auth/user-admin-cli.ts",
+    "build:cli": "esbuild src/worker.ts src/db/migrate-cli.ts src/db/seed-cli.ts src/server/auth/create-superadmin-cli.ts src/server/auth/user-admin-cli.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outdir=dist --entry-names=[name] --out-extension:.js=.cjs --log-level=warning"
   },
   "dependencies": {
-    "@fontsource-variable/archivo": "^5.2.0",
-    "@fontsource-variable/jetbrains-mono": "^5.2.0",
     "@node-rs/argon2": "^2.2.2",
     "drizzle-orm": "^0.45.4",
     "next": "^16.0.0",
     "next-intl": "^4.14.9",
+    "node-html-parser": "^9.0.5",
     "otplib": "^13.5.0",
     "pg": "^8.23.1",
     "pg-boss": "^12.38.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
@@ -41,6 +42,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitest/coverage-v8": "^5.0.5",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.0",

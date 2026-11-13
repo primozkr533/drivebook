@@ -49,24 +49,21 @@ async function signIn(page: Page, user: E2eUser) {
 
 test("a salesperson adds a car, a customer books and confirms it with the SMS code, the slot is taken and can be cancelled", async ({ page, browser }) => {
   await signIn(page, salesperson);
-  await page.goto(app("cars"));
-  await page.getByTestId("car-url").fill(LISTING);
+  await page.goto(app("cars", "new"));
+  await page.getByTestId("car-avtonet-url").fill(LISTING);
+  await page.getByTestId("car-make").fill("Audi");
+  await page.getByTestId("car-model").fill("A4 Avant");
+  await page.getByTestId("car-year").fill("2019");
+  await page.getByTestId("car-price").fill("21.500");
+  await page.getByTestId("car-mileage").fill("120.000");
   await page.getByTestId("car-notes").fill("Vozilo je na lokaciji Ljubljana.");
-  await page.getByTestId("car-submit").click();
-  // avto.net usually refuses server-side reads; then the dealer enters the details by hand.
-  await expect(page.getByTestId("car-manual").or(page.getByTestId("car-added"))).toBeVisible();
-  if (await page.getByTestId("car-manual").isVisible()) {
-    await page.getByTestId("car-make").fill("Audi");
-    await page.getByTestId("car-model").fill("A4 Avant");
-    await page.getByTestId("car-year").fill("2019");
-    await page.getByTestId("car-mileage").fill("120000");
-    await page.getByTestId("car-submit").click();
-  }
-  await expect(page.getByTestId("car-added")).toBeVisible();
+  await page.getByTestId("car-save").click();
+  await expect(page).toHaveURL(/\/cars(\?|$)/);
 
   const customer = await browser.newPage();
   await customer.goto(site(dealer.slug));
   await expect(customer.getByText("Vozilo je na lokaciji Ljubljana.")).toBeVisible();
+  await expect(customer.getByTestId("car-mileage").first()).toHaveText("120.000 km");
   await customer.locator('[data-testid^="book-"]').first().click();
   const firstSlot = customer.locator('[data-testid^="slot-"]').first();
   const label = (await firstSlot.textContent())!.trim();

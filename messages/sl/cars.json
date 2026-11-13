@@ -1,54 +1,101 @@
 {
-  "nav": "Vozila",
-  "title": "Vozila za testne vožnje",
-  "description": "Prilepite povezavo do oglasa na avto.net. Vozilo se prikaže na vaši javni strani in stranke lahko zanj rezervirajo termin. Vsako vozilo ima svoj koledar.",
-  "add": {
-    "title": "Dodaj vozilo",
-    "fields": {
-      "avtoNetUrl": "Povezava do oglasa na avto.net",
-      "notes": "Opombe za stranke",
-      "make": "Znamka",
-      "model": "Model",
-      "year": "Letnik",
-      "mileageKm": "Prevoženi kilometri",
-      "priceEur": "Cena (€)"
-    },
-    "urlPlaceholder": "https://www.avto.net/Ads/details.asp?id=…",
-    "notesPlaceholder": "npr. Vozilo je na lokaciji Ljubljana, s seboj prinesite vozniško dovoljenje.",
-    "optional": "neobvezno",
-    "submit": "Dodaj vozilo",
-    "added": "Vozilo je dodano in objavljeno na javni strani.",
-    "addedManual": "Vozilo je dodano s podatki, ki ste jih vnesli.",
-    "manualTitle": "Podatkov iz oglasa ni bilo mogoče prebrati",
-    "manualBody": "avto.net včasih ne dovoli samodejnega branja oglasov. Vpišite podatke o vozilu ročno, nato znova kliknite »Dodaj vozilo«."
+  "nav": "Avtomobili",
+  "title": "Avtomobili",
+  "description": "Vozila, ki jih stranke lahko rezervirajo za testno vožnjo ali ogled.",
+  "add": "Dodaj avto",
+  "filterLabel": "Prikaz vozil",
+  "filters": {
+    "active": "Aktivna",
+    "inactive": "Neaktivna",
+    "all": "Vsa"
   },
-  "list": {
-    "title": "Vaša vozila",
-    "empty": "Še niste dodali nobenega vozila. Dodajte prvo vozilo z obrazcem zgoraj.",
-    "visible": "Objavljeno",
-    "hidden": "Skrito",
-    "upcoming": "{count, plural, =0 {Ni prihodnjih rezervacij} one {# prihodnja rezervacija} two {# prihodnji rezervaciji} few {# prihodnje rezervacije} other {# prihodnjih rezervacij}}",
-    "showOnPage": "Prikaži na javni strani",
-    "showOnPageHint": "Skrito vozilo ni vidno strankam in zanj ni mogoče rezervirati termina.",
-    "edit": "Uredi podatke",
+  "count": "{count, plural, one {# vozilo} two {# vozili} few {# vozila} other {# vozil}}",
+  "empty": {
+    "active": "Ni aktivnih vozil. Dodajte prvo vozilo in delite njegovo povezavo.",
+    "inactive": "Ni neaktivnih vozil.",
+    "all": "Še niste dodali nobenega vozila."
+  },
+  "status": {
+    "active": "Aktivno",
+    "inactive": "Neaktivno"
+  },
+  "listTitle": "Seznam vozil",
+  "year": "Letnik",
+  "price": "Cena",
+  "deepLink": "Povezava za oglas",
+  "listing": "Oglas na avto.net",
+  "copy": "Kopiraj",
+  "copied": "Kopirano",
+  "edit": "Uredi",
+  "deactivate": "Deaktiviraj",
+  "reactivate": "Ponovno aktiviraj",
+  "back": "Nazaj na seznam",
+  "new": {
+    "title": "Nov avto",
+    "description": "Prilepite povezavo do oglasa na avto.net za samodejno izpolnjevanje ali podatke vnesite ročno."
+  },
+  "editPage": {
+    "title": "Uredi avto",
+    "description": "Spremembe so na javni strani vidne takoj po shranjevanju."
+  },
+  "form": {
+    "details": "Podatki o vozilu",
+    "image": "Slika",
+    "avtonetUrl": "Povezava do oglasa na avto.net",
+    "avtonetHint": "Samodejno izpolnjevanje dopolni le prazna polja.",
+    "autofill": "Samodejno izpolni",
+    "autofilling": "Pridobivam …",
+    "make": "Znamka",
+    "model": "Model",
+    "year": "Letnik",
+    "price": "Cena (EUR)",
+    "priceSuffix": "€",
+    "imageFile": "Naloži sliko",
+    "imageFileHint": "JPEG, PNG ali WebP. Sliko pomanjšamo in stisnemo.",
+    "imageUrl": "ali povezava do slike",
+    "imageUrlHint": "Sliko prenesemo in shranimo pri sebi.",
+    "preview": "Predogled slike",
+    "noImage": "Brez slike",
+    "removeImage": "Odstrani sliko",
+    "keepImage": "Obdrži sliko",
+    "imageRemoved": "Slika bo odstranjena ob shranjevanju.",
     "save": "Shrani",
-    "saved": "Shranjeno.",
-    "cancel": "Prekliči",
-    "delete": "Izbriši",
-    "deleteLabel": "Izbriši vozilo {car}",
-    "bookings": "Rezervacije",
-    "listing": "Oglas na avto.net",
-    "km": "km"
+    "saving": "Shranjujem …",
+    "mileage": "Prevoženi kilometri",
+    "mileageSuffix": "km",
+    "optional": "neobvezno",
+    "notes": "Opombe za stranke",
+    "notesPlaceholder": "npr. Vozilo je na lokaciji Ljubljana, s seboj prinesite vozniško dovoljenje.",
+    "notesHint": "Prikažejo se na javni strani pri vozilu."
+  },
+  "autofill": {
+    "filled": "{count, plural, one {Izpolnjeno # polje.} two {Izpolnjeni # polji.} few {Izpolnjena # polja.} other {Izpolnjenih # polj.}} Preverite podatke in shranite.",
+    "nothing": "Oglas ne vsebuje podatkov za prazna polja.",
+    "reasons": {
+      "invalid_url": "Povezava ni veljaven oglas na avto.net. Podatke vnesite ročno.",
+      "blocked": "Avto.net je zavrnil zahtevo. Podatke vnesite ročno.",
+      "timeout": "Avto.net se ni odzval pravočasno. Poskusite znova ali podatke vnesite ročno.",
+      "http_error": "Oglasa ni bilo mogoče naložiti. Podatke vnesite ročno.",
+      "parse_failed": "Iz oglasa ni bilo mogoče prebrati podatkov. Podatke vnesite ročno."
+    }
+  },
+  "notices": {
+    "imageNotFetched": "Vozilo je shranjeno brez slike, ker fotografije s povezave ni bilo mogoče prenesti. Sliko lahko dodate pozneje."
   },
   "errors": {
     "required": "To polje je obvezno.",
-    "invalid": "Vrednost ni veljavna.",
-    "invalidUrl": "Vnesite povezavo do oglasa na avto.net (…/Ads/details.asp?id=…).",
-    "too_long": "Besedilo je predolgo.",
-    "out_of_range": "Vrednost je izven dovoljenega razpona.",
-    "taken": "To vozilo je že dodano.",
-    "hasBookings": "Vozilo ima rezervacije, zato ga ni mogoče izbrisati. Lahko ga skrijete.",
+    "too_long": "Vnos je predolg.",
+    "out_of_range": "Vrednost je izven dovoljenega obsega.",
+    "invalid": "Vnos ni veljaven.",
+    "taken": "Ta oglas je že dodan pri drugem vozilu.",
+    "too_large": "Slika je prevelika.",
+    "unsupported_type": "Vrsta slike ni podprta.",
+    "download_failed": "Slike ni bilo mogoče prenesti.",
+    "blocked_host": "S tega naslova slik ne prenašamo.",
     "forbidden": "Za to dejanje nimate pravic.",
-    "readOnly": "Račun avtohiše je v načinu samo za branje, zato sprememb ni mogoče shraniti."
-  }
+    "readOnly": "Račun trgovca je omejen, spremembe niso mogoče.",
+    "limit": "Dosegli ste največje število aktivnih vozil v vašem paketu. Deaktivirajte vozilo ali nadgradite paket.",
+    "failed": "Shranjevanje ni uspelo. Poskusite znova."
+  },
+  "km": "km"
 }

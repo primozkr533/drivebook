@@ -1,5 +1,5 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
-import { and, asc, count, eq, gt, gte, inArray, lt, ne, or } from "drizzle-orm";
+import { and, asc, count, eq, gt, gte, lt, ne, or } from "drizzle-orm";
 import { bookingRules, bookings, cars, dealers } from "@/db/schema";
 import { dealerSiteOrigin, surfaceOrigin } from "@/lib/config";
 import { addDays, formatDateShort, formatTime, ljubljanaNow, toLjubljanaParts, zonedToUtc } from "@/lib/date";
@@ -441,26 +441,6 @@ export async function cancelBooking(ctx: DealerContext, bookingId: string): Prom
   );
   if (result.ok) await notifyBookingCancelled(ctx, bookingId);
   return result;
-}
-
-/** Number of upcoming confirmed bookings per car (admin car list). */
-export async function countUpcomingBookingsByCar(ctx: DealerContext, carIds: string[], now: Date = new Date()): Promise<Map<string, number>> {
-  await requireDealerRole(ctx, [...BOOKING_ROLES]);
-  if (carIds.length === 0) return new Map();
-  const rows = await db()
-    .select({ carId: bookings.carId })
-    .from(bookings)
-    .where(
-      and(
-        eq(bookings.dealerId, ctx.dealerId),
-        inArray(bookings.carId, carIds),
-        eq(bookings.status, "confirmed"),
-        gte(bookings.startsAt, now),
-      ),
-    );
-  const map = new Map<string, number>();
-  for (const r of rows) map.set(r.carId, (map.get(r.carId) ?? 0) + 1);
-  return map;
 }
 
 // ---- Public: SMS code verification ----

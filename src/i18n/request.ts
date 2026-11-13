@@ -25,7 +25,7 @@ export const locale = "sl";
 export const timeZone = "Europe/Ljubljana";
 
 export const messages = { common, dealerPage, auth, privacy, errors, dev, email, account, inbox, backoffice, holidays,
-  settings, settingsDealer, settingsBranding, settingsBooking, settingsHours, settingsClosures, dealerUsers,
-  cars, bookings, booking };
+  settings, settingsDealer, settingsBranding, settingsBooking, settingsHours, settingsClosures, dealerUsers, cars,
+  bookings, booking };
 
 export default getRequestConfig(async () => ({ locale, timeZone, messages }));

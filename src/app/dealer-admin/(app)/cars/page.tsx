@@ -1,168 +1,128 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { Badge, ButtonLink, Card, CardHeader, Container, Grid, PageHeader, Stack, Text } from "@/components/ui";
-import { CarSilhouette } from "@/components/signature";
+import { CarCard } from "@/components/signature";
+import { Button, ButtonLink, Card, Container, Grid, PageHeader, Pill, Stack, Text } from "@/components/ui";
+import { carDeepLink } from "@/lib/car-link";
 import { getSurfaceBasePath, requireDealerUser } from "@/server/auth/permissions";
-import { countUpcomingBookingsByCar } from "@/server/data/bookings";
-import { listCarsForAdmin, type AdminCar, type CarField } from "@/server/data/cars";
-import { addCarAction, deleteCarAction, setCarActiveAction, updateCarAction, type CarFormValues } from "./actions";
-import { AddCarForm, CarActiveSwitch, DeleteCarButton, EditCarForm, type CarFormLabels } from "./CarForms";
+import { listCarsForAdmin } from "@/server/data/cars";
+import { setCarActiveAction } from "./actions";
+import { CAR_STATUS_FILTERS, parseCarStatusFilter } from "./form-model";
+import { carsListHref, isCarListWarning, parseCarListNotice } from "./notice";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await getTranslations("cars"))("nav") };
+  return { title: (await getTranslations("cars"))("title") };
 }
 
-const int = new Intl.NumberFormat("sl-SI", { maximumFractionDigits: 0 });
-const eur = new Intl.NumberFormat("sl-SI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
-function formValues(car: AdminCar): CarFormValues {
-  return {
-    avtoNetUrl: car.avtoNetUrl,
-    notes: car.notes ?? "",
-    make: car.make,
-    model: car.model,
-    year: car.year?.toString() ?? "",
-    mileageKm: car.mileageKm?.toString() ?? "",
-    priceEur: car.priceEur?.toString() ?? "",
-  };
-}
-
-export default async function CarsPage() {
+export default async function CarsPage({ searchParams }: Props) {
   const { ctx } = await requireDealerUser();
-  const [t, basePath, cars] = await Promise.all([getTranslations("cars"), getSurfaceBasePath(), listCarsForAdmin(ctx)]);
-  const upcoming = await countUpcomingBookingsByCar(
-    ctx,
-    cars.map((c) => c.id),
-  );
-
-  const actionErrors = { forbidden: t("errors.forbidden"), readOnly: t("errors.readOnly"), hasBookings: t("errors.hasBookings") };
-  const common = {
-    required: t("errors.required"),
-    invalid: t("errors.invalid"),
-    too_long: t("errors.too_long"),
-    out_of_range: t("errors.out_of_range"),
-    taken: t("errors.taken"),
+  const [query, basePath, t] = await Promise.all([searchParams, getSurfaceBasePath(), getTranslations("cars")]);
+  const status = parseCarStatusFilter(query?.status);
+  const notice = parseCarListNotice(query?.notice);
+  const cars = await listCarsForAdmin(ctx, { status });
+  const listHref = `${basePath}/cars`;
+  const addHref = `${listHref}/new`;
+  const labels = {
+    listing: t("listing"),
+    active: t("status.active"),
+    inactive: t("status.inactive"),
+    deepLink: t("deepLink"),
+    copy: t("copy"),
+    copied: t("copied"),
+    km: t("km"),
   };
-  const fields: CarField[] = ["avtoNetUrl", "notes", "make", "model", "year", "mileageKm", "priceEur"];
-  const labels: CarFormLabels = {
-    fields: Object.fromEntries(fields.map((f) => [f, t(`add.fields.${f}`)])) as Record<CarField, string>,
-    optional: t("add.optional"),
-    urlPlaceholder: t("add.urlPlaceholder"),
-    notesPlaceholder: t("add.notesPlaceholder"),
-    submit: t("add.submit"),
-    added: t("add.added"),
-    addedManual: t("add.addedManual"),
-    manualTitle: t("add.manualTitle"),
-    manualBody: t("add.manualBody"),
-    save: t("list.save"),
-    saved: t("list.saved"),
-    fieldErrors: {
-      ...(Object.fromEntries(fields.map((f) => [f, common])) as CarFormLabels["fieldErrors"]),
-      avtoNetUrl: { ...common, invalid: t("errors.invalidUrl") },
-    },
-    errors: actionErrors,
-  };
-
-  const meta = (car: AdminCar) =>
-    [car.year?.toString(), car.mileageKm !== undefined ? `${int.format(car.mileageKm)} ${t("list.km")}` : null, car.priceEur !== undefined ? eur.format(car.priceEur) : null]
-      .filter(Boolean)
-      .join(" · ");
 
   return (
     <Container className="py-10 md:py-16">
       <Stack gap={8}>
-        <PageHeader title={t("title")} description={t("description")} />
-        <Card data-testid="cars-add">
-          <CardHeader title={t("add.title")} />
-          <AddCarForm action={addCarAction} labels={labels} />
-        </Card>
-
-        <Stack gap={4}>
-          <h2 className="text-h2 font-[700] text-ink">{t("list.title")}</h2>
-          {cars.length === 0 ? (
-            <Card tone="sunken">
-              <Text data-testid="cars-empty">{t("list.empty")}</Text>
-            </Card>
-          ) : (
-            <ul className="flex flex-col gap-4" data-testid="cars-list">
-              {cars.map((car) => {
-                const label = `${car.make} ${car.model}`;
-                return (
-                  <li key={car.id} data-testid={`car-${car.id}`}>
-                    <Card>
-                      <Grid cols={12} from="lg" gap="md">
-                        <div className="flex gap-4 lg:col-span-7">
-                          <div className="hidden aspect-[16/10] w-36 shrink-0 overflow-hidden bg-surface-2 sm:block">
-                            {car.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={car.imageUrl} alt="" className="size-full object-cover" loading="lazy" />
-                            ) : (
-                              <div className="grid size-full place-items-center p-3">
-                                <CarSilhouette body={car.body} className="w-full" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-h3 font-[700] text-ink">{label}</span>
-                              <Badge tone={car.active ? "ok" : "neutral"}>{car.active ? t("list.visible") : t("list.hidden")}</Badge>
-                            </div>
-                            {meta(car) && <span className="type-utility tabular text-ink-2">{meta(car)}</span>}
-                            {car.notes && <Text size="small" className="whitespace-pre-line">{car.notes}</Text>}
-                            <div className="flex flex-wrap gap-x-5 gap-y-1">
-                              <a
-                                href={car.avtoNetUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-small font-[600] text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
-                              >
-                                {t("list.listing")}
-                              </a>
-                              <a
-                                href={`${basePath}/bookings?car=${car.id}`}
-                                className="text-small font-[600] text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
-                              >
-                                {t("list.bookings")}: {t("list.upcoming", { count: upcoming.get(car.id) ?? 0 })}
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-4 lg:col-span-5">
-                          <CarActiveSwitch
-                            action={setCarActiveAction}
-                            id={car.id}
-                            active={car.active !== false}
-                            labels={{ label: t("list.showOnPage"), hint: t("list.showOnPageHint"), errors: actionErrors }}
-                          />
-                          {car.bookingCount === 0 && (
-                            <DeleteCarButton
-                              action={deleteCarAction}
-                              id={car.id}
-                              labels={{ submit: t("list.delete"), ariaLabel: t("list.deleteLabel", { car: label }), errors: actionErrors }}
-                            />
-                          )}
-                        </div>
-                      </Grid>
-                      <details className="mt-5 border-t border-dashed border-line pt-4">
-                        <summary className="cursor-pointer text-small font-[650] text-ink" data-testid={`car-edit-${car.id}`}>
-                          {t("list.edit")}
-                        </summary>
-                        <div className="pt-5">
-                          <EditCarForm action={updateCarAction} id={car.id} initial={formValues(car)} labels={labels} />
-                        </div>
-                      </details>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Stack>
-        <div>
-          <ButtonLink href={`${basePath}/bookings`} variant="secondary">
-            {t("list.bookings")}
-          </ButtonLink>
+        <PageHeader
+          title={t("title")}
+          description={t("description")}
+          actions={
+            cars.length > 0 ? (
+              <ButtonLink variant="primary" href={addHref} data-testid="car-add">
+                {t("add")}
+              </ButtonLink>
+            ) : undefined
+          }
+        />
+        {notice && (
+          <Card tone="sunken" data-testid="cars-notice" data-state={notice}>
+            {isCarListWarning(notice) ? (
+              <Text tone="warn" role="status">
+                {t(`notices.${notice}`)}
+              </Text>
+            ) : (
+              <Text tone="danger" role="alert">
+                {t(`errors.${notice}`)}
+              </Text>
+            )}
+          </Card>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label={t("filterLabel")} className="flex flex-wrap gap-2" data-testid="cars-filter">
+            {CAR_STATUS_FILTERS.map((s) => (
+              <a
+                key={s}
+                href={carsListHref(listHref, s)}
+                aria-current={s === status ? "page" : undefined}
+                className="rounded-pill"
+                data-testid={`cars-filter-${s}`}
+              >
+                <Pill active={s === status}>{t(`filters.${s}`)}</Pill>
+              </a>
+            ))}
+          </nav>
+          <Text size="small" tone="muted" data-testid="cars-count">
+            {t("count", { count: cars.length })}
+          </Text>
         </div>
+        {cars.length === 0 ? (
+          <Card tone="sunken" data-testid="cars-empty">
+            <Stack gap={4} className="items-start">
+              <Text>{t(`empty.${status}`)}</Text>
+              <ButtonLink variant="primary" href={addHref} data-testid="car-add">
+                {t("add")}
+              </ButtonLink>
+            </Stack>
+          </Card>
+        ) : (
+          <section aria-label={t("listTitle")} data-testid="cars-list">
+            <Grid cols={2} from="md" className="xl:grid-cols-3">
+              {cars.map((car) => (
+                <div key={car.id} className="min-w-0" data-testid="car-row" data-car-id={car.id} data-active={car.active}>
+                  <CarCard
+                    car={car}
+                    showStatus
+                    deepLink={carDeepLink(ctx.slug, car.id)}
+                    labels={labels}
+                    actions={
+                      <>
+                        <ButtonLink variant="secondary" size="sm" href={`${listHref}/${car.id}`} data-testid="car-edit">
+                          {t("edit")}
+                        </ButtonLink>
+                        <form action={setCarActiveAction}>
+                          <input type="hidden" name="id" value={car.id} />
+                          <input type="hidden" name="filter" value={status} />
+                          <input type="hidden" name="active" value={car.active ? "0" : "1"} />
+                          <Button
+                            type="submit"
+                            variant={car.active ? "danger" : "secondary"}
+                            size="sm"
+                            data-testid={car.active ? "car-deactivate" : "car-reactivate"}
+                          >
+                            {t(car.active ? "deactivate" : "reactivate")}
+                          </Button>
+                        </form>
+                      </>
+                    }
+                  />
+                </div>
+              ))}
+            </Grid>
+          </section>
+        )}
       </Stack>
     </Container>
   );

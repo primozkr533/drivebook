@@ -5,8 +5,8 @@ import { messages } from "./i18n";
 
 const dir = join(process.cwd(), "messages/sl");
 const namespaces = ["common", "dealerPage", "auth", "privacy", "errors", "dev", "email", "account", "inbox", "backoffice", "holidays",
-  "settings", "settingsDealer", "settingsBranding", "settingsBooking", "settingsHours", "settingsClosures", "dealerUsers",
-  "cars", "bookings", "booking"];
+  "settings", "settingsDealer", "settingsBranding", "settingsBooking", "settingsHours", "settingsClosures", "dealerUsers", "cars",
+  "bookings", "booking"];
 
 describe("sl messages", () => {
   it("has exactly the expected namespace files", () => {
@@ -29,5 +29,6 @@ describe("sl messages", () => {
     expect(messages.holidays.christmas).toBe("božič");
     expect(messages.settings.nav).toBe("Nastavitve");
     expect(messages.settings.usersNav).toBe("Uporabniki");
+    expect(messages.cars.nav).toBe("Avtomobili");
   });
 });

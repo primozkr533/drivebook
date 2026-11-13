@@ -1,92 +1,176 @@
 "use server";
 
-import { refresh } from "next/cache";
-import { notFound } from "next/navigation";
-import { DealerReadOnlyError, ForbiddenError, requireDealerUser } from "@/server/auth/permissions";
-import { addCar, deleteCar, setCarActive, updateCar, type CarError, type CarField, type CarInput } from "@/server/data/cars";
+import { revalidatePath } from "next/cache";
+import { notFound, redirect } from "next/navigation";
+import {
+  DealerReadOnlyError,
+  ForbiddenError,
+  getSurfaceBasePath,
+  requireDealerUser,
+} from "@/server/auth/permissions";
+import { fetchAvtonetListing, type AvtonetFailure } from "@/server/cars/avtonet";
+import {
+  CarLimitError,
+  CarNotFoundError,
+  createCar,
+  setCarActive,
+  updateCar,
+  type CarFieldError,
+  type CarImageInput,
+  type CarSaveNotice,
+} from "@/server/data/cars";
+import { parseCarStatusFilter } from "./form-model";
+import { carsListHref, type CarListNotice } from "./notice";
 
-export type CarsActionError = "forbidden" | "readOnly" | "hasBookings";
+const CARS_LIST_PATH = "/dealer-admin/cars";
 
-export type CarFormValues = Record<CarField, string>;
-export type AddCarState = {
-  values?: CarFormValues;
-  errors?: Partial<Record<CarField, CarError>>;
-  error?: CarsActionError;
-  needsDetails?: boolean;
-  added?: { id: string; fromListing: boolean };
+export type CarFormField = "make" | "model" | "year" | "price" | "mileage" | "notes" | "avtonetUrl" | "imageFile" | "imageUrl";
+
+export type CarFormValues = {
+  id: string;
+  make: string;
+  model: string;
+  year: string;
+  price: string;
+  mileage: string;
+  notes: string;
+  avtonetUrl: string;
+  imageUrl: string;
+  removeImage: string;
 };
-export type UpdateCarState = { values?: CarFormValues; errors?: Partial<Record<CarField, CarError>>; error?: CarsActionError; savedAt?: number };
-export type CarToggleState = { active: boolean; error?: CarsActionError };
-export type DeleteCarState = { error?: CarsActionError };
 
-const FIELDS: CarField[] = ["avtoNetUrl", "notes", "make", "model", "year", "mileageKm", "priceEur"];
+export type SaveCarState =
+  | { ok: true; id: string; notice?: CarSaveNotice }
+  | {
+      ok: false;
+      fieldErrors: Partial<Record<CarFormField, CarFieldError>>;
+      error?: "forbidden" | "readOnly" | "limit";
+      values?: CarFormValues;
+    };
+
+export type AutofillResult =
+  | { ok: true; fields: { make?: string; model?: string; year?: number; price?: number; imageUrl?: string } }
+  | { ok: false; reason: AvtonetFailure };
 
 const text = (form: FormData, name: string) => {
   const value = form.get(name);
   return typeof value === "string" ? value : "";
 };
 
-function values(form: FormData): CarFormValues {
-  return Object.fromEntries(FIELDS.map((f) => [f, text(form, f)])) as CarFormValues;
+function parseInteger(raw: string): number | "required" {
+  const value = raw.trim().replace(/\s/g, "");
+  return value ? Number(value) : "required";
 }
 
-function refused(err: unknown): CarsActionError {
-  if (err instanceof ForbiddenError) return "forbidden";
-  if (err instanceof DealerReadOnlyError) return "readOnly";
-  throw err;
+// Slovenian prices use "." (or ",") as the thousands separator: "12.500 €" is 12500, not 12.5.
+function parsePrice(raw: string): number | "required" {
+  const value = raw.replace(/\s/g, "").replace(/^€|€$/g, "");
+  if (!value) return "required";
+  return Number(/^\d{1,3}([.,]\d{3})+$/.test(value) ? value.replace(/[.,]/g, "") : value);
 }
 
-export async function addCarAction(_prev: AddCarState, form: FormData): Promise<AddCarState> {
+async function imageFrom(form: FormData, values: CarFormValues): Promise<CarImageInput> {
+  const file = form.get("imageFile");
+  if (file instanceof File && file.size > 0) return { kind: "upload", bytes: new Uint8Array(await file.arrayBuffer()) };
+  if (values.imageUrl.trim()) return { kind: "url", url: values.imageUrl.trim() };
+  return { kind: values.removeImage === "1" ? "remove" : "keep" };
+}
+
+function revalidateCars(slug: string) {
+  revalidatePath(CARS_LIST_PATH);
+  revalidatePath(`/site/${slug}`);
+}
+
+export async function saveCarAction(_prev: SaveCarState | null, form: FormData): Promise<SaveCarState> {
   const { ctx } = await requireDealerUser();
-  const input: CarInput = values(form);
+  const values: CarFormValues = {
+    id: text(form, "id").trim(),
+    make: text(form, "make"),
+    model: text(form, "model"),
+    year: text(form, "year"),
+    price: text(form, "price"),
+    mileage: text(form, "mileage"),
+    notes: text(form, "notes"),
+    avtonetUrl: text(form, "avtonetUrl"),
+    imageUrl: text(form, "imageUrl"),
+    removeImage: text(form, "removeImage"),
+  };
+
+  const year = parseInteger(values.year);
+  const price = parsePrice(values.price);
+  // Mileage is optional and uses the same thousands separators as prices ("87.400 km").
+  const mileage = parsePrice(values.mileage.replace(/km$/i, "").trim());
+  const image = await imageFrom(form, values);
+  const fieldErrors: Partial<Record<CarFormField, CarFieldError>> = {};
+  if (year === "required") fieldErrors.year = "required";
+  if (price === "required") fieldErrors.price = "required";
+  if (!values.make.trim()) fieldErrors.make = "required";
+  if (!values.model.trim()) fieldErrors.model = "required";
+  if (Object.keys(fieldErrors).length > 0) return { ok: false, fieldErrors, values };
+
+  const input = {
+    make: values.make,
+    model: values.model,
+    year: year as number,
+    priceEur: price as number,
+    mileageKm: mileage === "required" ? null : mileage,
+    notes: values.notes,
+    avtonetUrl: values.avtonetUrl,
+    image,
+  };
+
   try {
-    const result = await addCar(ctx, input);
-    if (!result.ok) return { values: values(form), errors: result.errors, needsDetails: result.needsDetails };
-    refresh();
-    return { added: { id: result.car.id, fromListing: result.fromListing } };
+    const result = values.id ? await updateCar(ctx, values.id, input) : await createCar(ctx, input);
+    if (!result.ok) {
+      const { priceEur, mileageKm, image: imageError, ...rest } = result.errors;
+      return {
+        ok: false,
+        fieldErrors: {
+          ...rest,
+          ...(priceEur && { price: priceEur }),
+          ...(mileageKm && { mileage: mileageKm }),
+          ...(imageError && { [image.kind === "upload" ? "imageFile" : "imageUrl"]: imageError }),
+        },
+        values,
+      };
+    }
+    revalidateCars(ctx.slug);
+    return { ok: true, id: result.car.id, ...(result.notice && { notice: result.notice }) };
   } catch (err) {
-    return { values: values(form), error: refused(err), needsDetails: text(form, "manual") === "1" };
+    if (err instanceof CarNotFoundError) notFound();
+    if (err instanceof ForbiddenError) return { ok: false, fieldErrors: {}, error: "forbidden", values };
+    if (err instanceof DealerReadOnlyError) return { ok: false, fieldErrors: {}, error: "readOnly", values };
+    if (err instanceof CarLimitError) return { ok: false, fieldErrors: {}, error: "limit", values };
+    throw err;
   }
 }
 
-export async function updateCarAction(_prev: UpdateCarState, form: FormData): Promise<UpdateCarState> {
+export async function setCarActiveAction(form: FormData): Promise<void> {
   const { ctx } = await requireDealerUser();
-  let result: Awaited<ReturnType<typeof updateCar>>;
+  let notice: CarListNotice | undefined;
   try {
-    result = await updateCar(ctx, text(form, "id"), values(form));
+    await setCarActive(ctx, text(form, "id"), text(form, "active") === "1");
   } catch (err) {
-    return { values: values(form), error: refused(err) };
+    if (err instanceof CarNotFoundError) notFound();
+    if (err instanceof ForbiddenError) notice = "forbidden";
+    else if (err instanceof DealerReadOnlyError) notice = "readOnly";
+    else if (err instanceof CarLimitError) notice = "limit";
+    else throw err;
   }
-  if ("notFound" in result) notFound();
-  if (!result.ok) return { values: values(form), errors: result.errors };
-  refresh();
-  return { savedAt: Date.now() };
+  if (notice) {
+    redirect(carsListHref(`${await getSurfaceBasePath()}/cars`, parseCarStatusFilter(text(form, "filter")), notice));
+  }
+  revalidateCars(ctx.slug);
 }
 
-export async function setCarActiveAction(prev: CarToggleState, form: FormData): Promise<CarToggleState> {
-  const { ctx } = await requireDealerUser();
-  const active = text(form, "active") === "true";
-  let result: Awaited<ReturnType<typeof setCarActive>>;
+export async function autofillFromAvtonetAction(url: string): Promise<AutofillResult> {
+  await requireDealerUser();
   try {
-    result = await setCarActive(ctx, text(form, "id"), active);
-  } catch (err) {
-    return { active: prev.active, error: refused(err) };
+    const result = await fetchAvtonetListing(typeof url === "string" ? url.trim() : "");
+    if (!result.ok) return result;
+    const { priceEur, ...fields } = result.fields;
+    return { ok: true, fields: { ...fields, ...(priceEur !== undefined && { price: priceEur }) } };
+  } catch {
+    return { ok: false, reason: "http_error" };
   }
-  if (!result.ok) notFound();
-  refresh();
-  return { active };
-}
-
-export async function deleteCarAction(_prev: DeleteCarState, form: FormData): Promise<DeleteCarState> {
-  const { ctx } = await requireDealerUser();
-  let result: Awaited<ReturnType<typeof deleteCar>>;
-  try {
-    result = await deleteCar(ctx, text(form, "id"));
-  } catch (err) {
-    return { error: refused(err) };
-  }
-  if ("notFound" in result) notFound();
-  if ("hasBookings" in result) return { error: "hasBookings" };
-  refresh();
-  return {};
 }

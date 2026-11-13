@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { CarCard } from "@/components/signature";
+import { CarCard } from "@/components/signature/CarCard";
 import { Card, CardHeader, Container, Eyebrow, Grid, Heading, Stack, Text } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { formatDateShort, ticketDateParts, zonedToUtc } from "@/lib/date";

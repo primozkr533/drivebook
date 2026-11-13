@@ -130,6 +130,51 @@ describe("phase-1 schema", () => {
     expect(ids.some((id) => /^\d+$/.test(id))).toBe(false);
   });
 
+  it("has the car admin columns, active defaulting to true, and a (dealer_id, active) index", async () => {
+    const result = await db.execute<{ column_name: string; data_type: string; is_nullable: string; column_default: string | null }>(sql`
+      SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'cars'`);
+    const columns = new Map(result.rows.map((r) => [r.column_name, r]));
+    const expected: Record<string, [string, string]> = {
+      make: ["text", "NO"],
+      model: ["text", "NO"],
+      year: ["integer", "NO"],
+      price_eur: ["integer", "NO"],
+      image_key: ["text", "YES"],
+      avto_net_url: ["text", "YES"],
+      active: ["boolean", "NO"],
+      created_at: ["timestamp with time zone", "NO"],
+      updated_at: ["timestamp with time zone", "NO"],
+    };
+    for (const [name, [type, nullable]] of Object.entries(expected)) {
+      expect(columns.get(name)?.data_type, name).toBe(type);
+      expect(columns.get(name)?.is_nullable, name).toBe(nullable);
+    }
+    expect(columns.get("active")?.column_default).toBe("true");
+    expect(columns.get("created_at")?.column_default).toBe("now()");
+    expect(columns.get("updated_at")?.column_default).toBe("now()");
+
+    const { dealer } = await insertDealer();
+    const [car] = await db
+      .insert(cars)
+      .values({
+        dealerId: dealer.id,
+        make: "Škoda",
+        model: "Fabia",
+        year: 2020,
+        priceEur: 11900,
+        body: "sedan",
+        avtoNetUrl: "https://www.avto.net/Ads/details.asp?id=3",
+      })
+      .returning();
+    expect(car.active).toBe(true);
+    expect(car.imageKey).toBeNull();
+
+    const indexes = await db.execute<{ indexdef: string }>(sql`
+      SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'cars_dealer_id_active_idx'`);
+    expect(indexes.rows[0]?.indexdef).toContain("(dealer_id, active)");
+  });
+
   it("keeps dealer user emails lowercased and unique across dealers", async () => {
     const { plan, dealer } = await insertDealer();
     const [other] = await db

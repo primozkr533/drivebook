@@ -21,7 +21,7 @@ export default async function BookingsPage({ searchParams }: Props) {
   const query = (await searchParams) ?? {};
   const carParam = typeof query.car === "string" ? query.car : undefined;
   const today = ljubljanaNow().dateISO;
-  const [t, cars] = await Promise.all([getTranslations("bookings"), listCarsForAdmin(ctx)]);
+  const [t, cars] = await Promise.all([getTranslations("bookings"), listCarsForAdmin(ctx, { status: "all" })]);
   const carId = carParam && cars.some((c) => c.id === carParam) ? carParam : undefined;
   const list = await listBookings(ctx, { fromDate: today, days: RANGE_DAYS, carId });
 

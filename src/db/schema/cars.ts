@@ -15,16 +15,13 @@ export const cars = pgTable(
     make: text("make").notNull(),
     model: text("model").notNull(),
     trim: text("trim"),
-    // Read from the avto.net listing when possible, otherwise entered by the dealer.
-    year: integer("year"),
+    year: integer("year").notNull(),
+    priceEur: integer("price_eur").notNull(),
     mileageKm: integer("mileage_km"),
-    priceEur: integer("price_eur"),
-    body: carBody("body"),
-    avtoNetUrl: text("avto_net_url").notNull(),
-    // Remote listing photo (avto.net), shown as-is; imageKey is a stored upload.
-    imageUrl: text("image_url"),
+    body: carBody("body").notNull(),
+    avtoNetUrl: text("avto_net_url"),
     imageKey: text("image_key"),
-    // Dealer's note, shown to customers on the public page.
+    // Dealer's note, shown to customers on the public page and booking page.
     notes: text("notes"),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -33,6 +30,7 @@ export const cars = pgTable(
   },
   (t) => [
     index("cars_dealer_id_idx").on(t.dealerId),
+    index("cars_dealer_id_active_idx").on(t.dealerId, t.active),
     unique("cars_dealer_avto_net_url_unique").on(t.dealerId, t.avtoNetUrl),
   ],
 );

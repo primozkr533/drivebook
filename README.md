@@ -13,6 +13,19 @@ Or locally: `npm install && npm run dev`.
 
 The design system (tokens, primitives, signature components, rules) is documented in `CLAUDE.md → Design system`.
 
+## Dev vs production compose
+
+| | Dev — `docker-compose.yml` | Production — `docker-compose.prod.yml` |
+| --- | --- | --- |
+| Command | `docker compose up --build` | `docker compose -f docker-compose.prod.yml up -d --build` |
+| Services | `db`, `web` (+ `worker`) | `db`, one-shot `migrate`, `web`, `worker`, `backup`, `caddy` |
+| Entry point | http://localhost:3000 (`*.drivebook.localhost`, dev aliases on) | Caddy on 80/443 with a wildcard certificate for `BASE_DOMAIN` and `*.BASE_DOMAIN` |
+| Migrations / seed | on server start, demo seed included | `migrate` runs before `web`/`worker`; no demo seed |
+| Providers | console mocks when keys are absent | real Twilio/Brevo required unless `ALLOW_FAKE_PROVIDERS=1` (staging only) |
+| Backups | — | nightly at 03:00, kept 14 days in the `backups` volume |
+
+Server setup, DNS, `.env`, the first Superadmin, staging, backups/restore and updates: see [docs/deploy.md](docs/deploy.md).
+
 ## Local setup
 
 On a fresh clone the only step is:

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { CarCard, HoursStrip } from "@/components/signature";
+import { cache } from "react";
+import { CarCard } from "@/components/signature/CarCard";
+import { HoursStrip } from "@/components/signature/HoursStrip";
 import { ButtonLink, Card, CardHeader, Container, Grid, Heading, Stack, Text } from "@/components/ui";
 import { addDays, ljubljanaNow } from "@/lib/date";
 import { getClosedDatesBetween, isDealerClosed } from "@/server/data/availability";
@@ -19,11 +21,12 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-async function loadDealer(slug: string) {
+// Shared by generateMetadata and the page so the slug resolves once per request.
+const loadDealer = cache(async (slug: string) => {
   const resolved = await resolveDealerSlug(slug);
   if (resolved.kind !== "current") notFound();
   return resolved;
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { dealer } = await loadDealer((await params).slug);
@@ -31,14 +34,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function DealerPage({ params, searchParams }: Props) {
-  const [{ slug }, query, h, t, holidayT] = await Promise.all([
-    params,
+  const [{ ctx, dealer }, query, h, t, holidayT] = await Promise.all([
+    params.then(({ slug }) => loadDealer(slug)),
     searchParams,
     headers(),
     getTranslations("dealerPage"),
     getTranslations("holidays"),
   ]);
-  const { ctx, dealer } = await loadDealer(slug);
   const suspended = dealer.status === "suspended";
   const now = ljubljanaNow();
   const [hours, cars, todayClosed, upcoming] = await Promise.all([
@@ -87,13 +89,14 @@ export default async function DealerPage({ params, searchParams }: Props) {
                     <Text tone="muted">{t("noCars")}</Text>
                   ) : (
                     <Grid cols={2} from="sm">
-                      {model.cars.map(({ car, selected }) => (
+                      {model.cars.map(({ car, selected }, i) => (
                         <CarCard
                           key={car.id}
                           car={car}
                           selected={selected}
+                          priority={i === 0}
                           labels={carLabels}
-                          action={
+                          actions={
                             <ButtonLink href={bookHref(car.id)} variant={selected ? "brand" : "secondary"} data-testid={`book-${car.id}`}>
                               {t("bookCar")}
                             </ButtonLink>

@@ -33,7 +33,14 @@ export async function DealerSiteShell({
   const name = dealer.logoUrl ? (
     // The stored-file URL is app-relative and served on every host, so no base-path prefix.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={dealer.logoUrl} alt={dealer.name} className={compact ? "h-10 w-auto max-w-full object-contain" : "h-16 w-auto max-w-full object-contain"} />
+    <img
+      src={dealer.logoUrl}
+      alt={dealer.name}
+      width={256}
+      height={64}
+      decoding="async"
+      className={compact ? "h-10 w-40 max-w-full object-contain object-left" : "h-16 w-64 max-w-full object-contain object-left"}
+    />
   ) : (
     dealer.name
   );

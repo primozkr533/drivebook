@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { DriveTicket } from "@/components/signature";
+import { DriveTicket } from "@/components/signature/DriveTicket";
 import { ButtonLink, Card, Container, Grid, Stack, Text } from "@/components/ui";
 import { formatDateShort, formatTime, ticketDateParts } from "@/lib/date";
 import { getPublicBooking } from "@/server/data/bookings";

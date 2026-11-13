@@ -1,5 +1,5 @@
 {
-  "id": "6dc47581-5171-41dd-a52d-7d10418b2945",
+  "id": "d3213c50-fa71-4c3a-a0d5-603685c91fa2",
   "prevId": "98ba84e0-1aca-451e-b578-0d797ab13e5e",
   "version": "7",
   "dialect": "postgresql",
@@ -1743,26 +1743,20 @@
           "name": "year",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
-        },
-        "mileage_km": {
-          "name": "mileage_km",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "price_eur": {
           "name": "price_eur",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "body": {
           "name": "body",
           "type": "car_body",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "avto_net_url": {
           "name": "avto_net_url",
@@ -1770,20 +1764,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "image_url": {
-          "name": "image_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "image_key": {
           "name": "image_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notes": {
-          "name": "notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1832,6 +1814,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "cars_dealer_id_active_idx": {
+          "name": "cars_dealer_id_active_idx",
+          "columns": [
+            {
+              "expression": "dealer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1862,189 +1865,6 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.bookings": {
-      "name": "bookings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "dealer_id": {
-          "name": "dealer_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "car_id": {
-          "name": "car_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "booking_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "booking_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'confirmed'"
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_name": {
-          "name": "customer_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_phone": {
-          "name": "customer_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_email": {
-          "name": "customer_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "customer_note": {
-          "name": "customer_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cancelled_at": {
-          "name": "cancelled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "bookings_dealer_starts_idx": {
-          "name": "bookings_dealer_starts_idx",
-          "columns": [
-            {
-              "expression": "dealer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "starts_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "bookings_car_starts_idx": {
-          "name": "bookings_car_starts_idx",
-          "columns": [
-            {
-              "expression": "car_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "starts_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "bookings_dealer_id_dealers_id_fk": {
-          "name": "bookings_dealer_id_dealers_id_fk",
-          "tableFrom": "bookings",
-          "tableTo": "dealers",
-          "columnsFrom": [
-            "dealer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "bookings_car_id_cars_id_fk": {
-          "name": "bookings_car_id_cars_id_fk",
-          "tableFrom": "bookings",
-          "tableTo": "cars",
-          "columnsFrom": [
-            "car_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "bookings_valid_range": {
-          "name": "bookings_valid_range",
-          "value": "\"bookings\".\"ends_at\" > \"bookings\".\"starts_at\""
-        }
-      },
       "isRLSEnabled": false
     },
     "public.audit_log": {
@@ -2363,22 +2183,6 @@
       "values": [
         "superadmin",
         "support"
-      ]
-    },
-    "public.booking_kind": {
-      "name": "booking_kind",
-      "schema": "public",
-      "values": [
-        "test_drive",
-        "viewing"
-      ]
-    },
-    "public.booking_status": {
-      "name": "booking_status",
-      "schema": "public",
-      "values": [
-        "confirmed",
-        "cancelled"
       ]
     },
     "public.car_body": {

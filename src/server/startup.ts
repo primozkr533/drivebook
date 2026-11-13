@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { getDb, type Db } from "@/db/client";
 import { runMigrations } from "@/db/migrate";
 import { runSeed } from "@/db/seed";
-import { getConfig } from "@/lib/config";
+import { assertProductionProviders, getConfig } from "@/lib/config";
 
 // Arbitrary app-wide key so concurrent replicas serialise migrate + seed.
 export const STARTUP_LOCK_KEY = 4_172_026_101;
@@ -44,7 +44,9 @@ export const startupReady: Promise<boolean> = new Promise((resolve) => {
   resolveReady = resolve;
 });
 
+// Rejects (instead of resolving false) only when production providers are misconfigured.
 export async function runStartupTasks(options: StartupOptions = {}): Promise<boolean> {
+  assertProductionProviders(getConfig());
   const ok = await runTasks(options).then(
     () => true,
     (error: unknown) => {
