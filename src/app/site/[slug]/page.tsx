@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { CarCard, HoursStrip } from "@/components/signature";
+import { cache } from "react";
+import { CarCard } from "@/components/signature/CarCard";
+import { HoursStrip } from "@/components/signature/HoursStrip";
 import { ButtonLink, Card, CardHeader, Container, Grid, Heading, Shell, Stack, Text } from "@/components/ui";
 import { brandStyle } from "@/lib/color";
 import { addDays, ljubljanaNow } from "@/lib/date";
@@ -19,11 +21,12 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-async function loadDealer(slug: string) {
+// Shared by generateMetadata and the page so the slug resolves once per request.
+const loadDealer = cache(async (slug: string) => {
   const resolved = await resolveDealerSlug(slug);
   if (resolved.kind !== "current") notFound();
   return resolved;
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { dealer } = await loadDealer((await params).slug);
@@ -31,14 +34,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function DealerPage({ params, searchParams }: Props) {
-  const [{ slug }, query, h, t, holidayT] = await Promise.all([
-    params,
+  const [{ ctx, dealer }, query, h, t, holidayT] = await Promise.all([
+    params.then(({ slug }) => loadDealer(slug)),
     searchParams,
     headers(),
     getTranslations("dealerPage"),
     getTranslations("holidays"),
   ]);
-  const { ctx, dealer } = await loadDealer(slug);
   const suspended = dealer.status === "suspended";
   const now = ljubljanaNow();
   const [hours, cars, todayClosed, upcoming] = await Promise.all([
@@ -71,7 +73,14 @@ export default async function DealerPage({ params, searchParams }: Props) {
               {dealer.logoUrl ? (
                 // The stored-file URL is app-relative and served on every host, so no base-path prefix.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={dealer.logoUrl} alt={dealer.name} className="h-16 w-auto max-w-full object-contain" />
+                <img
+                  src={dealer.logoUrl}
+                  alt={dealer.name}
+                  width={256}
+                  height={64}
+                  decoding="async"
+                  className="h-16 w-64 max-w-full object-contain object-left"
+                />
               ) : (
                 dealer.name
               )}
@@ -146,8 +155,8 @@ export default async function DealerPage({ params, searchParams }: Props) {
                     <Text tone="muted">{t("noCars")}</Text>
                   ) : (
                     <Grid cols={2} from="sm">
-                      {model.cars.map(({ car, selected }) => (
-                        <CarCard key={car.id} car={car} selected={selected} labels={carLabels} />
+                      {model.cars.map(({ car, selected }, i) => (
+                        <CarCard key={car.id} car={car} selected={selected} priority={i === 0} labels={carLabels} />
                       ))}
                     </Grid>
                   )}

@@ -26,7 +26,7 @@ import {
 import { CarCard, DriveTicket, HoursStrip, Plate } from "@/components/signature";
 import { brandStyle, contrast, readableInk } from "@/lib/color";
 import { ThemeToggle } from "./ThemeToggle";
-import { brandDemos, cars, dealer, spacing, swatches, ticket, typeScale, upcomingClosures, weekHours } from "./content";
+import { adminCarLabels, brandDemos, cars, dealer, spacing, swatches, ticket, typeScale, upcomingClosures, weekHours } from "./content";
 
 export const metadata: Metadata = { title: "Design · DriveBook" };
 export const dynamic = "force-static";
@@ -473,6 +473,31 @@ export default function DesignPage() {
               </div>
             </Card>
           </Grid>
+
+          <div className="flex flex-col gap-4">
+            <Eyebrow>CarCard v skrbniku · showStatus, deepLink, actions</Eyebrow>
+            <Grid cols={3} from="md" gap="md">
+              {[cars[0], { ...cars[3], active: false }].map((c) => (
+                <CarCard
+                  key={c.id}
+                  car={c}
+                  showStatus
+                  deepLink={`https://demo.drivebook.si/?car=${c.id}`}
+                  labels={adminCarLabels}
+                  actions={
+                    <>
+                      <ButtonLink variant="secondary" size="sm" href="#podpis">
+                        Uredi
+                      </ButtonLink>
+                      <Button variant={c.active === false ? "secondary" : "danger"} size="sm">
+                        {c.active === false ? "Ponovno aktiviraj" : "Deaktiviraj"}
+                      </Button>
+                    </>
+                  }
+                />
+              ))}
+            </Grid>
+          </div>
         </Stack>
       </Section>
 

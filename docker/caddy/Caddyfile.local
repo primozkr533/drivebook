@@ -1,0 +1,8 @@
+# Local run of docker-compose.prod.yml (docker-compose.prod.local.yml): certificates from Caddy's internal CA.
+{$BASE_DOMAIN}, *.{$BASE_DOMAIN} {
+	tls internal
+
+	encode zstd gzip
+
+	reverse_proxy web:3000
+}

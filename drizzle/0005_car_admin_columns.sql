@@ -1,0 +1,1 @@
+CREATE INDEX "cars_dealer_id_active_idx" ON "cars" USING btree ("dealer_id","active");

@@ -15,6 +15,7 @@ Phase 1's base is in place: data model + tenant-isolated data layer, host-based 
 - `npm run create-superadmin -- --email x` — create/invite a backoffice superadmin and print the set-password link
 - `npm run user-admin -- deactivate --surface dealer|backoffice --email x` — deactivate a user on that surface and revoke all of their sessions (unknown e-mail exits non-zero)
 - `npm run user-admin -- resend-invite --surface dealer|backoffice --email x` — re-issue an invited user's 7-day set-password link, queue the invitation e-mail and print the link
+- `docker compose -f docker-compose.prod.yml up -d --build` — production stack (reads `.env`; Caddy on 80/443, `migrate` runs before `web`/`worker`); see `docs/deploy.md`
 
 FARM-RUN-CONTRACT
 ```
@@ -37,6 +38,10 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/server/data/backoffice/` — the cross-tenant backoffice data layer: `withBackofficeMutation` (`mutate.ts`; Superadmin-only, audited, not blocked by dealer status), `validateSlug` (`slug.ts`), dealers (list/detail/create/manage, `dealers.ts`), plans (`plans.ts`), backoffice users (`users.ts`). Every function calls `requireBackofficeRole` first.
 - `src/server/data/settings-dealer.ts`, `src/server/data/settings-branding.ts`, `src/server/data/settings-booking.ts`, `src/server/data/settings-hours.ts`, `src/server/data/dealer-users.ts` — Owner-only settings services (every function calls `requireDealerRole(ctx, ['owner'])` first)
 - `src/server/data/availability.ts` — `isDealerClosed(ctx, date)`, `getOpeningRangesForDate`, `getClosedDatesBetween` (shared with the phase-2 slot engine)
+- `src/server/data/cars.ts` — cars data service: public reads (`listActiveCars`, `getCar`) plus admin list/create/update/setActive (`listCarsForAdmin`, `createCar`, `updateCar`, `setCarActive`) for Owner + Salesperson
+- `src/server/cars/images.ts` — car image service: resize to ≤1200 px wide WebP, URL download with SSRF guard, stored under `cars/<publicId>.webp` keys
+- `src/server/cars/avtonet.ts` — avto.net auto-fill: listing fetch (avto.net hosts only, 10 s timeout) + Open Graph/meta parser
+- `src/app/dealer-admin/(app)/cars` — cars pages (list, new, edit) and server actions (`actions.ts`), for both roles (Owner + Salesperson)
 - `src/app/dealer-admin/(app)/settings/*` (`src/app/dealer-admin/(app)/settings/`) and `src/app/dealer-admin/(app)/users` — Owner settings and users pages, gated by `requireOwnerPage()` in `src/app/dealer-admin/(app)/owner-gate.tsx`
 - `src/server/auth/permissions.ts` — role helpers (`requireDealerRole`, `requireBackofficeRole`)
 - `src/server/routing.ts` + `src/proxy.ts` — host routing (Next 16 proxy)
@@ -50,6 +55,12 @@ test-login: POST /api/test/login (requires FARM_TEST_AUTH=1; sets db_app_session
 - `src/app/backoffice/(app)/dealers`, `src/app/backoffice/(app)/plans`, `src/app/backoffice/(app)/users` — operator pages (Support: read-only UI, writes refused on the server)
 - `src/i18n/request.ts` + `messages/sl/` — translations (backoffice strings in `messages/sl/backoffice.json`)
 - `tests/unit` (Vitest), `tests/e2e` (Playwright), `tests/setup` (test DB + global setup)
+- `docker-compose.prod.yml` — production stack (`db`, one-shot `migrate`, `web`, `worker`, `backup`, `caddy`; only `caddy` publishes ports); `docker-compose.prod.local.yml` overrides it for a local run
+- `docker/caddy` — Caddy image (xcaddy + Cloudflare DNS) and `docker/caddy/Caddyfile` (wildcard certificate via DNS-01, reverse proxy to `web:3000`)
+- `docker/backup` — backup image: nightly `pg_dump` + uploads archive, retention, `docker/backup/restore.sh`, round-trip check `docker/backup/test-restore.sh`
+- `docs/deploy.md` — production/staging deployment, backups and updates
+- `docs/performance.md` — how to measure the public dealer page with Lighthouse (mobile, 360 px) and the recorded score
+- `src/app/fonts.ts` + `src/fonts/` — self-hosted Archivo / JetBrains Mono subsets (`next/font/local`) behind `--font-archivo` / `--font-jetbrains-mono` in `src/styles/tokens.css`; rebuild them with `src/fonts/subset-font.py`
 
 ## Required environment variables
 All have dev defaults in `docker-compose.yml` and are documented in `.env.example`. Provider keys are interpolated in compose as `${VAR:-}`, so they are optional; when absent, console mocks are used.
@@ -75,6 +86,13 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
 - `BREVO_SENDER_NAME` — display name on outgoing email
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token for dealer custom domains
 - `CLOUDFLARE_ZONE_ID` — Cloudflare zone ID for dealer custom domains
+- `ALLOW_FAKE_PROVIDERS` — `1` lets a production `web`/`worker` start with the fake SMS/e-mail adapters (staging only; off by default)
+
+Production stack only (`docker-compose.prod.yml`, Caddy, backup; not read by the app):
+- `ACME_EMAIL` — contact e-mail for Let's Encrypt certificates
+- `CLOUDFLARE_DNS_API_TOKEN` — Cloudflare token with Zone:DNS:Edit on the zone, for Caddy's DNS-01 wildcard certificate (separate from `CLOUDFLARE_API_TOKEN`)
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` — production Postgres container credentials; compose builds `DATABASE_URL` from them (`POSTGRES_PASSWORD` is required)
+- `BACKUP_RETENTION_DAYS` — days of nightly backups kept in the `backups` volume (default 14)
 
 ## API Contract
 - `POST /api/test/login`
@@ -88,6 +106,7 @@ All have dev defaults in `docker-compose.yml` and are documented in `.env.exampl
   - 304 when `If-None-Match` matches the ETag.
   - 404 for an invalid key (traversal etc.) or a missing file.
   - `HEAD` is supported with the same headers and no body; other methods are not defined.
+  - Car images use the same route (keys `cars/<publicId>.webp`, `Content-Type: image/webp`).
 
 ## Tenant isolation
 1. Every dealer-scoped table has `dealer_id`; dealer-scoped reads and writes go only through functions in `src/server/data/` that take a `DealerContext` as their first argument. Pages, route handlers, middleware and components never import `@/db/client` or `@/db/schema` (a guard test enforces this).
@@ -164,3 +183,11 @@ Host routing lives in `src/server/routing.ts` (pure, unit-tested) and is wired u
 - Uploaded files use unique keys (`logos/<publicId>.<ext>`) and are served with `Cache-Control: public, max-age=31536000, immutable`; replacing a logo deletes the old file after commit. The logo type is detected from content; unsafe SVGs are rejected, and SVGs are served with a sandbox CSP.
 - `isDealerClosed` covers holidays (unless marked open anyway for that year) and custom closures; weekdays with no opening ranges are handled by `getOpeningRangesForDate` returning [].
 - The SMS sender name defaults to the dealer name with diacritics removed, limited to 11 letters/digits/spaces.
+- Production refuses to start with fake SMS/e-mail providers unless ALLOW_FAKE_PROVIDERS=1 (staging only).
+- `NextIntlClientProvider` is mounted only in the admin `(app)` layouts (dealer admin and backoffice), not in the root layout, so public pages ship no intl runtime or messages. Client components elsewhere receive translated strings as props.
+- Cars are managed by Owners and Salespeople. Deactivated cars are hidden from every public read (list and ?car= deep link); by-id car operations for another dealer return not-found (404).
+- Car images are never hot-linked: uploads and image URLs are downloaded, resized to max 1200 px wide, re-encoded as WebP and stored under cars/<publicId>.webp; replacing an image deletes the old file after commit.
+- avto.net auto-fill only fetches URLs on avto.net or its subdomains (10 s timeout, realistic User-Agent) and never blocks saving: any failure or block shows a notice and manual entry always works.
+- A car's deep link is {scheme}://{slug}.{BASE_DOMAIN}{port}/?car={publicId}, shown with CopyLink in the cars list.
+- Car actions on a read_only/suspended dealer (save, deactivate, reactivate) never crash: the list toggles redirect back to the cars list with a status query param, and the list shows the restricted-account notice (`errors.readOnly`).
+- A car image URL (auto-filled or pasted) that can't be downloaded at save time never blocks saving: the car is saved without the image (on edit the current image is kept) and a non-blocking notice says the photo wasn't fetched. Upload validation errors (too large, unsupported/unsafe type) still block.

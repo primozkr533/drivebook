@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dealerSiteOrigin, getConfig, isReservedSlug, resetConfigForTests, surfaceOrigin } from "@/lib/config";
+import { assertProductionProviders, dealerSiteOrigin, getConfig, isReservedSlug, resetConfigForTests, surfaceOrigin } from "@/lib/config";
 
 const originalEnv = process.env;
 const SECRET = "x".repeat(32);
@@ -36,6 +36,7 @@ describe("getConfig", () => {
     expect(config.farmTestAuth).toBe(false);
     expect(config.devInboxEnabled).toBe(true);
     expect(config.notifyFake).toBe(false);
+    expect(config.allowFakeProviders).toBe(false);
     expect(config.publicUrlScheme).toBe("https");
     expect(config.publicUrlPort).toBeNull();
   });
@@ -80,6 +81,33 @@ describe("getConfig", () => {
   it("passes a valid AUTH_SECRET through in production", () => {
     setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET });
     expect(getConfig().authSecret).toBe(SECRET);
+  });
+
+  describe("sample AUTH_SECRET", () => {
+    const DEV_SECRET = "drivebook-dev-auth-secret-not-for-production";
+    const prod = { APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si" };
+
+    it("throws in production when AUTH_SECRET is the dev secret", () => {
+      setEnv({ ...prod, AUTH_SECRET: DEV_SECRET });
+      expect(() => getConfig()).toThrow(/AUTH_SECRET is the sample development secret/);
+    });
+
+    it("allows the dev secret in production when ALLOW_FAKE_PROVIDERS=1", () => {
+      setEnv({ ...prod, AUTH_SECRET: DEV_SECRET, ALLOW_FAKE_PROVIDERS: "1" });
+      expect(getConfig().authSecret).toBe(DEV_SECRET);
+    });
+
+    it("accepts a real secret in production", () => {
+      setEnv({ ...prod, AUTH_SECRET: SECRET });
+      expect(getConfig().authSecret).toBe(SECRET);
+    });
+
+    it("leaves development and test unaffected", () => {
+      for (const appEnv of ["development", "test"]) {
+        setEnv({ APP_ENV: appEnv, AUTH_SECRET: DEV_SECRET });
+        expect(getConfig().authSecret).toBe(DEV_SECRET);
+      }
+    });
   });
 
   it("treats auth/notify flags as true only for the literal 1", () => {
@@ -174,6 +202,64 @@ describe("getConfig", () => {
   it("never throws for missing provider keys in production", () => {
     setEnv({ APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET });
     expect(getConfig().providers).toEqual({ sms: "console", email: "console", cloudflare: false });
+  });
+});
+
+describe("allowFakeProviders", () => {
+  it("is true only for ALLOW_FAKE_PROVIDERS=1", () => {
+    setEnv({ ALLOW_FAKE_PROVIDERS: "1" });
+    expect(getConfig().allowFakeProviders).toBe(true);
+    setEnv({ ALLOW_FAKE_PROVIDERS: "true" });
+    expect(getConfig().allowFakeProviders).toBe(false);
+    setEnv({});
+    expect(getConfig().allowFakeProviders).toBe(false);
+  });
+});
+
+describe("assertProductionProviders", () => {
+  const prod = { APP_ENV: "production", DATABASE_URL: "postgres://x", BASE_DOMAIN: "drivebook.si", AUTH_SECRET: SECRET };
+  const providers = {
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "token",
+    TWILIO_FROM_NUMBER: "+38640111222",
+    BREVO_API_KEY: "brevo-key",
+    BREVO_SENDER_EMAIL: "noreply@drivebook.si",
+  };
+
+  function check(env: Record<string, string>) {
+    setEnv(env);
+    return () => assertProductionProviders(getConfig());
+  }
+
+  it("passes in production with every provider key set", () => {
+    expect(check({ ...prod, ...providers })).not.toThrow();
+  });
+
+  it("throws in production naming the missing provider keys", () => {
+    const run = check({ ...prod, ...providers, TWILIO_AUTH_TOKEN: "", BREVO_API_KEY: " " });
+    expect(run).toThrow(
+      "Production requires real providers: missing TWILIO_AUTH_TOKEN, BREVO_API_KEY (set ALLOW_FAKE_PROVIDERS=1 for staging)",
+    );
+  });
+
+  it("throws in production when no provider keys are set", () => {
+    expect(check(prod)).toThrow(
+      /missing TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, BREVO_API_KEY, BREVO_SENDER_EMAIL/,
+    );
+  });
+
+  it("throws in production when NOTIFY_FAKE=1 even with every key set", () => {
+    expect(check({ ...prod, ...providers, NOTIFY_FAKE: "1" })).toThrow(/NOTIFY_FAKE=1/);
+  });
+
+  it("does not throw in production when ALLOW_FAKE_PROVIDERS=1", () => {
+    expect(check({ ...prod, ALLOW_FAKE_PROVIDERS: "1", NOTIFY_FAKE: "1" })).not.toThrow();
+  });
+
+  it("never throws outside production", () => {
+    expect(check({ NOTIFY_FAKE: "1" })).not.toThrow();
+    expect(check({ APP_ENV: "development" })).not.toThrow();
+    expect(check({ APP_ENV: "test", NOTIFY_FAKE: "1" })).not.toThrow();
   });
 });
 

@@ -1,0 +1,1 @@
+ALTER TABLE "cars" ALTER COLUMN "avto_net_url" DROP NOT NULL;

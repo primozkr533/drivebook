@@ -8,6 +8,8 @@ const { runMigrations } = await import("@/db/migrate");
 const { runSeed } = await import("@/db/seed");
 const { runStartupTasks, startupReady, withRetry } = await import("@/server/startup");
 
+const originalEnv = { ...process.env };
+
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "log").mockImplementation(() => {});
@@ -18,6 +20,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.RUN_MIGRATIONS_ON_START;
   delete process.env.SEED_ON_START;
+  process.env = { ...originalEnv };
   resetConfigForTests();
 });
 
@@ -79,5 +82,22 @@ describe("runStartupTasks", () => {
     expect(connect).toHaveBeenCalled();
     expect(runMigrations).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/FAILED/), expect.any(Error));
+  });
+
+  it("rejects before touching the database when production providers are missing", async () => {
+    Object.assign(process.env, {
+      APP_ENV: "production",
+      DATABASE_URL: "postgres://x",
+      BASE_DOMAIN: "drivebook.si",
+      AUTH_SECRET: "x".repeat(32),
+      NOTIFY_FAKE: "1",
+    });
+    resetConfigForTests();
+    const db = vi.fn();
+
+    await expect(runStartupTasks({ db })).rejects.toThrow(/Production requires real providers/);
+
+    expect(db).not.toHaveBeenCalled();
+    expect(runMigrations).not.toHaveBeenCalled();
   });
 });
