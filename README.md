@@ -68,6 +68,10 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+### Test / demo server
+
+See [`deploy/README.md`](deploy/README.md): Docker Compose with Caddy (automatic HTTPS) on one server, fake SMS / e-mail in a password-protected inbox.
+
 ### Environment variables
 
 All variables and their defaults are listed in [`.env.example`](.env.example); copying it to `.env` is optional. Provider keys (Twilio, Brevo, Cloudflare) are optional — when they are absent the app uses console mocks for SMS, email and DNS.

@@ -1,0 +1,17 @@
+# Certificates are issued per host name (no wildcard certificate needed).
+# Every dealer subdomain must be listed in DEALER_HOSTS (deploy/.env).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN}, app.{$DOMAIN}, admin.{$DOMAIN}, {$DEALER_HOSTS} {
+	encode zstd gzip
+
+	# The dev inbox shows every SMS code and login link: keep it behind a password.
+	@inbox path /_dev/inbox /_dev/inbox/*
+	basic_auth @inbox {
+		{$INBOX_USER} {$INBOX_PASSWORD_HASH}
+	}
+
+	reverse_proxy web:3000
+}
